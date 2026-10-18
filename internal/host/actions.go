@@ -232,18 +232,22 @@ func (m Model) run(id string, a bound) (Model, tea.Cmd) {
 	case a.Input == widget.TextInput:
 		m.overlay = &overlay{kind: prompting, widget: id, action: a, value: []rune(a.Value), cursor: utf8.RuneCountInString(a.Value)}
 	default:
-		return m, m.invoke(id, a, "")
+		return m.invoke(id, a, "")
 	}
 	return m, nil
 }
 
-func (m Model) invoke(id string, a bound, text string) tea.Cmd {
+// invoke performs host-provided Actions itself and hands the rest to the Widget.
+func (m Model) invoke(id string, a bound, text string) (Model, tea.Cmd) {
+	if a.by == hide {
+		return m.setHidden(id, true), nil
+	}
 	actor, ok := m.widgets[id].widget.(widget.Actor)
 	if !ok {
-		return nil
+		return m, nil
 	}
 	inv := widget.Invocation{Action: a.ID, Item: a.item, Text: text, Now: m.opts.Ports.Clock.Now()}
-	return func() tea.Msg {
+	return m, func() tea.Msg {
 		res, err := actor.Invoke(context.Background(), inv)
 		return actedMsg{id: id, action: a.Action, result: res, err: err}
 	}

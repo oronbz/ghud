@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/oronbz/ghud/internal/hosttest"
+	"github.com/oronbz/ghud/internal/layout"
 	"github.com/oronbz/ghud/internal/widget"
 )
 
@@ -149,5 +150,27 @@ func TestThePaletteMovesItsSelectionAndAsksBeforeAConfirmedAction(t *testing.T) 
 	h.Press("y")
 	if len(*todoRan) != 1 || (*todoRan)[0].Action != "purge" {
 		t.Errorf("Todo ran %+v, want purge after confirming", *todoRan)
+	}
+}
+
+func TestHideFromThePaletteHidesTheWidgetAndRecordsIt(t *testing.T) {
+	h, _, todoRan := mailAndTodo(t, mailbox(), todoList())
+	h.Press("2", "ctrl+k", "t", "o", "h", "i", "d", "e", "enter")
+
+	if _, _, ok := h.Find("─ Todo "); ok {
+		t.Errorf("Todo still drawn after Hide:\n%s", h.Screen())
+	}
+	if footer := h.Line(23); !strings.Contains(footer, "Tab/hl focus") {
+		t.Errorf("footer %q after hiding the focused Todo, want ghud unfocused", footer)
+	}
+	if len(*todoRan) != 0 {
+		t.Errorf("Hide reached the Widget: %+v", *todoRan)
+	}
+	saved, err := layout.Load(h.Paths.Config)
+	if err != nil {
+		t.Fatalf("layout.json not written: %v", err)
+	}
+	if !slices.Equal(saved.Hidden, []string{"todo"}) {
+		t.Errorf("saved hidden %v, want [todo]", saved.Hidden)
 	}
 }
