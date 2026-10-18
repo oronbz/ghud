@@ -139,13 +139,27 @@ type bound struct {
 	item string
 	// subject names the Item in confirm questions.
 	subject string
+	// by is the host-provided Action this is, or none for the Widget's own.
+	by hostAction
 }
 
-// actions are Widget id's Actions as they apply now: the selected Item's, then the Widget's.
+type hostAction int
+
+const (
+	none hostAction = iota
+	hide
+)
+
+// actions are Widget id's Actions as they apply now: the selected Item's,
+// then the Widget's, then the host-provided ones.
 func (m Model) actions(id string) []bound {
 	r, ok := m.rects()[id]
-	if !ok || m.widgets[id].setup != "" {
+	if !ok {
 		return nil
+	}
+	host := []bound{{Action: widget.Action{ID: "hide", Label: "hide"}, by: hide}}
+	if m.widgets[id].setup != "" {
+		return host
 	}
 	p := m.payloadIn(id, r)
 	var out []bound
@@ -158,7 +172,7 @@ func (m Model) actions(id string) []bound {
 	for _, a := range p.Actions {
 		out = append(out, bound{Action: a})
 	}
-	return out
+	return append(out, host...)
 }
 
 // subject is the text of an Item's first flex Field, the name it goes by.
@@ -180,16 +194,24 @@ func subject(p widget.Payload, it widget.Item) string {
 func (m Model) hints(id string) []render.Hint {
 	var hs []render.Hint
 	for _, a := range m.actions(id) {
-		k := a.Key
-		if k == "" && a.Primary {
-			k = "enter"
+		if k := shownKey(a); k != "" {
+			hs = append(hs, render.Hint{Key: k, Label: a.Label})
 		}
-		if k == "" || hostKey(k) && !(k == "enter" && a.Primary) {
-			continue
-		}
-		hs = append(hs, render.Hint{Key: k, Label: a.Label})
 	}
 	return hs
+}
+
+// shownKey is the key that runs a while its Widget is focused, or "" when it
+// has none or a host key shadows it.
+func shownKey(a bound) string {
+	k := a.Key
+	if k == "" && a.Primary {
+		k = "enter"
+	}
+	if k == "" || hostKey(k) && !(k == "enter" && a.Primary) {
+		return ""
+	}
+	return k
 }
 
 // actionFor is the focused Widget's Action bound to key, Item Actions first.
