@@ -70,10 +70,43 @@ func (n notes) Invoke(_ context.Context, inv widget.Invocation) (widget.Result, 
 	case "edit":
 		return n.save(inv.Text, inv.Base, inv.Now)
 	case "editor":
-		// The editor may be one that can't create the note's directory.
-		return widget.Result{Edit: n.file}, os.MkdirAll(filepath.Dir(n.file), 0o755)
+		return n.copyForEditor()
+	case "editor-save":
+		return n.saveEditorCopy(inv.Text, inv.Base, inv.Now)
 	}
 	return widget.Result{}, fmt.Errorf("notes has no Action %q", inv.Action)
+}
+
+// copyForEditor hands $EDITOR a private copy of the note, under the same
+// name so the editor knows it's markdown. Editing the note in place would
+// let the editor's save silently replace a version saved meanwhile.
+func (n notes) copyForEditor() (widget.Result, error) {
+	src, err := n.read()
+	if err != nil {
+		return widget.Result{}, err
+	}
+	dir, err := os.MkdirTemp("", "ghud-edit-")
+	if err != nil {
+		return widget.Result{}, err
+	}
+	cp := filepath.Join(dir, filepath.Base(n.file))
+	if err := os.WriteFile(cp, []byte(src), 0o600); err != nil {
+		return widget.Result{}, err
+	}
+	return widget.Result{Edit: cp, Then: &widget.Action{ID: "editor-save", Label: "$EDITOR", Value: src}}, nil
+}
+
+// saveEditorCopy saves the editor's copy over the note, if the user changed it.
+func (n notes) saveEditorCopy(cp, base string, now time.Time) (widget.Result, error) {
+	b, err := os.ReadFile(cp)
+	if err != nil {
+		return widget.Result{}, err
+	}
+	defer os.RemoveAll(filepath.Dir(cp))
+	if string(b) == base {
+		return widget.Result{}, nil
+	}
+	return n.save(string(b), base, now)
 }
 
 // save writes text over the note. When the note changed on disk since base
