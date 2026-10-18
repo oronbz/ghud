@@ -18,3 +18,7 @@ func (noEventKit) Request(context.Context, Entity) (Access, error) { return Acce
 func (noEventKit) Events(context.Context, time.Time, time.Time) ([]Event, error) {
 	return nil, ErrNoAccess
 }
+
+func (noEventKit) Reminders(context.Context) ([]Reminder, error) { return nil, ErrNoAccess }
+
+func (noEventKit) Complete(context.Context, string) error { return ErrNoAccess }

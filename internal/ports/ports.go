@@ -112,6 +112,22 @@ type EventKit interface {
 	// Events are the events from every calendar that overlap [from, to).
 	// Without granted access it fails rather than asking.
 	Events(ctx context.Context, from, to time.Time) ([]Event, error)
+	// Reminders are the reminders not yet completed, from every list.
+	// Without granted access it fails rather than asking.
+	Reminders(ctx context.Context) ([]Reminder, error)
+	// Complete marks reminder id completed and saves it.
+	Complete(ctx context.Context, id string) error
+}
+
+// Reminder is one open reminder.
+type Reminder struct {
+	ID    string
+	Title string
+	List  string
+	// Due is zero when the reminder has no due date.
+	Due time.Time
+	// DateOnly is set when Due is a day without a time of day.
+	DateOnly bool
 }
 
 // Event is one occurrence of a calendar event.
