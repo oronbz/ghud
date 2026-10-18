@@ -128,6 +128,39 @@ func TestALiveConfigEditAddingAWidgetShowsIt(t *testing.T) {
 	}
 }
 
+func TestTheReloadAfterGhudsOwnConfigEditsChangesNothingMore(t *testing.T) {
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 80, Height: 20, Config: oneClock})
+
+	runFromPalette(t, h, "add calendar")
+	h.Press("2", "n")
+	h.Changed(configFile(h))
+	if n := strings.Count(h.Screen(), "─ Calendar "); n != 1 {
+		t.Fatalf("Calendar shown %d times after the reload, want once:\n%s", n, h.Screen())
+	}
+	if _, _, ok := h.Find("November 2026"); !ok {
+		t.Errorf("the reload rebuilt the added Calendar:\n%s", h.Screen())
+	}
+
+	runFromPalette(t, h, "calendar remove")
+	h.Changed(configFile(h))
+	if _, _, ok := h.Find("─ Calendar"); ok {
+		t.Errorf("the removed Calendar came back with the reload:\n%s", h.Screen())
+	}
+}
+
+func TestSettingsChangedInTheEditorApplyWhenTheConfigReloads(t *testing.T) {
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 80, Height: 20, Config: oneClock})
+	h.Editor.OnEdit = func(path string) error {
+		return os.WriteFile(path, []byte(oneClock+"title = \"Home\"\n"), 0o644)
+	}
+
+	runFromPalette(t, h, "clock edit settings")
+	h.Changed(configFile(h))
+	if _, _, ok := h.Find("╭─ Home "); !ok {
+		t.Errorf("the title set in the editor isn't shown:\n%s", h.Screen())
+	}
+}
+
 func TestALayoutSavedElsewhereMidArrangementIsWhatEscRevertsTo(t *testing.T) {
 	root := savedLayout(t, threeAcross)
 	a, b := phoneticAt(t, root), phoneticAt(t, root)

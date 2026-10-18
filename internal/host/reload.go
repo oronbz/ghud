@@ -17,7 +17,7 @@ type filesChangedMsg struct{ files []string }
 // watch points the file watcher at every file ghud reads: config.toml,
 // layout.json and each Watcher Widget's files.
 func (m Model) watch() Model {
-	files := []string{m.configFile, m.layoutFile()}
+	files := []string{m.edits.Path, m.layoutFile()}
 	for _, id := range m.ids() {
 		for _, f := range watched(m.widgets[id].widget) {
 			if !slices.Contains(files, f) {
@@ -39,7 +39,7 @@ func (m Model) nextChange() tea.Cmd {
 func (m Model) filesChanged(msg filesChangedMsg) (Model, tea.Cmd) {
 	cmds := []tea.Cmd{m.nextChange()}
 	var fresh []string
-	if slices.Contains(msg.files, m.configFile) {
+	if slices.Contains(msg.files, m.edits.Path) {
 		var cmd tea.Cmd
 		m, fresh, cmd = m.reloadConfig()
 		cmds = append(cmds, cmd)
@@ -55,23 +55,11 @@ func (m Model) filesChanged(msg filesChangedMsg) (Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-// ReloadConfig re-reads config.toml and applies it, as when the file
-// changes on disk; the Add and Remove Widget Actions can call it after
-// editing the file.
-func (m Model) ReloadConfig() (Model, tea.Cmd) {
-	m, fresh, cmd := m.reloadConfig()
-	cmds := []tea.Cmd{cmd}
-	for _, id := range fresh {
-		cmds = append(cmds, m.refresh(id))
-	}
-	return m, tea.Batch(cmds...)
-}
-
 // reloadConfig applies config.toml as it now is, returning the Widgets it
 // built afresh, which need a refresh. A config that doesn't parse leaves
 // everything as it was and says why until it parses again.
 func (m Model) reloadConfig() (Model, []string, tea.Cmd) {
-	cfg, err := config.Load(m.configFile, m.types, m.opts.Locale)
+	cfg, err := config.Load(m.edits.Path, m.edits.Types, m.opts.Locale)
 	if err != nil {
 		m.sticky = err.Error()
 		return m, nil, nil
@@ -85,7 +73,7 @@ func (m Model) reloadConfig() (Model, []string, tea.Cmd) {
 	m.colors.name, m.colors.over = cfg.Theme, cfg.Colors
 	m = m.resolveTheme()
 
-	m, ids, fresh := m.place(cfg)
+	m, ids, fresh := m.placeAll(cfg)
 	m.layout = m.layout.Join(ids)
 	if m.arranging {
 		m.before = m.before.Join(ids)
@@ -108,6 +96,9 @@ func (m Model) reloadConfig() (Model, []string, tea.Cmd) {
 	}
 	if m.overlay != nil && !slices.Contains(ids, m.overlay.widget) {
 		m.overlay = nil
+	}
+	if m.menu != nil && !slices.Contains(ids, m.menu.widget) {
+		m.menu = nil
 	}
 	for _, id := range m.ids() {
 		m.clampList(id)

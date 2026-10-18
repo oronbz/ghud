@@ -42,9 +42,10 @@ type Clipboard interface {
 	Copy(text string) tea.Cmd
 }
 
-// Editor hands a file to $EDITOR while the TUI is suspended, then calls done.
+// Editor hands a file to $EDITOR while the TUI is suspended, then calls
+// done. A line above zero opens the file at that line.
 type Editor interface {
-	Edit(path string, done func(error) tea.Msg) tea.Cmd
+	Edit(path string, line int, done func(error) tea.Msg) tea.Cmd
 }
 
 type Keyring interface {

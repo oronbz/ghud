@@ -73,17 +73,23 @@ type Model struct {
 	overlay *overlay
 	// editing is INSERT mode's editor, which takes every key but insertHostKeys.
 	editing *editing
-	// palette is the open ^K Action palette.
+	// palette is the open ^K Action palette; menu the open Action menu.
 	palette *palette
+	menu    *menu
 	// held is the modifier (Shift or Ctrl) held on its own, which swaps the
 	// footer to that modifier's keys; only kitty-protocol terminals report it.
 	held   tea.KeyMod
 	colors colors
-	// types are the Widget types config.toml can place; cfg is the last
-	// config.toml that parsed, read from configFile.
-	types      []widget.Type
-	cfg        config.Config
-	configFile string
+	// mouse is config.toml's mouse option: capture clicks, drags and the wheel.
+	mouse bool
+	// hover is the title or seam under the pointer while no button is held.
+	hover *layout.Zone
+	drag  *drag
+	click click
+	// edits is how host Actions change config.toml.
+	edits config.Editor
+	// base is what every Widget is built with, besides its settings.
+	base widget.Config
 	// sticky is the config.toml problem shown whenever no toast is, until the file is fixed.
 	sticky string
 	// ticks tells the current redraw timer from ones a config reload replaced.
@@ -96,7 +102,9 @@ type placed struct {
 	widget widget.Widget
 	// setup, when set, is the needs-setup hint drawn instead of the Widget.
 	setup string
-	// block is the [[widget]] block the Widget was built from.
+	// ref finds the Widget's block in config.toml; block is what it said
+	// when the Widget was built.
+	ref   config.Ref
 	block config.Widget
 }
 
@@ -119,7 +127,6 @@ func New(o Options) Model {
 	if file == "" {
 		file = filepath.Join(o.Paths.Config, config.FileName)
 	}
-	m.types, m.configFile = types, file
 	cfg, err := config.Load(file, types, o.Locale)
 	var problems []string
 	if err != nil {
@@ -128,7 +135,8 @@ func New(o Options) Model {
 	m.sticky = toastOf(append(problems, cfg.Problems...))
 	m.colors = colors{pinned: !o.Theme.IsZero(), name: cfg.Theme, over: cfg.Colors, asking: o.Theme.IsZero()}
 	m = m.resolveTheme()
-	m, ids, _ := m.place(cfg)
+	m.edits = config.Editor{Path: file, LockDir: filepath.Join(o.Paths.Data, "locks"), Types: types, Locale: o.Locale}
+	m, ids, _ := m.placeAll(cfg)
 	// An unreadable layout.json falls back to the default rather than blocking launch.
 	saved, err := layout.Load(o.Paths.Config)
 	if err != nil {
@@ -138,36 +146,46 @@ func New(o Options) Model {
 	return m.watch()
 }
 
-// place builds cfg's Widgets and returns their ids in config order, and
+// placeAll builds cfg's Widgets and returns their ids in config order, and
 // the ids of those it built afresh. A Widget whose block, and the globals
 // Widgets are built from, haven't changed is kept as it was, state and all.
-func (m Model) place(cfg config.Config) (Model, []string, []string) {
+func (m Model) placeAll(cfg config.Config) (Model, []string, []string) {
 	old := m.widgets
-	sameGlobals := cfg.TimeFormat == m.cfg.TimeFormat && cfg.WeekStart == m.cfg.WeekStart
-	m.widgets, m.cfg = make(map[string]placed, len(cfg.Widgets)), cfg
+	sameGlobals := cfg.TimeFormat == m.base.TimeFormat && cfg.WeekStart == m.base.WeekStart
+	m.mouse = cfg.Mouse
+	m.base = widget.Config{TimeFormat: cfg.TimeFormat, WeekStart: cfg.WeekStart, DataDir: m.opts.Paths.Data, Ports: m.opts.Ports}
+	m.widgets = make(map[string]placed, len(cfg.Widgets))
 	var ids, fresh []string
 	for _, wc := range cfg.Widgets {
-		id := wc.ID
+		id, ref := wc.ID, config.Ref{ID: wc.ID}
 		// Widgets sharing an id are all in needs setup; suffixes keep them apart on screen only.
 		for n := 2; m.widgets[id].title != ""; n++ {
-			id = fmt.Sprintf("%s~%d", wc.ID, n)
+			id, ref.N = fmt.Sprintf("%s~%d", wc.ID, n), n-1
 		}
 		ids = append(ids, id)
 		if p, ok := old[id]; ok && sameGlobals && p.block.Equal(wc) {
+			p.ref = ref
 			m.widgets[id] = p
 			continue
 		}
-		p := placed{title: wc.Title, setup: wc.Setup, block: wc}
-		if i := slices.IndexFunc(m.types, func(t widget.Type) bool { return t.Name == wc.Type }); i >= 0 {
-			p.typ = m.types[i]
-		}
-		if p.setup == "" {
-			p.widget = p.typ.New(widget.Config{Settings: wc.Settings, TimeFormat: cfg.TimeFormat, WeekStart: cfg.WeekStart, DataDir: m.opts.Paths.Data, Ports: m.opts.Ports})
-		}
-		m.widgets[id] = p
+		m.widgets[id] = m.place(wc, ref)
 		fresh = append(fresh, id)
 	}
 	return m, ids, fresh
+}
+
+// place builds the Widget a [[widget]] block configures, unless it needs setup.
+func (m Model) place(wc config.Widget, ref config.Ref) placed {
+	p := placed{title: wc.Title, setup: wc.Setup, ref: ref, block: wc}
+	if i := slices.IndexFunc(m.edits.Types, func(t widget.Type) bool { return t.Name == wc.Type }); i >= 0 {
+		p.typ = m.edits.Types[i]
+	}
+	if p.setup == "" {
+		c := m.base
+		c.Settings = wc.Settings
+		p.widget = p.typ.New(c)
+	}
+	return p
 }
 
 func (m Model) Init() tea.Cmd {
@@ -203,6 +221,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.edited(msg)
 	case filesChangedMsg:
 		return m.filesChanged(msg)
+	case configEditedMsg:
+		return m.configEdited(msg)
 	case toastExpiredMsg:
 		if m.toast.seq == msg.seq {
 			m.toast = toast{}
@@ -213,6 +233,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.now = msg.at
 		return m, m.nextTick()
+	case tea.MouseMsg:
+		return m.mouseMsg(msg)
 	case tea.KeyPressMsg:
 		return m.key(msg)
 	case tea.KeyReleaseMsg:
@@ -254,32 +276,24 @@ func (m Model) View() tea.View {
 		ReportAllKeysAsEscapeCodes: true,
 		ReportAssociatedText:       true,
 	}
+	if m.mouse {
+		v.MouseMode = tea.MouseModeAllMotion
+	}
 	if m.w == 0 || m.h == 0 {
 		return v
 	}
 	var layers []*lipgloss.Layer
-	if f := m.frame(); f.TooSmall {
-		layers = append(layers, lipgloss.NewLayer(m.tooSmall(f.Need)))
+	s := m.scene()
+	if s.TooSmall {
+		layers = append(layers, lipgloss.NewLayer(m.tooSmall(s.Need)))
 	} else {
-		for _, t := range f.Tiles {
-			tile := render.Tile{
-				Title:   t.Title,
-				W:       t.W,
-				H:       t.H,
-				Focused: t.ID == m.focus,
-				Arrange: m.arranging && t.ID == m.focus,
-				Payload: m.payloadIn(t.ID, t.Rect),
-				List:    m.lists[t.ID].render(),
-			}
-			if tile.Focused && !m.arranging {
-				tile.Hints = m.hints(t.ID)
-			}
+		for i, t := range s.Tiles {
 			if m.editing != nil && t.ID == m.editing.widget {
-				tile.Payload, tile.Hints = widget.Payload{}, []render.Hint{{Key: "esc", Label: "save"}}
 				layers = append(layers, m.editorLayer(t.X, t.Y))
 			}
-			layers = append(layers, lipgloss.NewLayer(render.Draw(m.opts.Theme, tile)).X(t.X).Y(t.Y))
+			layers = append(layers, lipgloss.NewLayer(render.Draw(m.opts.Theme, s.tiles[i])).X(t.X).Y(t.Y))
 		}
+		layers = append(layers, m.dragLayers(s)...)
 		layers = append(layers, lipgloss.NewLayer(m.footer()).Y(m.h-footerHeight))
 	}
 	if m.picking {
@@ -291,11 +305,15 @@ func (m Model) View() tea.View {
 	if m.palette != nil {
 		layers = append(layers, m.paletteLayer())
 	}
+	if m.menu != nil {
+		layers = append(layers, m.menuLayer())
+	}
 	if m.overlay != nil {
 		layers = append(layers, m.overlayLayer())
 	}
 	canvas := lipgloss.NewCanvas(m.w, m.h)
 	lipgloss.NewCompositor(layers...).Draw(canvas, image.Rect(0, 0, m.w, m.h))
+	m.tint(canvas, s.Tint)
 	v.SetContent(canvas.Render())
 	return v
 }
@@ -348,10 +366,57 @@ func (m Model) tooSmall(need layout.Size) string {
 }
 
 // Zones are the hit zones of the frame View draws.
-func (m Model) Zones() []layout.Zone { return m.frame().Zones }
+func (m Model) Zones() []layout.Zone { return m.scene().Zones }
+
+// scene is the one layout pass View draws and the mouse hits: the frame's
+// geometry, each tile's content, and the zones of the Item rows and key
+// hints placed in it.
+type scene struct {
+	layout.Frame
+	// tiles are drawn at Frame.Tiles' places.
+	tiles []render.Tile
+}
+
+func (m Model) scene() scene {
+	s := scene{Frame: m.frame()}
+	if s.TooSmall {
+		return s
+	}
+	for _, t := range s.Tiles {
+		tile := render.Tile{
+			Title:   t.Title,
+			W:       t.W,
+			H:       t.H,
+			Focused: t.ID == m.focus,
+			Arrange: m.arranging && t.ID == m.focus,
+			Handle:  t.Handle,
+			Payload: m.payloadIn(t.ID, t.Rect),
+			List:    m.lists[t.ID].render(),
+		}
+		switch {
+		case m.editing != nil && t.ID == m.editing.widget:
+			tile.Payload, tile.Hints = widget.Payload{}, []render.Hint{{Key: "esc", Label: "save"}}
+		case tile.Focused && !m.arranging:
+			tile.Hints = m.hints(t.ID)
+			for i, at := range render.HintSlots(tile.Hints, t.W) {
+				s.Zones = append(s.Zones, layout.Zone{Kind: layout.Hint, ID: t.ID, Index: i, Rect: layout.Rect{X: t.X + at.X, Y: t.Y + t.H - 1, W: at.W, H: 1}})
+			}
+		}
+		if tile.Payload.IsList() {
+			rows := render.Rows(tile.Payload)
+			for i := range t.H - 2 {
+				if j := tile.List.Top + i; j < len(rows) && rows[j] != render.Header {
+					s.Zones = append(s.Zones, layout.Zone{Kind: layout.Item, ID: t.ID, Index: rows[j], Rect: layout.Rect{X: t.X + 1, Y: t.Y + 1 + i, W: t.W - 2, H: 1}})
+				}
+			}
+		}
+		s.tiles = append(s.tiles, tile)
+	}
+	return s
+}
 
 func (m Model) frame() layout.Frame {
-	f := layout.Compute(m.layout, m.titles(), m.w, m.h-footerHeight)
+	f := layout.Compute(m.layout, m.titles(), m.w, m.h-footerHeight, m.pointer())
 	f.Need.H += footerHeight
 	return f
 }

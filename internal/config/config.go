@@ -50,6 +50,10 @@ type Widget struct {
 	line  int
 }
 
+// Line is the 1-based line of the Widget's [[widget]] header, or 0 for a
+// Widget of the built-in default set.
+func (w Widget) Line() int { return w.line }
+
 // Equal reports whether two blocks configure the same Widget, wherever in
 // the file they are.
 func (w Widget) Equal(o Widget) bool {
@@ -92,6 +96,11 @@ func Load(path string, types []widget.Type, loc Locale) (Config, error) {
 	if err != nil {
 		return Default(types, loc), fmt.Errorf("%s: %w", name, err)
 	}
+	return parse(name, src, types, loc)
+}
+
+// parse reads config source named name, as Load does.
+func parse(name string, src []byte, types []widget.Type, loc Locale) (Config, error) {
 	var doc map[string]any
 	if err := toml.Unmarshal(src, &doc); err != nil {
 		var de *toml.DecodeError
