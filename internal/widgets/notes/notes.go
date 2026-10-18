@@ -5,8 +5,10 @@ package notes
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -37,7 +39,9 @@ func (n notes) Refresh(context.Context, time.Time) (widget.Payload, error) {
 	if err != nil {
 		return widget.Payload{}, err
 	}
-	p := widget.Payload{Wrap: true}
+	p := widget.Payload{Wrap: true, Actions: []widget.Action{
+		{ID: "edit", Key: "i", Label: "edit", Verb: widget.Edit, Input: widget.InlineInput, Value: src},
+	}}
 	for _, l := range strings.Split(strings.TrimSuffix(src, "\n"), "\n") {
 		l = strings.TrimSuffix(strings.ReplaceAll(l, "\t", "    "), "\r")
 		if strings.HasPrefix(l, "#") {
@@ -47,6 +51,18 @@ func (n notes) Refresh(context.Context, time.Time) (widget.Payload, error) {
 		p.Lines = append(p.Lines, widget.Text(theme.Fg, l))
 	}
 	return p, nil
+}
+
+func (n notes) Invoke(_ context.Context, inv widget.Invocation) (widget.Result, error) {
+	switch inv.Action {
+	case "edit":
+		text := inv.Text
+		if text != "" && !strings.HasSuffix(text, "\n") {
+			text += "\n"
+		}
+		return widget.Result{Toast: "Saved " + filepath.Base(n.file)}, widget.WriteFile(n.file, []byte(text))
+	}
+	return widget.Result{}, fmt.Errorf("notes has no Action %q", inv.Action)
 }
 
 func (n notes) read() (string, error) {

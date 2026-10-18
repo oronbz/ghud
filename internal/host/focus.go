@@ -91,6 +91,9 @@ func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	if m.overlay != nil {
 		return m.overlayKey(msg)
 	}
+	if m.editing != nil && editsKey(msg) {
+		return m.editKey(msg)
+	}
 	if m.picking {
 		return m.pickerKey(msg), nil
 	}

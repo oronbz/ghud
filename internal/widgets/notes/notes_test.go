@@ -73,6 +73,32 @@ func TestNotesShowsTheNoteAsWrappedText(t *testing.T) {
 	}
 }
 
+func TestIEditsTheNoteInInsertModeAndEscSavesIt(t *testing.T) {
+	h := withNotes(t, "Buy milk\n", hosttest.Options{Width: 40, Height: 9})
+	h.Press("1", "i")
+	if got := h.Line(8); !strings.HasPrefix(got, " INSERT ") {
+		t.Fatalf("footer while editing = %q", got)
+	}
+	h.Type("Call mum, quick?")
+	if got := body(h, 2); got[1] != "Call mum, quick?" {
+		t.Fatalf("editor shows %q", got)
+	}
+	if b := readNote(t, notesFile(h.Root, "notes.md")); b != "Buy milk\n" {
+		t.Fatalf("saved before esc: %q", b)
+	}
+
+	h.Press("esc")
+	if got := readNote(t, notesFile(h.Root, "notes.md")); got != "Buy milk\nCall mum, quick?\n" {
+		t.Fatalf("notes.md = %q", got)
+	}
+	if got := h.Line(8); !strings.HasPrefix(got, " NORMAL ") {
+		t.Fatalf("footer after esc = %q", got)
+	}
+	if got := body(h, 2); got[0] != "Buy milk" || got[1] != "Call mum, quick?" {
+		t.Fatalf("Widget after save shows %q", got)
+	}
+}
+
 func TestJAndKScrollTheFocusedNote(t *testing.T) {
 	h := withNotes(t, "one\ntwo\nthree\nfour\nfive\nsix\nseven\n", hosttest.Options{Width: 30, Height: 7})
 	shown := func() string { return strings.Join(body(h, 4), " ") }

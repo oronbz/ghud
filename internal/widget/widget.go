@@ -184,6 +184,9 @@ const (
 	NoInput Input = iota
 	// TextInput asks for one line in the host prompt.
 	TextInput
+	// InlineInput edits Value in the host's multi-line editor over the
+	// Widget's body (INSERT mode); esc ends it and passes the text on.
+	InlineInput
 )
 
 type Line struct {

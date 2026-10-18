@@ -68,6 +68,8 @@ type Model struct {
 	lists   map[string]listState
 	// overlay is the open confirm or text prompt, which takes every key.
 	overlay *overlay
+	// editing is INSERT mode's editor, which takes every key but insertHostKeys.
+	editing *editing
 	// held is the modifier (Shift or Ctrl) held on its own, which swaps the
 	// footer to that modifier's keys; only kitty-protocol terminals report it.
 	held   tea.KeyMod
@@ -150,6 +152,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		for _, id := range m.ids() {
 			m.clampList(id)
 		}
+		m.sizeEditor()
+	case tea.PasteMsg:
+		if m.editing != nil && m.overlay == nil {
+			return m.editKey(msg)
+		}
 	case refreshedMsg:
 		return m.refreshed(msg)
 	case actedMsg:
@@ -220,6 +227,10 @@ func (m Model) View() tea.View {
 			}
 			if tile.Focused && !m.arranging {
 				tile.Hints = m.hints(t.ID)
+			}
+			if m.editing != nil && t.ID == m.editing.widget {
+				tile.Payload, tile.Hints = widget.Payload{}, []render.Hint{{Key: "esc", Label: "save"}}
+				layers = append(layers, m.editorLayer(t.X, t.Y))
 			}
 			layers = append(layers, lipgloss.NewLayer(render.Draw(m.opts.Theme, tile)).X(t.X).Y(t.Y))
 		}

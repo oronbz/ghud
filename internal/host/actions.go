@@ -219,6 +219,8 @@ func (m Model) run(id string, a bound) (Model, tea.Cmd) {
 		m.overlay = &overlay{kind: confirming, widget: id, action: a}
 	case a.Input == widget.TextInput:
 		m.overlay = &overlay{kind: prompting, widget: id, action: a, value: []rune(a.Value), cursor: utf8.RuneCountInString(a.Value)}
+	case a.Input == widget.InlineInput:
+		return m.startEditing(id, a)
 	default:
 		return m, m.invoke(id, a, "")
 	}
