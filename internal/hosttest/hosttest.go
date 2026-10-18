@@ -51,6 +51,9 @@ type Options struct {
 	Env map[string]string
 	// Version is the ghud version the app runs as (see host.Options.Version).
 	Version string
+	// BundleDir stands in for the directory ghud is installed in, where it
+	// finds the Plugins it ships with; empty ships none.
+	BundleDir string
 }
 
 var DefaultNow = time.Date(2026, 10, 18, 14, 5, 9, 0, time.UTC)
@@ -137,6 +140,7 @@ func New(t testing.TB, o Options) *Host {
 		Theme:     th,
 		Types:     o.Types,
 		Version:   o.Version,
+		BundleDir: o.BundleDir,
 		Ports: ports.Ports{
 			Clock:     h.Clock,
 			Opener:    h.Opener,

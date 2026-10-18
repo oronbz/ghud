@@ -55,6 +55,9 @@ type Options struct {
 	// Version is the ghud version agent skills are stamped with; "" means
 	// the version this binary was built as.
 	Version string
+	// BundleDir is the directory ghud's executable is installed in, where
+	// the Plugins it ships with sit; empty ships none.
+	BundleDir string
 }
 
 type Model struct {

@@ -36,6 +36,9 @@ type System struct {
 	Ports *ports.Ports
 	// ProgramOptions are extra Bubble Tea options, such as a fixed window size in tests.
 	ProgramOptions []tea.ProgramOption
+	// Executable is ghud's own path; the Plugins ghud ships with sit next
+	// to it. Empty ships none.
+	Executable string
 }
 
 const usage = `Usage: ghud [--config <path>] [--close-key <keys>]... [--version]
@@ -107,8 +110,9 @@ func Run(s System) int {
 		pp = *s.Ports
 	}
 
+	bundle := bundleDir(s.Executable)
 	reference := func() string {
-		types, problems := host.Types(p, configFile, locale, s.Getenv)
+		types, problems := host.Types(p, configFile, bundle, locale, s.Getenv)
 		for _, problem := range problems {
 			fmt.Fprintln(s.Stderr, "ghud:", problem)
 		}
@@ -128,7 +132,7 @@ func Run(s System) int {
 	case "config init":
 		return configInit(s, configFile, reference())
 	case "auth jira":
-		types, _ := host.Types(p, configFile, locale, s.Getenv)
+		types, _ := host.Types(p, configFile, bundle, locale, s.Getenv)
 		return authJira(s, pp, config.Editor{Path: configFile, LockDir: filepath.Join(p.Data, "locks"), Types: types, Locale: locale})
 	default:
 		fmt.Fprintf(s.Stderr, "ghud: unknown command %q\n\n%s", strings.Join(fs.Args(), " "), usage)
@@ -140,7 +144,7 @@ func Run(s System) int {
 		// Deferred, so a crash or a signal that ends the program restores herdr's menu too.
 		defer herdrRightClick(s.Getenv, pp.Commands, "herdr")
 	}
-	m := host.New(host.Options{Paths: p, ConfigFile: configFile, Locale: locale, Ports: pp, CloseKeys: closeKeys})
+	m := host.New(host.Options{Paths: p, ConfigFile: configFile, Locale: locale, Ports: pp, CloseKeys: closeKeys, BundleDir: bundle})
 	var opts []tea.ProgramOption
 	// Real files get Bubble Tea's defaults, which open /dev/tty when stdin is piped.
 	if _, isFile := s.Stdin.(*os.File); !isFile {
@@ -160,6 +164,18 @@ func Run(s System) int {
 		return 1
 	}
 	return 0
+}
+
+// bundleDir is the directory ghud is installed in: the real file's, since
+// package managers may link ghud into a shared bin.
+func bundleDir(exe string) string {
+	if exe == "" {
+		return ""
+	}
+	if real, err := filepath.EvalSymlinks(exe); err == nil {
+		return filepath.Dir(real)
+	}
+	return filepath.Dir(exe)
 }
 
 // repeated collects every value of a repeatable flag.
