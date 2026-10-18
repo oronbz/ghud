@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/oronbz/ghud/internal/theme"
 	"github.com/oronbz/ghud/internal/widget"
 )
 
@@ -30,6 +31,25 @@ func Reference(types []widget.Type, loc Locale) string {
 	b.WriteString("\n")
 	for _, s := range Globals(loc) {
 		setting(s)
+		b.WriteString("\n")
+	}
+
+	prose("Colour overrides. Everything is drawn with 13 colour tokens; set one to")
+	prose("change it everywhere, plugins included. [colors.dark] applies when the terminal")
+	prose("background is dark (or unknown), [colors.light] when it's light, on top of")
+	prose("`theme`. Values are \"#rrggbb\"; an invalid one is reported and ignored. The")
+	prose("values below are ghud's own palette. Tokens:")
+	for _, tok := range theme.Tokens() {
+		prose("  %-7s %s", tok, tok.Use())
+	}
+	for _, mode := range []struct {
+		name    string
+		palette theme.Theme
+	}{{"dark", theme.Dark()}, {"light", theme.Light()}} {
+		option("[colors.%s]", mode.name)
+		for _, tok := range theme.Tokens() {
+			option("%s = %q", tok, theme.Hex(mode.palette.Color(tok)))
+		}
 		b.WriteString("\n")
 	}
 

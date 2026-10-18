@@ -137,6 +137,34 @@ func TestConfigDefaultPrintsTheFullyCommentedReference(t *testing.T) {
 	}
 }
 
+func TestConfigDefaultDocumentsTheThemeAndEveryColourToken(t *testing.T) {
+	s, _, stdout, stderr := sandbox(t, nil, "", "config", "default")
+	if code := run(t, s); code != 0 {
+		t.Fatalf("exit code %d, stderr: %s", code, stderr)
+	}
+	ref := stdout.String()
+	for _, want := range []string{`#theme = "ghud"`, "#[colors.dark]", "#[colors.light]"} {
+		if !strings.Contains(ref, want+"\n") {
+			t.Errorf("reference lacks %q:\n%s", want, ref)
+		}
+	}
+	darkAt, lightAt := strings.Index(ref, "#[colors.dark]\n"), strings.Index(ref, "#[colors.light]\n")
+	if darkAt < 0 || lightAt < darkAt {
+		t.Fatalf("reference lacks [colors.dark] followed by [colors.light]:\n%s", ref)
+	}
+	dark, light := ref[darkAt:lightAt], ref[lightAt:]
+	for _, tok := range []string{"bg", "sel", "line", "faint", "dim", "fg", "bright", "accent", "warn", "ok", "bad", "info", "alt"} {
+		for name, table := range map[string]string{"dark": dark, "light": light} {
+			if !strings.Contains(table, "\n#"+tok+` = "#`) {
+				t.Errorf("[colors.%s] in the reference lacks the token %q", name, tok)
+			}
+		}
+	}
+	if !strings.Contains(dark, `#accent = "#8aa9ff"`) || !strings.Contains(light, `#accent = "#3f63d8"`) {
+		t.Errorf("token defaults aren't each palette's own colours:\n%s", ref)
+	}
+}
+
 func TestConfigDefaultFollowsTheLocale(t *testing.T) {
 	s, _, stdout, stderr := sandbox(t, map[string]string{"LANG": "de_DE.UTF-8"}, "", "config", "default")
 
