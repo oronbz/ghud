@@ -82,6 +82,22 @@ func TestTasksShowsOpenTasksWithDueDatesAndHidesDoneOnes(t *testing.T) {
 	}
 }
 
+func TestDueLabelsMoveOnAtMidnight(t *testing.T) {
+	h := withTasks(t, sample, hosttest.Options{Width: 40, Height: 7})
+
+	h.Advance(9*time.Hour + 54*time.Minute)
+	if line := h.Line(1); !strings.HasSuffix(line, "Tue │") {
+		t.Fatalf("a minute before midnight the passport is due %q, want Tue", line)
+	}
+	h.Advance(2 * time.Minute)
+	if line := h.Line(1); !strings.HasSuffix(line, "tomorrow │") {
+		t.Errorf("just after midnight the passport is due %q, want tomorrow", line)
+	}
+	if line := h.Line(3); !strings.HasSuffix(line, "overdue │") {
+		t.Errorf("just after midnight the dentist is due %q, want overdue", line)
+	}
+}
+
 func TestNarrowingTheWidgetDropsTheDueColumnBeforeTheTitle(t *testing.T) {
 	h := withTasks(t, sample, hosttest.Options{Width: 30, Height: 7})
 	if got, want := h.Line(1), "│ ○ Renew passport       Tue │"; got != want {

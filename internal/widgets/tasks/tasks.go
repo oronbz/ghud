@@ -30,7 +30,8 @@ var Type = widget.Type{
 		Description: "The markdown checklist; empty means tasks.md in the data dir.",
 		Why:         "Point it at a synced folder, or give two Tasks Widgets their own lists.",
 	}},
-	New: newTasks,
+	Midnight: true,
+	New:      newTasks,
 }
 
 func newTasks(c widget.Config) widget.Widget {
