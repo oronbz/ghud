@@ -9,7 +9,7 @@ import (
 
 // keyLines maps every key to its 1-based line, so problems can name
 // file:line. Keys are "theme", "widget.0" (the block header), "widget.0.id",
-// "plugin.1" and so on; keys inside other tables aren't recorded.
+// "plugin.1", "colors.dark" (a table header), "colors.dark.accent" and so on.
 func keyLines(src []byte) map[string]int {
 	lines := map[string]int{}
 	var p unstable.Parser
@@ -32,7 +32,16 @@ func keyLines(src []byte) map[string]int {
 				prefix += "."
 			}
 		case unstable.Table:
-			prefix = "\x00" // keys of other tables are ignored
+			name, line := keyPath(&p, e)
+			for k := name; ; k = k[:strings.LastIndex(k, ".")] {
+				if _, seen := lines[k]; !seen {
+					lines[k] = line
+				}
+				if !strings.Contains(k, ".") {
+					break
+				}
+			}
+			prefix = name + "."
 		case unstable.KeyValue:
 			if prefix == "\x00" {
 				continue

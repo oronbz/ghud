@@ -22,6 +22,7 @@ type colors struct {
 	// pinned themes come from Options.Theme and ignore the terminal.
 	pinned bool
 	name   string
+	over   theme.Overrides
 	term   theme.Terminal
 	// asking is true until the terminal has answered or colorWait passed;
 	// ghud leaves the terminal background alone meanwhile so the query
@@ -72,10 +73,14 @@ func (m Model) colorAnswer(msg tea.Msg) (Model, bool) {
 	default:
 		return m, false
 	}
+	return m.resolveTheme(), true
+}
+
+func (m Model) resolveTheme() Model {
 	if !m.colors.pinned {
-		m.opts.Theme = theme.Resolve(m.colors.name, m.colors.term)
+		m.opts.Theme = theme.Resolve(m.colors.name, m.colors.term, m.colors.over)
 	}
-	return m, true
+	return m
 }
 
 // paletteAnswer reads an OSC 4 answer ("ESC ]4;1;rgb:cccc/0000/0000 ST"),

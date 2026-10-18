@@ -6,6 +6,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"image/color"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 
 	toml "github.com/pelletier/go-toml/v2"
 
+	"github.com/oronbz/ghud/internal/theme"
 	"github.com/oronbz/ghud/internal/widget"
 )
 
@@ -26,6 +28,7 @@ type Config struct {
 	TimeFormat string
 	WeekStart  string
 	Mouse      bool
+	Colors     theme.Overrides
 	Widgets    []Widget
 	Plugins    []Plugin
 	// Problems are toast messages, each naming file:line, for options that
@@ -147,9 +150,9 @@ func (p *parser) parse(doc map[string]any, loc Locale) Config {
 				}
 			}
 			continue
-		}
-		if _, isTable := v.(map[string]any); isTable && k == "theme" {
-			continue // [theme.dark] / [theme.light] overrides belong to the theme ticket.
+		case "colors":
+			c.Colors = p.colors(v)
+			continue
 		}
 		i := slices.IndexFunc(globals, func(s widget.Setting) bool { return s.Name == k })
 		if i < 0 {
@@ -264,6 +267,51 @@ func (p *parser) plugin(i int, v any) (Plugin, bool) {
 		}
 	}
 	return Plugin{Path: path}, true
+}
+
+// colors reads the [colors.dark] and [colors.light] override tables; bad
+// entries are reported and left out.
+func (p *parser) colors(v any) theme.Overrides {
+	var o theme.Overrides
+	tables, ok := v.(map[string]any)
+	if !ok {
+		p.problem("colors", "`colors` must be [colors.dark] and [colors.light] tables")
+		return o
+	}
+	for _, mode := range p.sorted(tables, "colors.") {
+		at := "colors." + mode
+		var dst *map[theme.Token]color.Color
+		switch mode {
+		case "dark":
+			dst = &o.Dark
+		case "light":
+			dst = &o.Light
+		default:
+			p.problem(at, "unknown table [%s], use [colors.dark] or [colors.light]", at)
+			continue
+		}
+		table, ok := tables[mode].(map[string]any)
+		if !ok {
+			p.problem(at, "`%s` must be a [%s] table", at, at)
+			continue
+		}
+		*dst = map[theme.Token]color.Color{}
+		for _, k := range p.sorted(table, at+".") {
+			tok, ok := theme.Lookup(k)
+			if !ok {
+				p.problem(at+"."+k, "unknown colour token `%s` in [%s]", k, at)
+				continue
+			}
+			s, _ := table[k].(string)
+			c, ok := theme.ParseColor(s)
+			if !ok {
+				p.problem(at+"."+k, "`%s` in [%s] must be a colour like \"#ff8800\"; ignored", k, at)
+				continue
+			}
+			(*dst)[tok] = c
+		}
+	}
+	return o
 }
 
 // dedupe puts every Widget sharing an id in needs setup, since the Layout

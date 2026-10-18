@@ -11,6 +11,7 @@ import (
 	uv "github.com/charmbracelet/ultraviolet"
 
 	"github.com/oronbz/ghud/internal/hosttest"
+	"github.com/oronbz/ghud/internal/theme"
 )
 
 func hexOf(c color.Color) string {
@@ -109,6 +110,48 @@ func TestTerminalThemeFallsBackToGhudWithoutAnswers(t *testing.T) {
 	}
 	if got := hexOf(h.View().BackgroundColor); got != "#13171d" {
 		t.Errorf("terminal background %s, want the ghud dark palette's bg #13171d", got)
+	}
+}
+
+func TestAnAccentOverrideColoursTheFocusedBorder(t *testing.T) {
+	h := hosttest.New(t, hosttest.Options{Width: 40, Height: 9, Config: `
+[colors.dark]
+accent = "#ff8800"
+
+[colors.light]
+accent = "#0055aa"
+`})
+	h.Press("tab")
+
+	x, y, _ := h.Find("╭")
+	if got := fgHex(t, h, "╭"); got != "#ff8800" {
+		t.Errorf("focused border %s, want the [colors.dark] accent #ff8800", got)
+	}
+	if tok, ok := h.Fg(x, y); !ok || tok != theme.Accent {
+		t.Errorf("focused border maps to %v (%v), want the accent token", tok, ok)
+	}
+
+	h.Send(tea.BackgroundColorMsg{Color: lipgloss.Color("#ffffff")})
+	if got := fgHex(t, h, "╭"); got != "#0055aa" {
+		t.Errorf("focused border on a light terminal %s, want the [colors.light] accent #0055aa", got)
+	}
+	if got := fgHex(t, h, "Sun 18"); got != "#6b7383" {
+		t.Errorf("date %s, want the light palette's own dim #6b7383 under the override", got)
+	}
+}
+
+func TestOverridesApplyOnTopOfTheTerminalTheme(t *testing.T) {
+	h := hosttest.New(t, hosttest.Options{Width: 40, Height: 9, Config: `
+theme = "terminal"
+
+[colors.dark]
+line = "#00ff00"
+`})
+	h.Send(tea.BackgroundColorMsg{Color: lipgloss.Color("#000000")})
+	h.Send(tea.ForegroundColorMsg{Color: lipgloss.Color("#ffffff")})
+
+	if got := fgHex(t, h, "╭"); got != "#00ff00" {
+		t.Errorf("border %s, want the [colors.dark] line #00ff00", got)
 	}
 }
 

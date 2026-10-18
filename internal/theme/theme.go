@@ -5,6 +5,8 @@ package theme
 import (
 	"image/color"
 	"math"
+	"strconv"
+	"strings"
 
 	"charm.land/lipgloss/v2"
 )
@@ -35,6 +37,31 @@ func (t Token) String() string {
 		return "unknown"
 	}
 	return names[t]
+}
+
+// Lookup finds a token by its config name.
+func Lookup(name string) (Token, bool) {
+	for i, n := range names {
+		if n == name {
+			return Token(i), true
+		}
+	}
+	return 0, false
+}
+
+// ParseColor reads a "#rrggbb" or "#rgb" colour.
+func ParseColor(s string) (color.Color, bool) {
+	h, ok := strings.CutPrefix(s, "#")
+	if !ok || (len(h) != 3 && len(h) != 6) {
+		return nil, false
+	}
+	if _, err := strconv.ParseUint(h, 16, 32); err != nil {
+		return nil, false
+	}
+	if len(h) == 3 {
+		h = string([]byte{h[0], h[0], h[1], h[1], h[2], h[2]})
+	}
+	return lipgloss.Color("#" + h), true
 }
 
 // Tokens lists every token in canonical order.
@@ -102,12 +129,31 @@ type Terminal struct {
 // ansiTokens maps palette colour numbers (red, green, yellow, blue, magenta, cyan) to tokens.
 var ansiTokens = map[int]Token{1: Bad, 2: Ok, 3: Warn, 4: Accent, 5: Info, 6: Alt}
 
-// Resolve builds the named theme for what the terminal answered. ghud
-// picks its light or dark palette from the background, dark when there's
-// none. terminal derives tokens from the terminal's colours, and is ghud
-// until both foreground and background are known.
-func Resolve(name string, term Terminal) Theme {
+// Overrides are per-token colours from config.toml's [colors.dark] and
+// [colors.light], for dark and light backgrounds.
+type Overrides struct {
+	Dark, Light map[Token]color.Color
+}
+
+// Resolve builds the named theme for what the terminal answered, with the
+// overrides for its background on top. ghud picks its light or dark palette
+// from the background, dark when there's none. terminal derives tokens from
+// the terminal's colours, and is ghud until both foreground and background
+// are known.
+func Resolve(name string, term Terminal, o Overrides) Theme {
 	dark := term.Bg == nil || IsDark(term.Bg)
+	t := base(name, term, dark)
+	over := o.Dark
+	if !dark {
+		over = o.Light
+	}
+	for tok, c := range over {
+		t.colors[tok] = c
+	}
+	return t
+}
+
+func base(name string, term Terminal, dark bool) Theme {
 	t := Dark()
 	if !dark {
 		t = Light()

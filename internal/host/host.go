@@ -89,10 +89,8 @@ func New(o Options) Model {
 		problems = append(problems, err.Error())
 	}
 	m.toast = toastOf(append(problems, cfg.Problems...))
-	m.colors = colors{pinned: !o.Theme.IsZero(), name: cfg.Theme, asking: o.Theme.IsZero()}
-	if !m.colors.pinned {
-		m.opts.Theme = theme.Resolve(m.colors.name, m.colors.term)
-	}
+	m.colors = colors{pinned: !o.Theme.IsZero(), name: cfg.Theme, over: cfg.Colors, asking: o.Theme.IsZero()}
+	m = m.resolveTheme()
 	var ids []string
 	for _, wc := range cfg.Widgets {
 		id := wc.ID
