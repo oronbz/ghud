@@ -295,7 +295,8 @@ func TestScrollingPastTheEndThenUpMovesAtOnce(t *testing.T) {
 	h := withTasks(t, md.String(), hosttest.Options{Width: 30, Height: 8})
 	visible := func() string {
 		var titles []string
-		for _, l := range strings.Split(tile(h), "\n")[1:len(strings.Split(tile(h), "\n"))-1] {
+		lines := strings.Split(tile(h), "\n")
+		for _, l := range lines[1 : len(lines)-1] {
 			titles = append(titles, strings.Fields(strings.Trim(l, "│▐ ○"))[0])
 		}
 		return strings.Join(titles, " ")
@@ -331,6 +332,35 @@ func TestScrollingPastTheEndThenUpMovesAtOnce(t *testing.T) {
 	}
 	if got := strings.Split(tile(h), "\n"); !strings.Contains(got[len(got)-2], "eight") {
 		t.Errorf("shrinking hid the selection:\n%s", h.Screen())
+	}
+}
+
+func TestWithoutATasksFileTheWidgetInvitesAnAddThatCreatesIt(t *testing.T) {
+	root := t.TempDir()
+	h := hosttest.New(t, hosttest.Options{Width: 50, Height: 7, Root: root, Config: `
+[[widget]]
+type = "tasks"
+file = "lists/today.md"
+`})
+	if got, want := h.Line(1), "│ No tasks. Press a to add one.                  │"; got != want {
+		t.Errorf("empty list %q, want %q", got, want)
+	}
+	if _, _, ok := h.Find("Tasks 0"); !ok {
+		t.Errorf("empty list has no 0 count:\n%s", h.Screen())
+	}
+
+	h.Press("tab", "a")
+	typeText(h, "Plan the week due tomorrow")
+	h.Press("enter")
+	b, err := os.ReadFile(filepath.Join(paths.Under(root).Data, "lists", "today.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := string(b), "- [ ] Plan the week due:2026-10-19\n"; got != want {
+		t.Errorf("new file holds %q, want %q", got, want)
+	}
+	if !strings.Contains(h.Line(1), "Plan the week") || !strings.Contains(h.Line(1), "tomorrow") {
+		t.Errorf("first row %q, want the new task due tomorrow", h.Line(1))
 	}
 }
 
