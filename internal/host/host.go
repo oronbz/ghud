@@ -53,7 +53,9 @@ type Model struct {
 	// to revert to.
 	arranging bool
 	before    layout.Layout
-	picker    *picker
+	// picking is the w list of Widgets to show or hide, cursor its selected row.
+	picking bool
+	cursor  int
 	// toast is the message in the footer; it stays until replaced.
 	toast string
 	// held is the modifier (Shift or Ctrl) held on its own, which swaps the
@@ -185,6 +187,9 @@ func (m Model) View() tea.View {
 			})).X(t.X).Y(t.Y))
 		}
 		layers = append(layers, lipgloss.NewLayer(m.footer()).Y(m.h-footerHeight))
+	}
+	if m.picking {
+		layers = append(layers, m.pickerLayer())
 	}
 	if m.keyMap {
 		layers = append(layers, m.keyMapLayer())

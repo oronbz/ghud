@@ -70,7 +70,7 @@ func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	if m.picker != nil {
+	if m.picking {
 		return m.pickerKey(msg), nil
 	}
 	if m.arranging {
@@ -90,7 +90,7 @@ func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 			m.arranging, m.before = true, m.layout
 		}
 	case key.Matches(msg, keys.Widgets):
-		m.picker = &picker{}
+		m.picking, m.cursor = true, 0
 	case key.Matches(msg, keys.Jump):
 		if id := m.nth(int(msg.Code - '1')); id != "" {
 			m.focus = id

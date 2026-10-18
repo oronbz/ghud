@@ -163,6 +163,45 @@ func order(t *testing.T, h *hosttest.Host, titles ...string) string {
 	return out
 }
 
+func TestTheSavedLayoutFollowsWidgetsAddedToAndRemovedFromTheConfig(t *testing.T) {
+	root := savedLayout(t, `{"default": {"rows": [
+		{"weight": 1, "widgets": [{"id": "clock", "weight": 1}, {"id": "calendar", "weight": 1}]}
+	]}}`)
+	h := hosttest.New(t, hosttest.Options{Width: 100, Height: 21, Root: root, Config: `
+[[widget]]
+type = "clock"
+
+[[widget]]
+type = "clock"
+id = "work"
+title = "Work"
+`})
+	if _, y, ok := h.Find("╭─ Work "); !ok || y == 0 {
+		t.Fatalf("Work, new in the config, starts on row %d (shown %v), want a new last row:\n%s", y, ok, h.Screen())
+	}
+
+	h.Press("1", "m", "J", "enter")
+	saved, err := layout.Load(h.Paths.Config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := shapeOf(saved); got != "clock / work" {
+		t.Errorf("saved Layout %q, want clock / work without the removed calendar", got)
+	}
+}
+
+func shapeOf(l layout.Layout) string {
+	var rows []string
+	for _, r := range l.Rows {
+		var ids []string
+		for _, c := range r.Widgets {
+			ids = append(ids, c.ID)
+		}
+		rows = append(rows, strings.Join(ids, " "))
+	}
+	return strings.Join(rows, " / ")
+}
+
 func noLayoutFile(t *testing.T, h *hosttest.Host) {
 	t.Helper()
 	if _, err := os.Stat(filepath.Join(h.Paths.Config, layout.FileName)); !errors.Is(err, os.ErrNotExist) {

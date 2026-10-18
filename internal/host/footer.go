@@ -28,6 +28,9 @@ func (m Model) footer() string {
 		bindings = arrangeBindings()
 		hints = "hjkl move · HJKL resize · ⏎ keep · esc revert"
 	}
+	if m.picking {
+		hints = "jk move · ␣ show/hide · esc close"
+	}
 	badge := th.Fg(theme.Bg).Background(th.Color(modeColor)).Bold(true).Render(mode)
 	switch m.held {
 	case tea.ModShift:
