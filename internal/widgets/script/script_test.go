@@ -165,7 +165,7 @@ func TestAddWidgetPlacesAScriptThatAsksForItsCommand(t *testing.T) {
 	}
 }
 
-const outdated =`printf '[{"name":"git","installed":"2.46","current":"2.47"},{"name":"go","installed":"1.27.0","current":"1.27.1"}]'`
+const outdated = `printf '[{"name":"git","installed":"2.46","current":"2.47"},{"name":"go","installed":"1.27.0","current":"1.27.1"}]'`
 
 func TestScriptRunsItsCommandOnItsIntervalAndShowsTheItemsItPrints(t *testing.T) {
 	f := withScript(t, `interval = "10m"`, outdated)
