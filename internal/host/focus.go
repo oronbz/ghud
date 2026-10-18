@@ -13,7 +13,7 @@ import (
 type keyMap struct {
 	Quit, Unfocus, NextRow, PrevRow, Left, Right key.Binding
 	MoveLeft, MoveDown, MoveUp, MoveRight        key.Binding
-	Arrange, Widgets, Jump, Help, Palette        key.Binding
+	Arrange, Widgets, Jump, Help, Palette, Menu  key.Binding
 	Down, Up, First, Last, Primary               key.Binding
 	// Arrange mode.
 	Shift, Grow, Keep, Revert key.Binding
@@ -35,6 +35,7 @@ var keys = keyMap{
 	Jump:      key.NewBinding(key.WithKeys("1", "2", "3", "4", "5", "6", "7", "8", "9"), key.WithHelp("1–9", "jump to the Nth Widget")),
 	Help:      key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "key map")),
 	Palette:   key.NewBinding(key.WithKeys("ctrl+k", ":"), key.WithHelp("^K :", "Action palette: every Widget's Actions")),
+	Menu:      key.NewBinding(key.WithKeys("."), key.WithHelp(".", "Action menu of the selected Item (right-click)")),
 	Down:      key.NewBinding(key.WithKeys("j", "down"), key.WithHelp("j ↓", "next Item")),
 	Up:        key.NewBinding(key.WithKeys("k", "up"), key.WithHelp("k ↑", "previous Item")),
 	First:     key.NewBinding(key.WithKeys("g"), key.WithHelp("g", "first Item")),
@@ -54,7 +55,7 @@ func normalBindings() []key.Binding {
 	k := keys
 	return []key.Binding{
 		k.NextRow, k.PrevRow, k.Left, k.Right, k.MoveLeft, k.MoveDown, k.MoveUp, k.MoveRight,
-		k.Jump, k.Arrange, k.Widgets, k.Unfocus, k.Down, k.Up, k.First, k.Last, k.Primary, k.Palette, k.Help, k.Quit,
+		k.Jump, k.Arrange, k.Widgets, k.Unfocus, k.Down, k.Up, k.First, k.Last, k.Primary, k.Palette, k.Menu, k.Help, k.Quit,
 	}
 }
 
@@ -95,6 +96,9 @@ func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	if m.palette != nil {
 		return m.paletteKey(msg)
 	}
+	if m.menu != nil {
+		return m.menuKey(msg)
+	}
 	if m.picking {
 		return m.pickerKey(msg), nil
 	}
@@ -106,6 +110,11 @@ func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m.keyMap = true
 	case key.Matches(msg, keys.Palette):
 		m.palette = &palette{}
+	case key.Matches(msg, keys.Menu):
+		if m.focus != "" {
+			x, y := m.selectedAt(m.focus)
+			m = m.openMenu(m.focus, x, y)
+		}
 	case key.Matches(msg, keys.Quit):
 		return m, tea.Quit
 	case key.Matches(msg, keys.Unfocus):

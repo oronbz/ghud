@@ -1,8 +1,10 @@
 package host_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -215,6 +217,117 @@ func TestTheWheelScrollsWithoutFocusingAndAClickSelectsTheItemUnderIt(t *testing
 	if got, want := strings.Trim(h.Line(1), "│▐ "), "a1"; got != want {
 		t.Errorf("wheeling far up starts on %q, want %q", got, want)
 	}
+}
+
+func explosive() widget.Payload {
+	its := items("", "alpha", "bravo", "charlie")
+	for i := range its {
+		its[i].Actions = []widget.Action{
+			{ID: "open", Label: "open", Primary: true},
+			{ID: "explode", Key: "x", Label: "explode"},
+		}
+	}
+	return widget.Payload{Columns: []widget.Column{{Flex: true}}, Items: its,
+		Actions: []widget.Action{{ID: "sync", Key: "s", Label: "sync"}}}
+}
+
+func TestDoubleClickRunsThePrimaryActionOnTheClickedItem(t *testing.T) {
+	h, ran := withInbox(t, 8, explosive(), nil)
+	h.Click(10, 2)
+	h.Advance(500 * time.Millisecond)
+	h.Click(10, 2)
+	if len(*ran) != 0 {
+		t.Fatalf("two clicks 500ms apart ran %+v, want nothing", *ran)
+	}
+	h.Click(10, 3)
+	if len(*ran) != 0 {
+		t.Fatalf("a click on another Item ran %+v", *ran)
+	}
+	h.Advance(100 * time.Millisecond)
+	h.Click(10, 3)
+	if len(*ran) != 1 || (*ran)[0].Action != "open" || (*ran)[0].Item != "charlie" {
+		t.Errorf("double-click on charlie ran %+v, want open on charlie", *ran)
+	}
+}
+
+func TestClickingABorderHintRunsItsAction(t *testing.T) {
+	h, ran := withInbox(t, 8, explosive(), nil)
+	h.Click(10, 2)
+	x, y, ok := h.Find("x explode")
+	if !ok {
+		t.Fatalf("no explode hint in the bottom border:\n%s", h.Screen())
+	}
+	h.Click(x+4, y)
+	if len(*ran) != 1 || (*ran)[0].Action != "explode" || (*ran)[0].Item != "bravo" {
+		t.Errorf("clicking the explode hint ran %+v, want explode on bravo", *ran)
+	}
+	x, y, _ = h.Find("s sync")
+	h.Click(x, y)
+	if len(*ran) != 2 || (*ran)[1].Action != "sync" {
+		t.Errorf("clicking the sync hint ran %+v, want sync", *ran)
+	}
+}
+
+func TestRightClickOpensTheItemsMenuAndDotOpensTheSameMenu(t *testing.T) {
+	h, ran := withInbox(t, 14, explosive(), nil)
+	h.RightClick(10, 3)
+	mouse := menuEntries(h)
+	want := "open ⏎ / explode x / sync s / hide"
+	if got := strings.Join(mouse, " / "); got != want {
+		t.Fatalf("right-click on charlie opened %q, want %q:\n%s", got, want, h.Screen())
+	}
+	if _, _, ok := h.Find("─ charlie "); !ok {
+		t.Errorf("the menu isn't titled with the Item:\n%s", h.Screen())
+	}
+	h.Press("esc")
+	if menuEntries(h) != nil {
+		t.Fatalf("esc left the menu open:\n%s", h.Screen())
+	}
+
+	h.Press(".")
+	if got := strings.Join(menuEntries(h), " / "); got != want {
+		t.Errorf(". opened %q, want the right-click menu %q", got, want)
+	}
+	h.Press("j", "enter")
+	if len(*ran) != 1 || (*ran)[0].Action != "explode" || (*ran)[0].Item != "charlie" {
+		t.Errorf("j ⏎ in the menu ran %+v, want explode on charlie", *ran)
+	}
+	if menuEntries(h) != nil {
+		t.Errorf("running an Action left the menu open:\n%s", h.Screen())
+	}
+
+	h.RightClick(10, 1)
+	x, y, _ := h.Find("sync")
+	h.Click(x, y)
+	if len(*ran) != 2 || (*ran)[1].Action != "sync" {
+		t.Errorf("clicking sync in alpha's menu ran %+v, want sync", *ran)
+	}
+	h.RightClick(10, 1)
+	h.Click(30, 12)
+	if menuEntries(h) != nil || len(*ran) != 2 {
+		t.Errorf("a click outside the menu ran %+v or left it open:\n%s", *ran, h.Screen())
+	}
+}
+
+// menuEntries are the open Action menu's rows as their words, or nil when
+// no menu is open. The menu is the box drawn over the Inbox tile.
+func menuEntries(h *hosttest.Host) []string {
+	var out []string
+	for _, l := range strings.Split(h.Screen(), "\n") {
+		r := []rune(l)
+		start := slices.Index(r[1:], '│') + 1
+		if start < 1 || start >= len(r)-1 {
+			continue
+		}
+		end := slices.Index(r[start+1:], '│') + start + 1
+		if end <= start {
+			continue
+		}
+		if words := strings.Fields(string(r[start+1 : end])); len(words) > 0 {
+			out = append(out, strings.Join(words, " "))
+		}
+	}
+	return out
 }
 
 func isFg(h *hosttest.Host, x, y int, want theme.Token) bool {

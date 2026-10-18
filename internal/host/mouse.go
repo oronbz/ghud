@@ -42,6 +42,9 @@ func (m Model) mouseMsg(msg tea.MouseMsg) (Model, tea.Cmd) {
 	if !m.mouse || m.keyMap || m.overlay != nil || m.palette != nil || m.picking || m.arranging {
 		return m, nil
 	}
+	if m.menu != nil {
+		return m.menuMouse(msg)
+	}
 	ms := msg.Mouse()
 	s := m.scene()
 	z, hit := s.Hit(ms.X, ms.Y)
@@ -55,8 +58,16 @@ func (m Model) mouseMsg(msg tea.MouseMsg) (Model, tea.Cmd) {
 			m.hover = &z
 		}
 	case tea.MouseClickMsg:
-		if ms.Button == tea.MouseLeft && hit {
+		switch {
+		case !hit:
+		case ms.Button == tea.MouseLeft:
 			return m.press(s, z, ms.X, ms.Y)
+		case ms.Button == tea.MouseRight && z.ID != "":
+			if z.Kind == layout.Item {
+				m = m.selectItem(z.ID, z.Index)
+			}
+			m.focus, m.last = z.ID, z.ID
+			return m.openMenu(z.ID, ms.X, ms.Y), nil
 		}
 	case tea.MouseReleaseMsg:
 		return m.release(), nil
@@ -122,7 +133,7 @@ func (m Model) selectItem(id string, i int) Model {
 // view has the input.
 func (m Model) pointer() layout.Pointer {
 	var p layout.Pointer
-	if m.keyMap || m.overlay != nil || m.palette != nil || m.picking || m.arranging {
+	if m.keyMap || m.overlay != nil || m.palette != nil || m.menu != nil || m.picking || m.arranging {
 		return p
 	}
 	if d := m.drag; d != nil {
@@ -155,10 +166,24 @@ func (m Model) press(s scene, z layout.Zone, x, y int) (Model, tea.Cmd) {
 		m.drag = &drag{zone: z, dx: x - t.X, dy: y - t.Y, x: x, y: y}
 	case layout.WidgetSeam, layout.RowSeam:
 		m.drag = &drag{zone: z, dx: x - z.X, dy: y - z.Y, x: x, y: y, before: m.layout}
-	case layout.Item:
-		m = m.selectItem(z.ID, z.Index)
-	case layout.Body:
+	case layout.Hint:
+		if hs := m.hinted(z.ID); z.Index < len(hs) {
+			return m.run(z.ID, hs[z.Index])
+		}
+	case layout.Item, layout.Body:
 		m.focus, m.last = z.ID, z.ID
+		if z.Kind == layout.Item {
+			m = m.selectItem(z.ID, z.Index)
+		}
+		now := m.opts.Ports.Clock.Now()
+		last := m.click
+		m.click = click{zone: z, at: now}
+		if last.zone.Kind == z.Kind && last.zone.ID == z.ID && last.zone.Index == z.Index && now.Sub(last.at) < doubleClick {
+			m.click = click{}
+			if a, ok := m.actionFor("enter"); ok {
+				return m.run(z.ID, a)
+			}
+		}
 	}
 	return m, nil
 }
