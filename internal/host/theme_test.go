@@ -140,6 +140,36 @@ accent = "#0055aa"
 	}
 }
 
+func TestAnInvalidColourToastsAndIsIgnored(t *testing.T) {
+	h := hosttest.New(t, hosttest.Options{Width: 120, Height: 9, Config: `
+[colors.dark]
+line = "#00ff00"
+accent = "orange"
+`})
+
+	if _, _, ok := h.Find("config.toml:4: `accent` in [colors.dark] must be a colour like \"#ff8800\""); !ok {
+		t.Errorf("no toast naming the bad value's line:\n%s", h.Screen())
+	}
+	if got := fgHex(t, h, "╭"); got != "#00ff00" {
+		t.Errorf("border %s, want the valid line override #00ff00 still applied", got)
+	}
+	h.Press("tab")
+	if got := fgHex(t, h, "╭"); got != "#8aa9ff" {
+		t.Errorf("focused border %s, want the palette's own accent #8aa9ff", got)
+	}
+}
+
+func TestAnUnknownColourTokenToasts(t *testing.T) {
+	h := hosttest.New(t, hosttest.Options{Width: 120, Height: 9, Config: `
+[colors.light]
+acent = "#ff8800"
+`})
+
+	if _, _, ok := h.Find("config.toml:3: unknown colour token `acent` in [colors.light]"); !ok {
+		t.Errorf("no toast naming the unknown token:\n%s", h.Screen())
+	}
+}
+
 func TestOverridesApplyOnTopOfTheTerminalTheme(t *testing.T) {
 	h := hosttest.New(t, hosttest.Options{Width: 40, Height: 9, Config: `
 theme = "terminal"

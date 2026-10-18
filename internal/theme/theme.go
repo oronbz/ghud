@@ -3,6 +3,7 @@
 package theme
 
 import (
+	"fmt"
 	"image/color"
 	"math"
 	"strconv"
@@ -31,6 +32,30 @@ const (
 )
 
 var names = [tokenCount]string{"bg", "sel", "line", "faint", "dim", "fg", "bright", "accent", "warn", "ok", "bad", "info", "alt"}
+
+var uses = [tokenCount]string{
+	Bg:     "background",
+	Sel:    "selected row background",
+	Line:   "borders",
+	Faint:  "least important text, weekends, separators",
+	Dim:    "secondary text",
+	Fg:     "body text and titles",
+	Bright: "emphasis, focused titles, big digits",
+	Accent: "focused border, today, links",
+	Warn:   "warnings, stale data, toasts",
+	Ok:     "success",
+	Bad:    "errors and failures",
+	Info:   "informational highlights",
+	Alt:    "a second accent",
+}
+
+// Use says what the token colours, for the config reference.
+func (t Token) Use() string {
+	if t < 0 || t >= tokenCount {
+		return ""
+	}
+	return uses[t]
+}
 
 func (t Token) String() string {
 	if t < 0 || t >= tokenCount {
@@ -62,6 +87,12 @@ func ParseColor(s string) (color.Color, bool) {
 		h = string([]byte{h[0], h[0], h[1], h[1], h[2], h[2]})
 	}
 	return lipgloss.Color("#" + h), true
+}
+
+// Hex formats c as "#rrggbb".
+func Hex(c color.Color) string {
+	r, g, b, _ := c.RGBA()
+	return fmt.Sprintf("#%02x%02x%02x", r>>8, g>>8, b>>8)
 }
 
 // Tokens lists every token in canonical order.
