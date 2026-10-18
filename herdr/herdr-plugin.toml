@@ -1,0 +1,9 @@
+id = "ghud"
+name = "ghud"
+version = "0.1.0"
+min_herdr_version = "0.8.0"
+description = "Install ghud, a god's-eye HUD for your day, if it's missing."
+platforms = ["macos", "linux"]
+
+[[build]]
+command = ["bash", "install-ghud.sh"]
