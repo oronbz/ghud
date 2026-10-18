@@ -104,7 +104,6 @@ func (m Model) added(wc config.Widget) (Model, tea.Cmd) {
 	m.widgets[wc.ID] = p
 	m.schedule(wc.ID, wc.Refresh)
 	m.layout = m.layout.Join(m.ids())
-	m = m.saveLayout()
 	m, toast := m.say("Added "+p.title, theme.Fg)
 	m, fetch := m.whenDue(wc.ID)
 	m, beat := m.beat()
@@ -136,6 +135,5 @@ func (m Model) removed(id string) (Model, tea.Cmd) {
 		m.last = ""
 	}
 	m.layout = m.layout.Join(m.ids())
-	m = m.saveLayout()
 	return m.say("Removed "+gone.title, theme.Fg)
 }
