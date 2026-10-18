@@ -13,19 +13,29 @@ import (
 )
 
 // DataFile resolves a Widget's `file` setting: empty means def in the data
-// dir, a relative path is under the data dir, and `~/` is the home dir.
+// dir, a relative path is under the data dir, and `~/` is the home dir
+// (the data dir when there's no HOME).
 func (c Config) DataFile(file, def string) string {
 	switch {
 	case file == "":
 		return filepath.Join(c.DataDir, def)
 	case strings.HasPrefix(file, "~/"):
-		if home, err := os.UserHomeDir(); err == nil {
-			return filepath.Join(home, file[2:])
-		}
+		return filepath.Join(c.home(), file[2:])
 	case !filepath.IsAbs(file):
 		return filepath.Join(c.DataDir, file)
 	}
 	return file
+}
+
+func (c Config) home() string {
+	if c.Ports.Getenv != nil {
+		for _, k := range []string{"HOME", "USERPROFILE"} {
+			if h := c.Ports.Getenv(k); h != "" {
+				return h
+			}
+		}
+	}
+	return c.DataDir
 }
 
 // WriteFile replaces path atomically (temp file plus rename), so a reader

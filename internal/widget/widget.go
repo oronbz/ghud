@@ -57,7 +57,9 @@ type Config struct {
 	WeekStart string
 	// DataDir is ghud's data directory, where local Widget data lives by default.
 	DataDir string
-	// Ports are the outside-world adapters, the only way a Widget reaches the world.
+	// Ports are how a Widget reaches the world, but for two direct paths by
+	// design: the files it keeps (under DataDir, or where its `file` setting
+	// points) and the Script Widget running its own command.
 	Ports ports.Ports
 }
 
