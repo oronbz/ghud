@@ -103,12 +103,12 @@ func (m Model) View() tea.View {
 	if m.w == 0 || m.h == 0 {
 		return v
 	}
-	f := layout.Compute(m.layout, m.w, m.h)
+	f := m.frame()
 	layers := make([]*lipgloss.Layer, 0, len(f.Tiles))
 	for _, t := range f.Tiles {
 		w := m.widgets[t.ID]
 		layers = append(layers, lipgloss.NewLayer(render.Draw(m.opts.Theme, render.Tile{
-			Title: w.typ.Title,
+			Title: t.Title,
 			W:     t.W,
 			H:     t.H,
 			Payload: w.widget.Payload(widget.Frame{
@@ -121,4 +121,15 @@ func (m Model) View() tea.View {
 	lipgloss.NewCompositor(layers...).Draw(canvas, image.Rect(0, 0, m.w, m.h))
 	v.SetContent(canvas.Render())
 	return v
+}
+
+// Zones are the hit zones of the frame View draws.
+func (m Model) Zones() []layout.Zone { return m.frame().Zones }
+
+func (m Model) frame() layout.Frame {
+	titles := make(map[string]string, len(m.widgets))
+	for id, w := range m.widgets {
+		titles[id] = w.typ.Title
+	}
+	return layout.Compute(m.layout, titles, m.w, m.h)
 }
