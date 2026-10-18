@@ -108,7 +108,10 @@ func (i Installer) Install(ctx context.Context, src Source, ref string, trust fu
 	if err := i.build(ctx, plan, staged, trust); err != nil {
 		return plan, err
 	}
-	return plan, os.Rename(staged, plan.Dir)
+	if err := os.Rename(staged, plan.Dir); err != nil {
+		return plan, err
+	}
+	return plan, plugin.Unbury(i.Dir, plan.Manifest.Name)
 }
 
 // Update fetches an installed Plugin's recorded ref again and, when that
@@ -156,13 +159,19 @@ func (i Installer) Update(ctx context.Context, name string, trust func(Plan) boo
 	return was, plan.Record, nil
 }
 
-// Uninstall deletes an installed Plugin, returning where it came from.
+// Uninstall deletes an installed Plugin, returning where it came from, and
+// keeps a Tombstone of it.
 func (i Installer) Uninstall(name string) (plugin.Record, error) {
 	dir, err := i.dir(name)
 	if err != nil {
 		return plugin.Record{}, err
 	}
 	rec, _ := plugin.ReadRecord(dir)
+	if m, err := plugin.ReadManifest(dir); err == nil {
+		if err := plugin.Bury(i.Dir, m, rec); err != nil {
+			return rec, err
+		}
+	}
 	trash, err := i.trash(dir)
 	if err != nil {
 		return rec, err

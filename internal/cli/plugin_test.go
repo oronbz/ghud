@@ -294,7 +294,7 @@ func TestPluginUninstallDeletesTheFolder(t *testing.T) {
 		t.Fatalf("exit %d, stderr:\n%s", code, stderr)
 	}
 	contains(t, "stdout", stdout, "Uninstalled greet")
-	if got := in.installed(); strings.Join(got, " ") != ".staging" {
+	if got := in.installed(); strings.Join(got, " ") != ".staging .uninstalled" {
 		t.Errorf("plugins directory holds %v after uninstall", got)
 	}
 	code, _, stderr = in.ghud("", "plugin", "uninstall", "greet")

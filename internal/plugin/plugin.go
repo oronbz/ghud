@@ -347,14 +347,7 @@ func (p *Plugin) restart(m Manifest, rec Record) {
 	}
 }
 
-// missing is the needs-setup hint for the Plugin's Widgets once it's gone.
-func (p *Plugin) missing() string {
-	hint := fmt.Sprintf("Plugin `%s` isn't installed", p.name)
-	if p.record.Source != "" {
-		hint += "; run `" + p.record.InstallCommand() + "`"
-	}
-	return hint
-}
+func (p *Plugin) missing() string { return missing(p.name, p.record) }
 
 // ended handles the end of proc's session: a crash fails its Widgets and
 // sets when the process may start again.

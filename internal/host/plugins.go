@@ -55,6 +55,13 @@ func (m Model) loadConfig(file string, base []widget.Type) (config.Config, error
 	}
 	found = append(found, m.plugins.Bundled(m.bundled(), taken)...)
 	gone := m.plugins.Gone()
+	for _, t := range found {
+		taken = append(taken, t.Name)
+	}
+	for _, t := range gone {
+		taken = append(taken, t.Name)
+	}
+	gone = append(gone, plugin.Buried(m.pluginsDir(), taken)...)
 	if len(found) == 0 && len(gone) == 0 {
 		return cfg, err, base, problems
 	}
