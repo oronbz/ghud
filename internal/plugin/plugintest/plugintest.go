@@ -58,6 +58,8 @@ type Options struct {
 	Refresh string
 	// Default places a Widget of the type when config.toml places none.
 	Default bool
+	// Mode is the `mode` setting's default; "" is "items".
+	Mode string
 }
 
 // Write lays out a fixture Plugin in dir: its ghud-plugin.toml, whose
@@ -72,6 +74,9 @@ func Write(t testing.TB, dir string, o Options) string {
 	}
 	if o.Refresh == "" {
 		o.Refresh = "1m"
+	}
+	if o.Mode == "" {
+		o.Mode = "items"
 	}
 	command := []string{fmt.Sprintf("%q", Binary(t))}
 	for _, a := range o.Args {
@@ -99,10 +104,10 @@ description = "Words in front of every Item"
 [[widget.setting]]
 name = "mode"
 kind = "string"
-default = "items"
+default = %q
 description = "What refreshes return"
-choices = ["items", "lines", "raw-colour", "malformed", "setup", "error"]
-`, o.Name, o.Protocol, strings.Join(command, ", "), o.Name, o.Refresh, o.Default)
+choices = ["items", "lines", "raw-colour", "malformed", "unknown-field", "setup", "error"]
+`, o.Name, o.Protocol, strings.Join(command, ", "), o.Name, o.Refresh, o.Default, o.Mode)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}

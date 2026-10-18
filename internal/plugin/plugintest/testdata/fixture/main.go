@@ -3,8 +3,9 @@
 // another language would, and depends on nothing in ghud.
 //
 // Flags pick process-wide behaviour (-protocol answers the handshake with
-// another version, -log records every message); each Widget's `mode`
-// setting picks what its refreshes return.
+// another version, -handshake silent never answers it and -handshake empty
+// answers without a version, -log records every message); each Widget's
+// `mode` setting picks what its refreshes return.
 package main
 
 import (
@@ -50,15 +51,17 @@ type fixture struct {
 	out       *json.Encoder
 	log       *json.Encoder
 	protocol  int
+	handshake string
 	widgets   map[string]*widget
 	refreshes map[string]int
 }
 
 func main() {
 	protocol := flag.Int("protocol", 1, "the protocol version to answer the handshake with")
+	handshake := flag.String("handshake", "", "silent: never answer initialize; empty: answer it without a version")
 	logFile := flag.String("log", "", "append every message, in and out, to this file")
 	flag.Parse()
-	f := &fixture{out: json.NewEncoder(os.Stdout), protocol: *protocol, widgets: map[string]*widget{}, refreshes: map[string]int{}}
+	f := &fixture{out: json.NewEncoder(os.Stdout), protocol: *protocol, handshake: *handshake, widgets: map[string]*widget{}, refreshes: map[string]int{}}
 	if *logFile != "" {
 		lf, err := os.OpenFile(*logFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 		if err != nil {
@@ -114,7 +117,13 @@ func (f *fixture) handle(msg message) {
 	f.mu.Unlock()
 	switch msg.Method {
 	case "initialize":
-		f.reply(msg.ID, map[string]any{"protocol": f.protocol})
+		switch f.handshake {
+		case "silent":
+		case "empty":
+			f.reply(msg.ID, map[string]any{})
+		default:
+			f.reply(msg.ID, map[string]any{"protocol": f.protocol})
+		}
 	case "widget/open":
 		nw := p.widget
 		f.mu.Lock()
@@ -183,6 +192,8 @@ func (f *fixture) refresh(id json.RawMessage, w *widget) {
 		}}})
 	case "raw-colour":
 		f.reply(id, map[string]any{"payload": map[string]any{"lines": []any{line("#ff0000", "red")}}})
+	case "unknown-field":
+		f.reply(id, map[string]any{"payload": map[string]any{"lines": []any{line("fg", "hi")}, "colour": "red"}})
 	case "malformed":
 		f.mu.Lock()
 		os.Stdout.WriteString("{this is not json\n")
