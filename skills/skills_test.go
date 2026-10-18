@@ -23,7 +23,7 @@ func TestTheRepoHoldsExactlyTheBundledSkills(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if d.IsDir() && d.Name() == ".git" {
+		if d.IsDir() && p != ".." && strings.HasPrefix(d.Name(), ".") {
 			return filepath.SkipDir
 		}
 		if d.Name() == "SKILL.md" {
