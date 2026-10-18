@@ -186,6 +186,11 @@ func (h *Host) Advance(d time.Duration) {
 	h.Clock.set(target)
 }
 
+// Sleep jumps the wall clock forward by d the way sleeping the machine does:
+// timers count monotonic time, so each still waits what it had left, and
+// nothing fires until the next Advance.
+func (h *Host) Sleep(d time.Duration) { h.Clock.sleep(d) }
+
 // Quit reports whether the app has asked Bubble Tea to quit.
 func (h *Host) Quit() bool { return h.quit }
 

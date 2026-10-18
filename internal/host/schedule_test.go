@@ -207,6 +207,33 @@ func TestCtrlRRefreshesEveryWidgetAtOnceEvenInBackoff(t *testing.T) {
 	}
 }
 
+func TestAfterWakeFromSleepOverdueWidgetsRefreshOnceStaggered(t *testing.T) {
+	a, b, c := &feedLog{}, &feedLog{}, &feedLog{}
+	slow := feedType("slow", "Slow", c)
+	slow.Refresh = 2 * time.Hour
+	h := hosttest.New(t, hosttest.Options{Width: 90, Height: 10, Types: []widget.Type{
+		feedType("feed", "Feed", a), feedType("wire", "Wire", b), slow,
+	}})
+	h.Advance(30 * time.Second)
+
+	h.Sleep(time.Hour)
+	h.Advance(10 * time.Second)
+	if n := a.count() + b.count(); n != 3 {
+		t.Fatalf("Feed and Wire refreshed %d times in all right after waking, want 3 (one of them first)", n)
+	}
+	h.Advance(5 * time.Second)
+	if a.count() != 2 || b.count() != 2 {
+		t.Errorf("Feed %d and Wire %d refreshes 5s after waking, want 2 each", a.count(), b.count())
+	}
+	if c.count() != 1 {
+		t.Errorf("Slow, not due for another hour, refreshed %d times, want 1", c.count())
+	}
+	h.Advance(time.Minute)
+	if a.count() != 2 || b.count() != 2 {
+		t.Errorf("Feed %d and Wire %d refreshes a minute after waking, want 2 each (once)", a.count(), b.count())
+	}
+}
+
 func TestThePaletteListsRefreshForEachWidget(t *testing.T) {
 	log := &feedLog{}
 	h := hosttest.New(t, hosttest.Options{Width: 90, Height: 24, Types: []widget.Type{

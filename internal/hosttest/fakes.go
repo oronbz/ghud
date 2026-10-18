@@ -59,6 +59,15 @@ func (c *Clock) set(t time.Time) {
 	c.now = t
 }
 
+func (c *Clock) sleep(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.now = c.now.Add(d)
+	for i := range c.timers {
+		c.timers[i].due = c.timers[i].due.Add(d)
+	}
+}
+
 func (c *Clock) fireNext(limit time.Time) (tea.Msg, bool) {
 	c.mu.Lock()
 	if len(c.timers) == 0 {
