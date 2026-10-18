@@ -156,9 +156,15 @@ func (m Model) startAll(force bool) (Model, tea.Cmd) {
 
 func (m Model) spun(msg spinMsg) (Model, tea.Cmd) {
 	m.now = msg.at
+	again := func() tea.Cmd {
+		return m.opts.Ports.Clock.After(spinEvery, func(t time.Time) tea.Msg { return spinMsg{t} })
+	}
+	if m.menu != nil && m.menu.loading {
+		return m, again()
+	}
 	for _, s := range m.sched {
 		if s.busy {
-			return m, m.opts.Ports.Clock.After(spinEvery, func(t time.Time) tea.Msg { return spinMsg{t} })
+			return m, again()
 		}
 	}
 	m.spinning = false

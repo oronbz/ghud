@@ -132,6 +132,8 @@ type bound struct {
 	by hostAction
 	// typ is the Widget type an addWidget Action places.
 	typ string
+	// choice is the Choice picked for a choice Action.
+	choice *widget.Choice
 }
 
 type hostAction int
@@ -258,6 +260,8 @@ func (m Model) run(id string, a bound) (Model, tea.Cmd) {
 				return actedMsg{id: id, action: a.Action, err: opener.Open(target), byHost: true}
 			}
 		}
+	case a.Input == widget.ChoiceInput:
+		return m.choose(id, a)
 	case a.Input == widget.InlineInput:
 		return m.startEditing(id, a)
 	default:
@@ -289,6 +293,9 @@ func (m Model) invoke(id string, a bound, text string) (Model, tea.Cmd) {
 		return m, nil
 	}
 	inv := widget.Invocation{Action: a.ID, Item: a.item, Text: text, Base: a.Value, Now: m.opts.Ports.Clock.Now()}
+	if a.choice != nil {
+		inv.Choice = a.choice.ID
+	}
 	secret := a.Input == widget.SecretInput
 	return m, func() tea.Msg {
 		res, err := actor.Invoke(context.Background(), inv)

@@ -14,12 +14,19 @@ import (
 )
 
 // menu is the Action menu of one Widget's selected Item, opened by
-// right-click or ".", anchored at the pointer or the Item.
+// right-click or ".", anchored at the pointer or the Item; or a choice
+// Action's menu of choices.
 type menu struct {
 	widget, title string
 	actions       []bound
 	sel           int
 	x, y          int
+	// choosing is the choice Action whose choices the menu lists; loading
+	// says they haven't arrived yet, and seq tells them from those of a
+	// menu this one replaced.
+	choosing bound
+	loading  bool
+	seq      int
 }
 
 // openMenu opens Widget id's Action menu with its top-left corner at x, y,
@@ -62,6 +69,9 @@ func (m Model) menuKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m.menu = nil
 		return m, nil
 	case "enter":
+		if len(mu.actions) == 0 {
+			return m, nil
+		}
 		m.menu = nil
 		return m.run(mu.widget, mu.actions[mu.sel])
 	case "j", "down", "ctrl+n":
@@ -103,10 +113,10 @@ func (m Model) menuBox() layout.Rect {
 	mu := m.menu
 	w := ansi.StringWidth(mu.title) + 6
 	for _, a := range mu.actions {
-		w = max(w, menuLabelW(mu)+ansi.StringWidth(render.KeyLabel(shownKey(a)))+6)
+		w = max(w, menuLabelW(mu)+ansi.StringWidth(render.KeyLabel(entryKey(a)))+6)
 	}
 	w = min(w, m.w)
-	h := min(len(mu.actions)+2, m.h-footerHeight)
+	h := min(max(len(mu.actions), 1)+2, m.h-footerHeight)
 	return layout.Rect{
 		X: min(max(mu.x, 0), m.w-w),
 		Y: min(max(mu.y, 0), m.h-footerHeight-h),
@@ -117,9 +127,25 @@ func (m Model) menuBox() layout.Rect {
 func menuLabelW(mu *menu) int {
 	n := 0
 	for _, a := range mu.actions {
-		n = max(n, ansi.StringWidth(a.Label))
+		n = max(n, ansi.StringWidth(entryLabel(a)))
 	}
 	return n
+}
+
+// entryLabel is what a menu entry reads: a choice's label, else its Action's.
+func entryLabel(a bound) string {
+	if a.choice != nil {
+		return a.choice.Label
+	}
+	return a.Label
+}
+
+// entryKey is the key shown beside a menu entry; choices have none.
+func entryKey(a bound) string {
+	if a.choice != nil {
+		return ""
+	}
+	return shownKey(a)
 }
 
 // menuLayer draws each entry as its label and the key that runs it, the
@@ -129,15 +155,19 @@ func (m Model) menuLayer() *lipgloss.Layer {
 	box := m.menuBox()
 	labelW := menuLabelW(mu)
 	var lines []widget.Line
+	if mu.loading {
+		lines = append(lines, widget.Line{Spans: []widget.Span{{Text: " " + m.spinner(), Token: theme.Accent}}})
+	}
 	for i, a := range mu.actions {
 		bg, tok := theme.Bg, theme.Fg
 		if i == mu.sel {
 			bg, tok = theme.Sel, theme.Bright
 		}
-		key := render.KeyLabel(shownKey(a))
+		key := render.KeyLabel(entryKey(a))
+		label := entryLabel(a)
 		gap := strings.Repeat(" ", max(0, box.W-4-labelW-ansi.StringWidth(key)))
 		lines = append(lines, widget.Line{Spans: []widget.Span{
-			{Text: " " + a.Label + strings.Repeat(" ", labelW-ansi.StringWidth(a.Label)), Token: tok, Bold: i == mu.sel, Bg: bg},
+			{Text: " " + label + strings.Repeat(" ", labelW-ansi.StringWidth(label)), Token: tok, Bold: i == mu.sel, Bg: bg},
 			{Text: gap, Bg: bg},
 			{Text: key + " ", Token: theme.Accent, Bold: true, Bg: bg},
 		}})
