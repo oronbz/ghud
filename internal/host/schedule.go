@@ -35,7 +35,8 @@ type sched struct {
 	interval time.Duration
 	// due is when the next refresh is planned; zero is none.
 	due time.Time
-	// timer tells the armed timer from ones a newer plan replaced.
+	// timer tells the armed timer from ones a newer plan, or a Widget
+	// rebuilt under the same id, replaced.
 	timer int
 	// busy is a refresh in flight; again asks for another once it lands.
 	busy, again bool
@@ -98,7 +99,7 @@ func (m Model) start(id string) (Model, tea.Cmd) {
 		return m, nil
 	}
 	s.busy, s.due = true, time.Time{}
-	s.timer++
+	s.timer = m.nextTimer()
 	m.sched[id] = s
 	now := m.opts.Ports.Clock.Now()
 	fetch := func() tea.Msg {
@@ -142,7 +143,7 @@ func (m Model) spun(msg spinMsg) (Model, tea.Cmd) {
 func (m Model) plan(id string, at time.Time) tea.Cmd {
 	s := m.sched[id]
 	s.due = at
-	s.timer++
+	s.timer = m.nextTimer()
 	m.sched[id] = s
 	seq := s.timer
 	return m.opts.Ports.Clock.After(at.Sub(m.opts.Ports.Clock.Now()), func(t time.Time) tea.Msg {
@@ -355,6 +356,12 @@ func (m Model) schedule(id string, refresh time.Duration) (problem string) {
 	iv, problem := interval(p, refresh)
 	m.sched[id] = sched{interval: iv}
 	return problem
+}
+
+// nextTimer numbers a timer uniquely for the life of the app.
+func (m Model) nextTimer() int {
+	*m.timers++
+	return *m.timers
 }
 
 // interval is how often Source p refreshes: its `refresh` setting, else its

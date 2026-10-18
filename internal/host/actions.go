@@ -43,17 +43,20 @@ type listState struct {
 
 func (s listState) render() render.List { return render.List{Selected: s.idx, Top: s.top} }
 
-// editedMsg says $EDITOR exited after editing Widget id's file.
+// editedMsg says $EDITOR exited after editing file for Widget id.
 type editedMsg struct {
-	id  string
-	err error
+	id, file string
+	err      error
+	// then is the Action to run now, on the Item the edit began on.
+	then *widget.Action
+	item string
 }
 
 type actedMsg struct {
-	id     string
-	action widget.Action
-	result widget.Result
-	err    error
+	id, item string
+	action   widget.Action
+	result   widget.Result
+	err      error
 	// byHost marks an Action the host performed, which leaves the Widget as it was.
 	byHost bool
 }
@@ -274,10 +277,10 @@ func (m Model) invoke(id string, a bound, text string) (Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
-	inv := widget.Invocation{Action: a.ID, Item: a.item, Text: text, Now: m.opts.Ports.Clock.Now()}
+	inv := widget.Invocation{Action: a.ID, Item: a.item, Text: text, Base: a.Value, Now: m.opts.Ports.Clock.Now()}
 	return m, func() tea.Msg {
 		res, err := actor.Invoke(context.Background(), inv)
-		return actedMsg{id: id, action: a.Action, result: res, err: err}
+		return actedMsg{id: id, item: a.item, action: a.Action, result: res, err: err}
 	}
 }
 
@@ -291,15 +294,22 @@ func (m Model) acted(msg actedMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	if f := msg.result.Edit; f != "" {
-		return m, m.opts.Ports.Editor.Edit(f, 0, func(err error) tea.Msg { return editedMsg{id: msg.id, err: err} })
+		then, item := msg.result.Then, msg.item
+		return m, m.opts.Ports.Editor.Edit(f, 0, func(err error) tea.Msg {
+			return editedMsg{id: msg.id, file: f, err: err, then: then, item: item}
+		})
 	}
 	return m.after(msg.id, msg.result.Toast)
 }
 
-// edited refreshes the Widget whose file the editor just had, or says why it failed.
+// edited runs the Action that follows the editor, or refreshes the Widget
+// whose file the editor just had, or says why it failed.
 func (m Model) edited(msg editedMsg) (Model, tea.Cmd) {
 	if msg.err != nil {
 		return m.say("$EDITOR failed: "+msg.err.Error(), theme.Bad)
+	}
+	if msg.then != nil {
+		return m.invoke(msg.id, bound{Action: *msg.then, item: msg.item}, msg.file)
 	}
 	return m.after(msg.id, "")
 }

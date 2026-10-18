@@ -74,6 +74,8 @@ type Model struct {
 	sched  map[string]sched
 	paused map[string]time.Time
 	rng    *rand.Rand
+	// timers counts the refresh timers armed so far; copies share it.
+	timers *int
 	// spinning and beating are the spinner's and the wall-clock check's
 	// timer chains, each kept to one.
 	spinning, beating bool
@@ -98,6 +100,10 @@ type Model struct {
 	edits config.Editor
 	// base is what every Widget is built with, besides its settings.
 	base widget.Config
+	// sticky is the config.toml problem shown whenever no toast is, until the file is fixed.
+	sticky string
+	// ticks tells the current redraw timer from ones a config reload replaced.
+	ticks int
 }
 
 type placed struct {
@@ -106,11 +112,16 @@ type placed struct {
 	widget widget.Widget
 	// setup, when set, is the needs-setup hint drawn instead of the Widget.
 	setup string
-	// ref finds the Widget's block in config.toml.
-	ref config.Ref
+	// ref finds the Widget's block in config.toml; block is what it said
+	// when the Widget was built.
+	ref   config.Ref
+	block config.Widget
 }
 
-type tickMsg struct{ at time.Time }
+type tickMsg struct {
+	at  time.Time
+	seq int
+}
 
 // Builtins are the Widget types compiled into ghud, in reference order.
 var Builtins = []widget.Type{clock.Type, calendar.Type, tasks.Type, cpu.Type, notes.Type, script.Type}
@@ -118,7 +129,7 @@ var Builtins = []widget.Type{clock.Type, calendar.Type, tasks.Type, cpu.Type, no
 func New(o Options) Model {
 	m := Model{opts: o, now: o.Ports.Clock.Now(), widgets: map[string]placed{},
 		fetched: map[string]widget.Payload{}, lists: map[string]listState{},
-		sched: map[string]sched{}, paused: map[string]time.Time{}, rng: newRand(o.Ports.Clock.Now())}
+		sched: map[string]sched{}, paused: map[string]time.Time{}, rng: newRand(o.Ports.Clock.Now()), timers: new(int)}
 	types := o.Types
 	if types == nil {
 		types = Builtins
@@ -132,37 +143,60 @@ func New(o Options) Model {
 	if err != nil {
 		problems = append(problems, err.Error())
 	}
-	m.mouse = cfg.Mouse
 	m.colors = colors{pinned: !o.Theme.IsZero(), name: cfg.Theme, over: cfg.Colors, asking: o.Theme.IsZero()}
 	m = m.resolveTheme()
 	m.edits = config.Editor{Path: file, LockDir: filepath.Join(o.Paths.Data, "locks"), Types: types, Locale: o.Locale}
-	m.base = widget.Config{TimeFormat: cfg.TimeFormat, WeekStart: cfg.WeekStart, DataDir: o.Paths.Data, Ports: o.Ports}
-	var ids []string
-	for _, wc := range cfg.Widgets {
-		id, ref := wc.ID, config.Ref{ID: wc.ID}
-		// Widgets sharing an id are all in needs setup; suffixes keep them apart on screen only.
-		for n := 2; m.widgets[id].title != ""; n++ {
-			id, ref.N = fmt.Sprintf("%s~%d", wc.ID, n), n-1
-		}
-		m.widgets[id] = m.place(wc, ref)
-		ids = append(ids, id)
-		if problem := m.schedule(id, wc.Refresh); problem != "" {
-			problems = append(problems, problem)
-		}
-	}
-	m.toast = toast{text: toastOf(append(problems, cfg.Problems...)), tok: theme.Warn}
+	m, ids, _, clamped := m.placeAll(cfg)
+	m.sticky = toastOf(append(append(problems, cfg.Problems...), clamped...))
 	// An unreadable layout.json falls back to the default rather than blocking launch.
 	saved, err := layout.Load(o.Paths.Config)
 	if err != nil {
 		saved = layout.Default()
 	}
 	m.layout = saved.Join(ids)
-	return m
+	return m.watch()
+}
+
+// placeAll builds cfg's Widgets and returns their ids in config order, the
+// ids of those it built afresh, and toasts for refresh settings it clamped.
+// A Widget whose block, and the globals Widgets are built from, haven't
+// changed is kept as it was, state and all.
+func (m Model) placeAll(cfg config.Config) (Model, []string, []string, []string) {
+	old := m.widgets
+	sameGlobals := cfg.TimeFormat == m.base.TimeFormat && cfg.WeekStart == m.base.WeekStart
+	m.mouse = cfg.Mouse
+	m.base = widget.Config{TimeFormat: cfg.TimeFormat, WeekStart: cfg.WeekStart, DataDir: m.opts.Paths.Data, Ports: m.opts.Ports}
+	m.widgets = make(map[string]placed, len(cfg.Widgets))
+	var ids, fresh, clamped []string
+	for _, wc := range cfg.Widgets {
+		id, ref := wc.ID, config.Ref{ID: wc.ID}
+		// Widgets sharing an id are all in needs setup; suffixes keep them apart on screen only.
+		for n := 2; m.widgets[id].title != ""; n++ {
+			id, ref.N = fmt.Sprintf("%s~%d", wc.ID, n), n-1
+		}
+		ids = append(ids, id)
+		if p, ok := old[id]; ok && sameGlobals && p.block.Equal(wc) {
+			p.ref = ref
+			m.widgets[id] = p
+			continue
+		}
+		m.widgets[id] = m.place(wc, ref)
+		fresh = append(fresh, id)
+		if problem := m.schedule(id, wc.Refresh); problem != "" {
+			clamped = append(clamped, problem)
+		}
+	}
+	for id := range m.sched {
+		if _, ok := m.widgets[id]; !ok {
+			delete(m.sched, id)
+		}
+	}
+	return m, ids, fresh, clamped
 }
 
 // place builds the Widget a [[widget]] block configures, unless it needs setup.
 func (m Model) place(wc config.Widget, ref config.Ref) placed {
-	p := placed{title: wc.Title, setup: wc.Setup, ref: ref}
+	p := placed{title: wc.Title, setup: wc.Setup, ref: ref, block: wc}
 	if i := slices.IndexFunc(m.edits.Types, func(t widget.Type) bool { return t.Name == wc.Type }); i >= 0 {
 		p.typ = m.edits.Types[i]
 	}
@@ -175,7 +209,7 @@ func (m Model) place(wc config.Widget, ref config.Ref) placed {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.nextTick(), m.queryColors(), func() tea.Msg { return startMsg{} })
+	return tea.Batch(m.nextTick(), m.queryColors(), m.nextChange(), func() tea.Msg { return startMsg{} })
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -209,6 +243,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.acted(msg)
 	case editedMsg:
 		return m.edited(msg)
+	case filesChangedMsg:
+		return m.filesChanged(msg)
 	case configEditedMsg:
 		return m.configEdited(msg)
 	case toastExpiredMsg:
@@ -216,6 +252,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.toast = toast{}
 		}
 	case tickMsg:
+		if msg.seq != m.ticks {
+			return m, nil
+		}
 		m.now = msg.at
 		return m, m.nextTick()
 	case tea.MouseMsg:
@@ -243,7 +282,8 @@ func (m Model) nextTick() tea.Cmd {
 	if next.IsZero() {
 		return nil
 	}
-	return m.opts.Ports.Clock.After(next.Sub(m.now), func(t time.Time) tea.Msg { return tickMsg{at: t} })
+	seq := m.ticks
+	return m.opts.Ports.Clock.After(next.Sub(m.now), func(t time.Time) tea.Msg { return tickMsg{at: t, seq: seq} })
 }
 
 func (m Model) View() tea.View {

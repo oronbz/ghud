@@ -3,6 +3,8 @@ package host_test
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -131,6 +133,26 @@ func TestRefreshSettingOverridesTheTypesInterval(t *testing.T) {
 	h.Advance(time.Minute)
 	if log.count() != 2 {
 		t.Errorf("refreshed %d times by 5m, want 2", log.count())
+	}
+}
+
+func TestAReloadedRefreshSettingReschedulesTheWidget(t *testing.T) {
+	h, log := withFeed(t, hosttest.Options{Config: "[[widget]]\ntype = \"feed\"\nrefresh = \"5m\"\n"})
+	file := filepath.Join(h.Paths.Config, "config.toml")
+	if err := os.WriteFile(file, []byte("[[widget]]\ntype = \"feed\"\nrefresh = \"1m\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.Changed(file)
+	if log.count() != 2 {
+		t.Fatalf("reloading a changed block refreshed it %d times in all, want 2", log.count())
+	}
+	h.Advance(time.Minute)
+	if log.count() != 3 {
+		t.Errorf("refreshed %d times a minute after refresh became 1m, want 3", log.count())
+	}
+	h.Advance(4 * time.Minute)
+	if log.count() != 7 {
+		t.Errorf("refreshed %d times 5m after refresh became 1m, want 7 (the old 5m timer is gone)", log.count())
 	}
 }
 

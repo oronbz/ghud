@@ -60,8 +60,11 @@ func (m Model) footer() string {
 		hints = modifierHints("Ctrl", bindings, func(k string) bool { return strings.HasPrefix(k, "ctrl+") })
 	}
 	toast := ""
-	if m.toast.text != "" {
+	switch {
+	case m.toast.text != "":
 		toast = th.Fg(m.toast.tok).Render(m.toast.text) + "  "
+	case m.sticky != "":
+		toast = th.Fg(theme.Warn).Render(m.sticky) + "  "
 	}
 	return ansi.Truncate(badge+" "+toast+th.Fg(hintTok).Render(hints), m.w, "…")
 }
