@@ -25,6 +25,7 @@ func System(getenv func(string) string) Ports {
 		Commands:  execCommands{},
 		EventKit:  noEventKit{},
 		Machine:   newMachine(),
+		Watcher:   newFSWatcher(),
 		HTTP:      &http.Client{Timeout: 30 * time.Second},
 		Endpoints: DefaultEndpoints(),
 	}

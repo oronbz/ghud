@@ -136,11 +136,11 @@ func New(o Options) Model {
 		saved = layout.Default()
 	}
 	m.layout = saved.Join(ids)
-	return m
+	return m.watch()
 }
 
 func (m Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.nextTick(), m.queryColors()}
+	cmds := []tea.Cmd{m.nextTick(), m.queryColors(), m.nextChange()}
 	for _, id := range m.ids() {
 		cmds = append(cmds, m.refresh(id))
 	}
@@ -170,6 +170,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.acted(msg)
 	case editedMsg:
 		return m.edited(msg)
+	case filesChangedMsg:
+		return m.filesChanged(msg)
 	case toastExpiredMsg:
 		if m.toast.seq == msg.seq {
 			m.toast = toast{}

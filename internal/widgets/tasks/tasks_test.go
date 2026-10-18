@@ -364,6 +364,19 @@ file = "lists/today.md"
 	}
 }
 
+func TestEditingTasksMdOutsideGhudUpdatesTheWidget(t *testing.T) {
+	h := withTasks(t, "- [ ] Call the bank\n", hosttest.Options{Width: 40, Height: 7})
+
+	writeTasks(t, h.Root, "- [ ] Call the bank\n- [ ] Water plants\n")
+	if strings.Contains(tile(h), "Water plants") {
+		t.Fatalf("Widget changed before the watcher reported the file:\n%s", tile(h))
+	}
+	h.Changed(tasksFile(h.Root))
+	if !strings.Contains(tile(h), "○ Water plants") || !strings.Contains(h.Line(0), "Tasks 2") {
+		t.Fatalf("Widget after the external edit:\n%s", tile(h))
+	}
+}
+
 // typeText presses one key per character of s.
 func typeText(h *hosttest.Host, s string) {
 	for _, r := range s {

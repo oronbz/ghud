@@ -101,6 +101,59 @@ func (m *Machine) Stats() (ports.Stats, error) {
 	return m.stats, m.Err
 }
 
+// Watcher is a fake file watcher. Next arms a waiter when its Cmd runs; the
+// test reports changes with Host.Changed.
+type Watcher struct {
+	mu      sync.Mutex
+	files   []string
+	waiting []func([]string) tea.Msg
+}
+
+func (w *Watcher) Watch(files []string) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.files = slices.Clone(files)
+	return nil
+}
+
+func (w *Watcher) Next(msg func([]string) tea.Msg) tea.Cmd {
+	return func() tea.Msg {
+		w.mu.Lock()
+		defer w.mu.Unlock()
+		w.waiting = append(w.waiting, msg)
+		return nil
+	}
+}
+
+// Files are the files the app watches.
+func (w *Watcher) Files() []string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return slices.Clone(w.files)
+}
+
+// fire returns the message the app is waiting for, for the watched ones
+// among files; ok is false when none is watched or nothing waits.
+func (w *Watcher) fire(files []string) (msg tea.Msg, watched, ok bool) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	var hit []string
+	for _, f := range files {
+		if slices.Contains(w.files, f) {
+			hit = append(hit, f)
+		}
+	}
+	if len(hit) == 0 {
+		return nil, false, false
+	}
+	if len(w.waiting) == 0 {
+		return nil, true, false
+	}
+	next := w.waiting[0]
+	w.waiting = w.waiting[1:]
+	return next(hit), true, true
+}
+
 // Opener records every target handed to the system opener.
 type Opener struct {
 	Opened []string
