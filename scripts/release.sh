@@ -79,10 +79,15 @@ expect() {
     green "  $1: $3"
 }
 
+# lipo lists a fat binary's slices in the order they were joined, which varies.
+archs() {
+    lipo -archs "$1" | tr ' ' '\n' | sort | paste -sd ' ' -
+}
+
 verify_snapshot() {
     local want="$VERSION-snapshot" bin
     bin=$(binary 'ghud-universal_darwin_all' ghud)
-    expect "darwin archs" "$(lipo -info "$bin")" "x86_64 arm64"
+    expect "darwin archs" "$(archs "$bin")" "arm64 x86_64"
     expect "darwin cgo" "$(go version -m "$bin")" "CGO_ENABLED=1"
     expect "darwin --version" "$("$bin" --version)" "ghud $want"
     for target in linux_amd64 linux_arm64 windows_amd64 windows_arm64; do
@@ -95,7 +100,7 @@ verify_snapshot() {
         fi
     done
     bin=$(binary 'ghud-weather-universal_darwin_all' ghud-weather)
-    expect "weather darwin archs" "$(lipo -info "$bin")" "x86_64 arm64"
+    expect "weather darwin archs" "$(archs "$bin")" "arm64 x86_64"
     for target in linux_amd64 linux_arm64 windows_amd64 windows_arm64; do
         local name=ghud-weather
         if [[ "$target" == windows_* ]]; then name=ghud-weather.exe; fi
