@@ -39,6 +39,7 @@ func (m Model) entries() []entry {
 			}
 		}
 	}
+	all = append(all, m.addEntries()...)
 	q := strings.TrimSpace(string(m.palette.query))
 	if q == "" {
 		return all

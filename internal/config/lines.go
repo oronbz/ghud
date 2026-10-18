@@ -69,3 +69,18 @@ func keyPath(p *unstable.Parser, n *unstable.Node) (string, int) {
 	}
 	return strings.Join(parts, "."), line
 }
+
+// headerLines are the 1-based lines of every [table] and [[array]] header, in order.
+func headerLines(src []byte) []int {
+	var lines []int
+	var p unstable.Parser
+	p.Reset(src)
+	for p.NextExpression() {
+		e := p.Expression()
+		if e.Kind == unstable.Table || e.Kind == unstable.ArrayTable {
+			_, line := keyPath(&p, e)
+			lines = append(lines, line)
+		}
+	}
+	return lines
+}
