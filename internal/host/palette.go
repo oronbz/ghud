@@ -40,6 +40,7 @@ func (m Model) entries() []entry {
 		}
 	}
 	all = append(all, m.addEntries()...)
+	all = append(all, entry{title: dashboard, action: bound{Action: widget.Action{ID: "install-skills", Label: "install agent skills"}, by: installSkills}})
 	q := strings.TrimSpace(string(m.palette.query))
 	if q == "" {
 		return all
