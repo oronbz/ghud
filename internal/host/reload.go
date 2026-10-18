@@ -49,10 +49,13 @@ func (m Model) filesChanged(msg filesChangedMsg) (Model, tea.Cmd) {
 	}
 	for _, id := range m.ids() {
 		if slices.Contains(fresh, id) || slices.ContainsFunc(watched(m.widgets[id].widget), func(f string) bool { return slices.Contains(msg.files, f) }) {
-			cmds = append(cmds, m.refresh(id))
+			var cmd tea.Cmd
+			m, cmd = m.start(id)
+			cmds = append(cmds, cmd)
 		}
 	}
-	return m, tea.Batch(cmds...)
+	m, beat := m.beat()
+	return m, tea.Batch(append(cmds, beat)...)
 }
 
 // reloadConfig applies config.toml as it now is, returning the Widgets it
@@ -64,7 +67,6 @@ func (m Model) reloadConfig() (Model, []string, tea.Cmd) {
 		m.sticky = err.Error()
 		return m, nil, nil
 	}
-	m.sticky = toastOf(cfg.Problems)
 	var cmds []tea.Cmd
 	if cfg.Theme != m.colors.name && !m.colors.pinned {
 		m.colors.asking = true
@@ -73,7 +75,8 @@ func (m Model) reloadConfig() (Model, []string, tea.Cmd) {
 	m.colors.name, m.colors.over = cfg.Theme, cfg.Colors
 	m = m.resolveTheme()
 
-	m, ids, fresh := m.placeAll(cfg)
+	m, ids, fresh, clamped := m.placeAll(cfg)
+	m.sticky = toastOf(append(cfg.Problems, clamped...))
 	m.layout = m.layout.Join(ids)
 	if m.arranging {
 		m.before = m.before.Join(ids)
@@ -82,7 +85,6 @@ func (m Model) reloadConfig() (Model, []string, tea.Cmd) {
 		if _, ok := m.widgets[id]; !ok {
 			delete(m.fetched, id)
 			delete(m.lists, id)
-			delete(m.due, id)
 		}
 	}
 	if _, ok := m.rects()[m.focus]; !ok {

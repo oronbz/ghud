@@ -71,10 +71,13 @@ func (m Model) added(wc config.Widget) (Model, tea.Cmd) {
 	})
 	p := m.place(wc, config.Ref{ID: wc.ID})
 	m.widgets[wc.ID] = p
+	m.schedule(wc.ID, wc.Refresh)
 	m.layout = m.layout.Join(m.ids())
 	m = m.saveLayout()
 	m, toast := m.say("Added "+p.title, theme.Fg)
-	cmds := []tea.Cmd{toast, m.refresh(wc.ID)}
+	m, fetch := m.start(wc.ID)
+	m, beat := m.beat()
+	cmds := []tea.Cmd{toast, fetch, beat}
 	// One tick chain serves every live view; start it only if none is running.
 	if !ticking {
 		cmds = append(cmds, m.nextTick())
@@ -87,6 +90,7 @@ func (m Model) removed(id string) (Model, tea.Cmd) {
 	delete(m.widgets, id)
 	delete(m.fetched, id)
 	delete(m.lists, id)
+	delete(m.sched, id)
 	for other, p := range m.widgets {
 		if p.ref.ID == gone.ref.ID && p.ref.N > gone.ref.N {
 			p.ref.N--

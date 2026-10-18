@@ -20,8 +20,12 @@ func (m Model) footer() string {
 	mode, modeColor := " NORMAL ", theme.Accent
 	bindings := normalBindings()
 	hints := "Tab/hl focus · 1–9 jump · w widgets · ? keys · q quit"
+	hintTok := theme.Dim
 	if m.focus != "" {
 		hints = "Tab rows · hl widgets · HJKL any direction · m arrange · esc unfocus · ? keys"
+		if e := m.staleError(m.focus); e != "" {
+			hints, hintTok = e, theme.Warn
+		}
 	}
 	if m.arranging {
 		mode, modeColor = " ARRANGE ", theme.Warn
@@ -62,7 +66,7 @@ func (m Model) footer() string {
 	case m.sticky != "":
 		toast = th.Fg(theme.Warn).Render(m.sticky) + "  "
 	}
-	return ansi.Truncate(badge+" "+toast+th.Fg(theme.Dim).Render(hints), m.w, "…")
+	return ansi.Truncate(badge+" "+toast+th.Fg(hintTok).Render(hints), m.w, "…")
 }
 
 // modifierHints lists the bindings that have at least one key using the modifier.

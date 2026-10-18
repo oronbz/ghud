@@ -6,6 +6,7 @@ package host
 import (
 	"fmt"
 	"image"
+	"math/rand/v2"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -27,6 +28,7 @@ import (
 	"github.com/oronbz/ghud/internal/widgets/clock"
 	"github.com/oronbz/ghud/internal/widgets/cpu"
 	"github.com/oronbz/ghud/internal/widgets/notes"
+	"github.com/oronbz/ghud/internal/widgets/script"
 	"github.com/oronbz/ghud/internal/widgets/tasks"
 )
 
@@ -70,8 +72,16 @@ type Model struct {
 	// Like every map here they're shared by Model copies, and only Update writes them.
 	fetched map[string]widget.Payload
 	lists   map[string]listState
-	// due is each scheduled Source's current refresh timer.
-	due map[string]int
+	// sched is each Source's refresh schedule and Status; paused, when each
+	// rate-limited credential may be used again.
+	sched  map[string]sched
+	paused map[string]time.Time
+	rng    *rand.Rand
+	// timers counts the refresh timers armed so far; copies share it.
+	timers *int
+	// spinning and beating are the spinner's and the wall-clock check's
+	// timer chains, each kept to one.
+	spinning, beating bool
 	// overlay is the open confirm or text prompt, which takes every key.
 	overlay *overlay
 	// editing is INSERT mode's editor, which takes every key but insertHostKeys.
@@ -118,11 +128,12 @@ type tickMsg struct {
 }
 
 // Builtins are the Widget types compiled into ghud, in reference order.
-var Builtins = []widget.Type{clock.Type, calendar.Type, tasks.Type, cpu.Type, notes.Type}
+var Builtins = []widget.Type{clock.Type, calendar.Type, tasks.Type, cpu.Type, notes.Type, script.Type}
 
 func New(o Options) Model {
 	m := Model{opts: o, now: o.Ports.Clock.Now(), widgets: map[string]placed{},
-		fetched: map[string]widget.Payload{}, lists: map[string]listState{}, due: map[string]int{},
+		fetched: map[string]widget.Payload{}, lists: map[string]listState{},
+		sched: map[string]sched{}, paused: map[string]time.Time{}, rng: newRand(o.Ports.Clock.Now()), timers: new(int),
 		closing: closekey.NewMatcher(o.CloseKeys)}
 	types := o.Types
 	if types == nil {
@@ -137,11 +148,11 @@ func New(o Options) Model {
 	if err != nil {
 		problems = append(problems, err.Error())
 	}
-	m.sticky = toastOf(append(problems, cfg.Problems...))
 	m.colors = colors{pinned: !o.Theme.IsZero(), name: cfg.Theme, over: cfg.Colors, asking: o.Theme.IsZero()}
 	m = m.resolveTheme()
 	m.edits = config.Editor{Path: file, LockDir: filepath.Join(o.Paths.Data, "locks"), Types: types, Locale: o.Locale}
-	m, ids, _ := m.placeAll(cfg)
+	m, ids, _, clamped := m.placeAll(cfg)
+	m.sticky = toastOf(append(append(problems, cfg.Problems...), clamped...))
 	// An unreadable layout.json falls back to the default rather than blocking launch.
 	saved, err := layout.Load(o.Paths.Config)
 	if err != nil {
@@ -151,16 +162,17 @@ func New(o Options) Model {
 	return m.watch()
 }
 
-// placeAll builds cfg's Widgets and returns their ids in config order, and
-// the ids of those it built afresh. A Widget whose block, and the globals
-// Widgets are built from, haven't changed is kept as it was, state and all.
-func (m Model) placeAll(cfg config.Config) (Model, []string, []string) {
+// placeAll builds cfg's Widgets and returns their ids in config order, the
+// ids of those it built afresh, and toasts for refresh settings it clamped.
+// A Widget whose block, and the globals Widgets are built from, haven't
+// changed is kept as it was, state and all.
+func (m Model) placeAll(cfg config.Config) (Model, []string, []string, []string) {
 	old := m.widgets
 	sameGlobals := cfg.TimeFormat == m.base.TimeFormat && cfg.WeekStart == m.base.WeekStart
 	m.mouse = cfg.Mouse
 	m.base = widget.Config{TimeFormat: cfg.TimeFormat, WeekStart: cfg.WeekStart, DataDir: m.opts.Paths.Data, Ports: m.opts.Ports}
 	m.widgets = make(map[string]placed, len(cfg.Widgets))
-	var ids, fresh []string
+	var ids, fresh, clamped []string
 	for _, wc := range cfg.Widgets {
 		id, ref := wc.ID, config.Ref{ID: wc.ID}
 		// Widgets sharing an id are all in needs setup; suffixes keep them apart on screen only.
@@ -175,8 +187,16 @@ func (m Model) placeAll(cfg config.Config) (Model, []string, []string) {
 		}
 		m.widgets[id] = m.place(wc, ref)
 		fresh = append(fresh, id)
+		if problem := m.schedule(id, wc.Refresh); problem != "" {
+			clamped = append(clamped, problem)
+		}
 	}
-	return m, ids, fresh
+	for id := range m.sched {
+		if _, ok := m.widgets[id]; !ok {
+			delete(m.sched, id)
+		}
+	}
+	return m, ids, fresh, clamped
 }
 
 // place builds the Widget a [[widget]] block configures, unless it needs setup.
@@ -194,11 +214,7 @@ func (m Model) place(wc config.Widget, ref config.Ref) placed {
 }
 
 func (m Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.nextTick(), m.queryColors(), m.nextChange()}
-	for _, id := range m.ids() {
-		cmds = append(cmds, m.refresh(id))
-	}
-	return tea.Batch(cmds...)
+	return tea.Batch(m.nextTick(), m.queryColors(), m.nextChange(), func() tea.Msg { return startMsg{} })
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -218,8 +234,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case refreshedMsg:
 		return m.refreshed(msg)
-	case refreshDueMsg:
-		return m, m.refreshDue(msg)
+	case startMsg:
+		m, fetch := m.startAll()
+		m, beat := m.beat()
+		return m, tea.Batch(fetch, beat)
+	case dueMsg:
+		return m.due(msg)
+	case beatMsg:
+		return m.beaten(msg)
+	case spinMsg:
+		return m.spun(msg)
 	case actedMsg:
 		return m.acted(msg)
 	case editedMsg:
@@ -326,11 +350,8 @@ func (m Model) View() tea.View {
 // payloadIn is what Widget id shows in a tile at r, border included.
 func (m Model) payloadIn(id string, r layout.Rect) widget.Payload {
 	w := m.widgets[id]
-	if w.setup != "" {
-		return widget.Payload{Center: true, Lines: []widget.Line{
-			widget.Text(theme.Warn, "needs setup"),
-			widget.Text(theme.Dim, w.setup),
-		}}
+	if p, ok := m.statusPayload(id); ok {
+		return p
 	}
 	switch v := w.widget.(type) {
 	case widget.Source:
@@ -397,6 +418,7 @@ func (m Model) scene() scene {
 			Handle:  t.Handle,
 			Payload: m.payloadIn(t.ID, t.Rect),
 			List:    m.lists[t.ID].render(),
+			Status:  m.chrome(t.ID),
 		}
 		switch {
 		case m.editing != nil && t.ID == m.editing.widget:

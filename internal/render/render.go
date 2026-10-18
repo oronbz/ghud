@@ -27,6 +27,16 @@ type Tile struct {
 	List List
 	// Hints are the key hints drawn in the bottom border.
 	Hints []Hint
+	// Status is drawn at the right of the top border.
+	Status Status
+}
+
+// Status is a Widget's health as its top border shows it.
+type Status struct {
+	// Spinner is the spinner frame while the Widget refreshes, or "".
+	Spinner string
+	// Stale is the stale marker, reason and age such as "offline · 12m", or "".
+	Stale string
 }
 
 // Hint is one key hint: the key as Bubble Tea prints it, and what it does.
@@ -59,7 +69,13 @@ func Draw(th theme.Theme, t Tile) string {
 	if t.Payload.IsList() {
 		label += count.Render(fmt.Sprint(t.Payload.Count)) + " "
 	}
-	top := border.Render(b.TopLeft+b.Top) + label + border.Render(strings.Repeat(b.Top, max(0, t.W-3-lipgloss.Width(label)))) + border.Render(b.TopRight)
+	right := status(th, t.Status, t.W-5-lipgloss.Width(label))
+	fill := t.W - 3 - lipgloss.Width(label) - lipgloss.Width(right)
+	if right != "" {
+		fill--
+		right += border.Render(b.Top)
+	}
+	top := border.Render(b.TopLeft+b.Top) + label + border.Render(strings.Repeat(b.Top, max(0, fill))) + right + border.Render(b.TopRight)
 
 	out := make([]string, 0, t.H)
 	out = append(out, ansi.Truncate(top, t.W, ""))
@@ -69,6 +85,25 @@ func Draw(th theme.Theme, t Tile) string {
 	}
 	out = append(out, bottom(th, border, b, t.Hints, t.W))
 	return strings.Join(out, "\n")
+}
+
+// status is the stale marker in warn and the spinner in accent, in at most
+// room cells; the marker is cut short to fit, and left out when it can't.
+func status(th theme.Theme, st Status, room int) string {
+	spin := ""
+	if st.Spinner != "" {
+		spin = st.Spinner + " "
+	}
+	stale := ""
+	if st.Stale != "" {
+		if w := room - lipgloss.Width(spin) - 2; w >= 4 {
+			stale = th.Fg(theme.Warn).Render(ansi.Truncate(st.Stale, w, "…")) + " "
+		}
+	}
+	if stale == "" && (spin == "" || room < 3) {
+		return ""
+	}
+	return " " + stale + th.Fg(theme.Accent).Render(spin)
 }
 
 // bottom is the bottom border of a tile w wide, carrying " key label "

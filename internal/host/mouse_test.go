@@ -289,7 +289,7 @@ func TestRightClickOpensTheItemsMenuAndDotOpensTheSameMenu(t *testing.T) {
 	h, ran := withInbox(t, 14, explosive(), nil)
 	h.RightClick(10, 3)
 	mouse := menuEntries(h)
-	want := "open ⏎ / explode x / sync s / hide / edit settings / remove"
+	want := "open ⏎ / explode x / sync s / refresh / hide / edit settings / remove"
 	if got := strings.Join(mouse, " / "); got != want {
 		t.Fatalf("right-click on charlie opened %q, want %q:\n%s", got, want, h.Screen())
 	}

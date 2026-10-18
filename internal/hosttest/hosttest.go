@@ -201,6 +201,11 @@ func (h *Host) Advance(d time.Duration) {
 	h.Clock.set(target)
 }
 
+// Sleep jumps the wall clock forward by d the way sleeping the machine does:
+// timers count monotonic time, so each still waits what it had left, and
+// nothing fires until the next Advance.
+func (h *Host) Sleep(d time.Duration) { h.Clock.sleep(d) }
+
 // Changed reports that files changed on disk, as the file watcher would.
 // Files the app doesn't watch are ignored, like a real watcher ignores them.
 func (h *Host) Changed(files ...string) {

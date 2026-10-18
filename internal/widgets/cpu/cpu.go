@@ -18,6 +18,7 @@ var Type = widget.Type{
 	Title:       "CPU + memory",
 	Description: "CPU history, memory use and load averages.",
 	Refresh:     2 * time.Second,
+	Floor:       time.Second,
 	New: func(c widget.Config) widget.Widget {
 		return &meter{machine: c.Ports.Machine}
 	},

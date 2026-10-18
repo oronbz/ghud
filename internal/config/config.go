@@ -70,10 +70,13 @@ type Plugin struct {
 var common = []string{"type", "id", "title", "refresh"}
 
 // Default is the config used with no config.toml: global defaults and one
-// Widget of every type, with the type name as its id.
+// Widget of every type but the opt-in ones, with the type name as its id.
 func Default(types []widget.Type, loc Locale) Config {
 	c := globalsOnly(loc)
 	for _, t := range types {
+		if t.OptIn {
+			continue
+		}
 		c.Widgets = append(c.Widgets, Widget{ID: t.Name, Type: t.Name, Title: t.Title, Settings: widget.Defaults(t.Settings)})
 	}
 	return c

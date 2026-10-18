@@ -21,6 +21,13 @@ func Reference(types []widget.Type, loc Locale) string {
 		if len(s.Choices) > 0 {
 			prose("One of: %s.", strings.Join(s.Choices, ", "))
 		}
+		for _, f := range s.Fields {
+			required := ""
+			if f.Required {
+				required = " Required."
+			}
+			prose("  %-8s %s%s", f.Name, f.Description, required)
+		}
 		prose("Why: %s", s.Why)
 		option("%s = %s", s.Name, widget.TOMLValue(s.Default))
 	}
@@ -68,6 +75,13 @@ func Reference(types []widget.Type, loc Locale) string {
 	for _, t := range types {
 		b.WriteString("\n")
 		prose("%s Widget. %s", t.Title, t.Description)
+		if t.Refresh > 0 {
+			floor := ""
+			if t.Floor > 0 {
+				floor = fmt.Sprintf(", %s at the shortest", widget.ShortDuration(t.Floor))
+			}
+			prose("Refreshes every %s unless `refresh` says otherwise%s.", widget.ShortDuration(t.Refresh), floor)
+		}
 		option("[[widget]]")
 		option("type = %q", t.Name)
 		option("id = %q", t.Name)
