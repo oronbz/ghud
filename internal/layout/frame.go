@@ -84,6 +84,9 @@ type Frame struct {
 func Compute(l Layout, titles map[string]string, w, h int, p Pointer) Frame {
 	l = l.Visible()
 	var f Frame
+	if len(l.Rows) == 0 {
+		return f
+	}
 	for _, r := range l.Rows {
 		f.Need.W = max(f.Need.W, len(r.Widgets)*MinTile.W)
 	}

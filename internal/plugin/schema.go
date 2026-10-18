@@ -22,10 +22,8 @@ var schemaFiles embed.FS
 // SchemaBase is the URL every shipped schema's $id starts with.
 const SchemaBase = "https://ghud.dev/schema/"
 
-// SchemaNames are the shipped schemas: the manifest and the protocol.
 var SchemaNames = []string{"manifest.json", "protocol.json"}
 
-// Schema is the shipped JSON Schema named name, one of SchemaNames.
 func Schema(name string) []byte {
 	b, _ := schemaFiles.ReadFile("schema/" + name)
 	return b
@@ -87,7 +85,6 @@ func Validate(ref string, instance any) error {
 	return errors.New(firstViolation(ve))
 }
 
-// validateJSON is Validate on a JSON document.
 func validateJSON(ref string, src []byte) error {
 	doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(src))
 	if err != nil {

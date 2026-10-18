@@ -43,87 +43,68 @@ type Options struct {
 	// Locale gives time_format and week_start their defaults.
 	Locale config.Locale
 	Ports  ports.Ports
-	// Theme, when set, pins the palette (tests use sentinel colours). Left
-	// zero, New fills it from config.toml and the terminal's colours, and it
-	// stays the theme in use as answers arrive.
+	// Theme, when set, pins the palette (tests use sentinel colours); zero
+	// follows config.toml and the terminal's colours.
 	Theme theme.Theme
-	// Types replaces the built-in Widget types; with no config.toml there is
-	// one Widget of each. Tests use it to stage Layouts the built-ins can't fill.
-	Types []widget.Type
-	// CloseKeys quit ghud from any mode (--close-key).
+	// Types replaces the built-in Widget types, so tests can stage Layouts
+	// the built-ins can't fill.
+	Types     []widget.Type
 	CloseKeys []closekey.Seq
-	// Version is the ghud version agent skills are stamped with; "" means
-	// the version this binary was built as.
+	// Version stamps agent skills; "" is the version this binary was built as.
 	Version string
-	// BundleDir is the directory ghud's executable is installed in, where
-	// the Plugins it ships with sit; empty ships none.
+	// BundleDir is where ghud's executable and the Plugins it ships with sit.
 	BundleDir string
 }
 
+// Model is the root tea.Model. Its maps are shared by Model copies, so only
+// Update writes them.
 type Model struct {
 	opts    Options
 	w, h    int
 	now     time.Time
 	widgets map[string]placed
 	layout  layout.Layout
-	// focus is the focused Widget's id, "" when ghud is unfocused; last
-	// survives unfocusing so focus can return to it.
+	// focus is "" when ghud is unfocused; last survives unfocusing.
 	focus, last string
 	keyMap      bool
-	// arranging is arrange mode on the focused Widget; before is the Layout
-	// to revert to.
-	arranging bool
-	before    layout.Layout
-	// picking is the w list of Widgets to show or hide, cursor its selected row.
+	arranging   bool
+	// before is the Layout arrange mode reverts to.
+	before  layout.Layout
 	picking bool
 	cursor  int
 	toast   toast
-	// fetched holds each Source's last Payload; lists, each list's selection.
-	// Like every map here they're shared by Model copies, and only Update writes them.
 	fetched map[string]widget.Payload
 	lists   map[string]listState
-	// sched is each Source's refresh schedule and Status; paused, when each
-	// rate-limited credential may be used again.
-	sched  map[string]sched
+	sched   map[string]sched
+	// paused is when each rate-limited credential may be used again.
 	paused map[string]time.Time
-	// cache keeps fetching Widgets' data across runs and instances.
-	cache cache.Store
-	rng   *rand.Rand
-	// timers counts the refresh timers armed so far; copies share it.
+	cache  cache.Store
+	rng    *rand.Rand
+	// timers numbers the refresh timers app-wide, so a rebuilt Widget's old
+	// timers never match.
 	timers *int
-	// spinning and beating are the spinner's and the wall-clock check's
-	// timer chains, each kept to one.
-	spinning, beating bool
-	// overlay is the open confirm or text prompt, which takes every key.
-	overlay *overlay
-	// editing is INSERT mode's editor, which takes every key but insertHostKeys.
-	editing *editing
-	// palette is the open ^K Action palette; menu the open Action menu;
-	// menus counts the choice menus opened so far.
-	palette *palette
-	menu    *menu
-	menus   int
-	// held is the modifier (Shift or Ctrl) held on its own, which swaps the
-	// footer to that modifier's keys; only kitty-protocol terminals report it.
-	held   tea.KeyMod
-	colors colors
-	// mouse is config.toml's mouse option: capture clicks, drags and the wheel.
-	mouse bool
-	// hover is the title or seam under the pointer while no button is held.
-	hover *layout.Zone
-	drag  *drag
-	click click
-	// edits is how host Actions change config.toml.
-	edits config.Editor
-	// base is what every Widget is built with, besides its settings.
-	base widget.Config
-	// sticky is the config.toml problem shown whenever no toast is, until the file is fixed.
-	sticky string
+	// Each timer chain is kept to one.
+	spinning, checkingWallClock bool
+	overlay                     *overlay
+	editing                     *editing
+	palette                     *palette
+	menu                        *menu
+	menus                       int
+	// heldModifier is only reported by kitty-protocol terminals.
+	heldModifier tea.KeyMod
+	colors       colors
+	mouse        bool
+	hover        *layout.Zone
+	drag         *drag
+	click        click
+	configEditor config.Editor
+	// widgetBase is what every Widget is built with, besides its settings.
+	widgetBase widget.Config
+	// configProblem shows whenever no toast does, until config.toml is fixed.
+	configProblem string
 	// ticks tells the current redraw timer from ones a config reload replaced.
-	ticks   int
-	closing closekey.Matcher
-	// plugins runs the external Plugins; pushes carries what their Widgets
-	// send unasked; observed is what each Observer was last told.
+	ticks    int
+	closing  closekey.Matcher
 	plugins  *plugin.Registry
 	pushes   chan tea.Msg
 	observed map[string]observation
@@ -135,9 +116,8 @@ type placed struct {
 	widget widget.Widget
 	// setup, when set, is the needs-setup hint drawn instead of the Widget.
 	setup string
-	// ref finds the Widget's block in config.toml; block is what it said
-	// when the Widget was built.
 	ref   config.Ref
+	// block is what config.toml said when the Widget was built.
 	block config.Widget
 }
 
@@ -165,10 +145,9 @@ func New(o Options) Model {
 	}
 	m.colors = colors{pinned: !o.Theme.IsZero(), name: cfg.Theme, over: cfg.Colors, asking: o.Theme.IsZero()}
 	m = m.resolveTheme()
-	m.edits = config.Editor{Path: file, LockDir: filepath.Join(o.Paths.Data, "locks"), Types: types, Locale: o.Locale}
+	m.configEditor = config.NewEditor(file, o.Paths.Data, types, o.Locale)
 	m, ids, _, clamped := m.placeAll(cfg)
-	m.sticky = toastOf(append(append(problems, cfg.Problems...), clamped...))
-	// An unreadable layout.json falls back to the default rather than blocking launch.
+	m.configProblem = toastOf(append(append(problems, cfg.Problems...), clamped...))
 	saved, err := layout.Load(o.Paths.Config)
 	if err != nil {
 		saved = layout.Default()
@@ -183,9 +162,9 @@ func New(o Options) Model {
 // changed is kept as it was, state and all.
 func (m Model) placeAll(cfg config.Config) (Model, []string, []string, []string) {
 	old := m.widgets
-	sameGlobals := cfg.TimeFormat == m.base.TimeFormat && cfg.WeekStart == m.base.WeekStart
+	sameGlobals := cfg.TimeFormat == m.widgetBase.TimeFormat && cfg.WeekStart == m.widgetBase.WeekStart
 	m.mouse = cfg.Mouse
-	m.base = widget.Config{TimeFormat: cfg.TimeFormat, WeekStart: cfg.WeekStart, DataDir: m.opts.Paths.Data, Ports: m.opts.Ports}
+	m.widgetBase = widget.Config{TimeFormat: cfg.TimeFormat, WeekStart: cfg.WeekStart, DataDir: m.opts.Paths.Data, Ports: m.opts.Ports}
 	m.widgets = make(map[string]placed, len(cfg.Widgets))
 	var ids, fresh, clamped []string
 	for _, wc := range cfg.Widgets {
@@ -215,14 +194,13 @@ func (m Model) placeAll(cfg config.Config) (Model, []string, []string, []string)
 	return m, ids, fresh, clamped
 }
 
-// place builds the Widget a [[widget]] block configures, unless it needs setup.
 func (m Model) place(wc config.Widget, ref config.Ref) placed {
 	p := placed{title: wc.Title, setup: wc.Setup, ref: ref, block: wc}
-	if i := slices.IndexFunc(m.edits.Types, func(t widget.Type) bool { return t.Name == wc.Type }); i >= 0 {
-		p.typ = m.edits.Types[i]
+	if i := slices.IndexFunc(m.configEditor.Types, func(t widget.Type) bool { return t.Name == wc.Type }); i >= 0 {
+		p.typ = m.configEditor.Types[i]
 	}
 	if p.setup == "" {
-		c := m.base
+		c := m.widgetBase
 		c.ID, c.Settings = wc.ID, wc.Settings
 		p.widget = p.typ.New(c)
 	}
@@ -233,7 +211,6 @@ func (m Model) Init() tea.Cmd {
 	return tea.Batch(m.nextTick(), m.queryColors(), m.nextChange(), m.nextPush(), m.listen(m.ids()), func() tea.Msg { return startMsg{} }, m.cleanCache(), m.refreshSkills())
 }
 
-// baseTypes are the Widget types compiled in, or the ones a test stages.
 func (m Model) baseTypes() []widget.Type {
 	if m.opts.Types != nil {
 		return m.opts.Types
@@ -309,13 +286,12 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.key(msg)
 	case tea.KeyReleaseMsg:
 		if _, ok := loneModifier(msg.Code); ok {
-			m.held = 0
+			m.heldModifier = 0
 		}
 	}
 	return m, nil
 }
 
-// nextTick schedules one redraw for the soonest change of any live view.
 func (m Model) nextTick() tea.Cmd {
 	var next time.Time
 	for _, w := range m.widgets {
@@ -354,9 +330,13 @@ func (m Model) View() tea.View {
 	}
 	var layers []*lipgloss.Layer
 	s := m.scene()
-	if s.TooSmall {
-		layers = append(layers, lipgloss.NewLayer(m.tooSmall(s.Need)))
-	} else {
+	switch {
+	case s.TooSmall:
+		layers = append(layers, lipgloss.NewLayer(m.centred(fmt.Sprintf("too small (needs %d×%d)", s.Need.W, s.Need.H), theme.Warn)))
+	case len(s.Tiles) == 0:
+		layers = append(layers, lipgloss.NewLayer(m.centred("all Widgets hidden · w to show", theme.Dim)),
+			lipgloss.NewLayer(m.footer()).Y(m.h-footerHeight))
+	default:
 		for i, t := range s.Tiles {
 			if m.editing != nil && t.ID == m.editing.widget {
 				layers = append(layers, m.editorLayer(t.X, t.Y))
@@ -403,7 +383,6 @@ func (m Model) payloadIn(id string, r layout.Rect) widget.Payload {
 	return widget.Payload{}
 }
 
-// ids lists the placed Widgets in a stable order.
 func (m Model) ids() []string {
 	ids := make([]string, 0, len(m.widgets))
 	for id := range m.widgets {
@@ -413,7 +392,6 @@ func (m Model) ids() []string {
 	return ids
 }
 
-// toastOf shows the first message, counting the rest.
 func toastOf(msgs []string) string {
 	switch len(msgs) {
 	case 0:
@@ -424,11 +402,11 @@ func toastOf(msgs []string) string {
 	return fmt.Sprintf("%s (+%d more)", msgs[0], len(msgs)-1)
 }
 
-func (m Model) tooSmall(need layout.Size) string {
-	text := ansi.Truncate(fmt.Sprintf("too small (needs %d×%d)", need.W, need.H), m.w, "…")
+func (m Model) centred(text string, tok theme.Token) string {
+	text = ansi.Truncate(text, m.w, "…")
 	pad := (m.w - ansi.StringWidth(text)) / 2
 	lines := make([]string, m.h)
-	lines[(m.h-1)/2] = strings.Repeat(" ", pad) + m.opts.Theme.Fg(theme.Warn).Render(text)
+	lines[(m.h-1)/2] = strings.Repeat(" ", pad) + m.opts.Theme.Fg(tok).Render(text)
 	return strings.Join(lines, "\n")
 }
 

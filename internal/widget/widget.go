@@ -17,17 +17,16 @@ import (
 type Type struct {
 	// Name is the `type` key in config.toml.
 	Name string
-	// Title is the default title drawn in the Widget's top border.
+	// Title is the default border title.
 	Title string
-	// Description is the one-line summary above the type's block in the config reference.
+	// Description heads the type's block in the config reference.
 	Description string
-	// Settings is the schema a Widget's config.toml block is validated
-	// against and the config reference is generated from.
+	// Settings validate a Widget's config.toml block and generate the reference.
 	Settings []Setting
 	// Refresh is how often the host refreshes a Source; zero means only at
 	// start and after its Actions. A Widget's `refresh` setting overrides it.
 	Refresh time.Duration
-	// Floor is the shortest `refresh` allowed; shorter ones are clamped to it.
+	// Floor is the shortest `refresh` allowed.
 	Floor time.Duration
 	// Midnight also refreshes a Source at local midnight, for payloads that
 	// depend on the date.
@@ -45,24 +44,19 @@ type Type struct {
 	New     func(Config) Widget
 }
 
-// MacOnly names the Widget types built only on macOS. Elsewhere a config
-// naming one gets needs setup rather than an unknown-type problem, so one
-// config.toml works on every machine.
-var MacOnly = []string{"meetings", "reminders"}
-
 // Config is what a Widget is built from: its validated settings, defaults
 // filled in, and the global options that affect it.
 type Config struct {
-	// ID is the Widget's id, which a Plugin's messages are addressed by.
 	ID       string
 	Settings Settings
 	// TimeFormat is "12h" or "24h".
 	TimeFormat string
 	// WeekStart is a lower-case English weekday, such as "sunday".
 	WeekStart string
-	// DataDir is ghud's data directory, where local Widget data lives by default.
-	DataDir string
-	// Ports are the outside-world adapters, the only way a Widget reaches the world.
+	DataDir   string
+	// Ports are how a Widget reaches the world, but for two direct paths by
+	// design: the files it keeps (under DataDir, or where its `file` setting
+	// points) and the Script Widget running its own command.
 	Ports ports.Ports
 }
 
@@ -119,21 +113,20 @@ type Pusher interface {
 
 // Push is one update a Pusher sends.
 type Push struct {
-	// Payload, when set, replaces the data shown.
 	Payload *Payload
 	// Err is a Status, read the way Refresh's error is.
 	Err error
 	// Lost drops the data shown, such as Items whose Actions can't run any
 	// more because the process behind them stopped.
 	Lost bool
-	// Retry, when set, is when the host refreshes the Widget again, whatever its schedule.
+	// Retry, when set, refreshes the Widget then, whatever its schedule.
 	Retry time.Time
 }
 
 // Observer is a Widget that wants to know how it's shown, such as a Plugin
 // fitting its data to the tile.
 type Observer interface {
-	// Observe is called on the UI thread whenever Shown changes, so it must not block.
+	// Observe runs on the UI thread, so it must not block.
 	Observe(Shown)
 }
 
@@ -141,7 +134,6 @@ type Shown struct {
 	// Size is the tile's inner size; zero while the Widget isn't visible.
 	Size    Size
 	Focused bool
-	// Visible is false while the Widget is hidden.
 	Visible bool
 }
 
@@ -164,7 +156,6 @@ type Chooser interface {
 	Choices(ctx context.Context, inv Invocation) ([]Choice, error)
 }
 
-// Choice is one entry of a ChoiceInput Action's menu.
 type Choice struct {
 	// ID comes back to the Widget in Invocation.Choice.
 	ID    string
@@ -174,15 +165,11 @@ type Choice struct {
 	Target string
 }
 
-// Invocation is one run of an Action.
 type Invocation struct {
-	// Action is the Action's ID.
 	Action string
-	// Item is the selected Item's ID, or "" for a Widget Action.
-	Item string
-	// Text is what the user typed into a text input.
-	Text string
-	// Choice is the ID of the Choice picked for a choice input.
+	// Item is "" for a Widget Action.
+	Item   string
+	Text   string
 	Choice string
 	// Base is the Action's Value, the text an input started from, so a
 	// Widget can tell whether its data changed underneath the edit.
@@ -192,7 +179,6 @@ type Invocation struct {
 
 // Result is what a successful Action reports back.
 type Result struct {
-	// Toast is shown in the footer.
 	Toast string `json:"toast,omitempty"`
 	// Edit is a file for the host to open in $EDITOR, with the TUI
 	// suspended; the Widget refreshes once the editor exits.
@@ -232,8 +218,7 @@ type Payload struct {
 	Columns []Column `json:"columns,omitempty"`
 	Items   []Item   `json:"items,omitempty"`
 	// Count is drawn after a list Widget's title, such as the number of open tasks.
-	Count int `json:"count,omitempty"`
-	// Empty is shown when the list has no Items.
+	Count int    `json:"count,omitempty"`
 	Empty string `json:"empty,omitempty"`
 	// Rule, when set, draws a line across the list, such as a timeline's now-line.
 	Rule *Rule `json:"rule,omitempty"`
@@ -242,22 +227,18 @@ type Payload struct {
 	Actions []Action `json:"actions,omitempty"`
 }
 
-// IsList reports whether the Payload is a list of Items rather than lines.
 func (p Payload) IsList() bool { return len(p.Columns) > 0 }
 
-// Column is one column of a list.
 type Column struct {
 	// Priority decides which columns survive a narrow Widget: the
 	// highest-numbered column is dropped first.
 	Priority int `json:"priority,omitempty"`
 	// Flex columns share the width the others leave and truncate to fit;
 	// the others are as wide as their widest Field.
-	Flex bool `json:"flex,omitempty"`
-	// Right aligns the column's Fields to its right edge.
+	Flex  bool `json:"flex,omitempty"`
 	Right bool `json:"right,omitempty"`
 }
 
-// Item is one row of a list Widget.
 type Item struct {
 	// ID is stable across refreshes, so the selection follows the Item.
 	ID string `json:"id"`
@@ -278,7 +259,6 @@ type Rule struct {
 	Token  theme.Token `json:"token"`
 }
 
-// Field is one cell of an Item, in its Column.
 type Field []Span
 
 // F is a Field of one span.
@@ -308,7 +288,6 @@ type Action struct {
 	Value  string `json:"value,omitempty"`
 }
 
-// Verb says what kind of thing an Action does.
 type Verb string
 
 const (
@@ -420,7 +399,7 @@ type Span struct {
 
 // Bar is a horizontal bar in the span's Token over a track in the line token.
 type Bar struct {
-	// Value is the filled share, 0 to 1.
+	// Value is 0 to 1.
 	Value float64 `json:"value"`
 	// Width is the bar's width in cells; zero takes the width the line's other spans leave.
 	Width int `json:"width,omitempty"`

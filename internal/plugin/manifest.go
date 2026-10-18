@@ -24,7 +24,7 @@ type Manifest struct {
 	Command     []string     `toml:"-"`
 	Build       []Build      `toml:"build"`
 	Widgets     []WidgetType `toml:"widget"`
-	// Dir is the Plugin's directory, the command's working directory.
+	// Dir is also the command's working directory.
 	Dir string `toml:"-"`
 	// Env is added to the environment the process inherits from ghud.
 	Env []string `toml:"-"`
@@ -62,7 +62,6 @@ var kinds = map[string]widget.Kind{"string": widget.String, "bool": widget.Bool,
 // reserved are the keys every [[widget]] block takes, so no setting may use them.
 var reserved = []string{"type", "id", "title", "refresh"}
 
-// ReadManifest reads and checks the manifest in dir.
 func ReadManifest(dir string) (Manifest, error) {
 	file := filepath.Join(dir, ManifestFile)
 	src, err := os.ReadFile(file)

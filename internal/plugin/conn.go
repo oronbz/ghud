@@ -154,7 +154,6 @@ func (c *conn) send(msg message) error {
 	return nil
 }
 
-// Notify sends a notification.
 func (c *conn) Notify(method string, params any) error {
 	b, err := json.Marshal(params)
 	if err != nil {
@@ -163,7 +162,6 @@ func (c *conn) Notify(method string, params any) error {
 	return c.send(message{Method: method, Params: b})
 }
 
-// Call sends a request and decodes its result into result.
 func (c *conn) Call(ctx context.Context, method string, params, result any) error {
 	b, err := json.Marshal(params)
 	if err != nil {
@@ -211,7 +209,6 @@ func (c *conn) closedErr() error {
 	return c.err
 }
 
-// Close ends the session from this side.
 func (c *conn) Close() { c.fail(errClosed) }
 
 var errClosed = errors.New("closed by ghud")

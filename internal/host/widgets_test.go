@@ -58,6 +58,7 @@ func TestAddWidgetFromThePaletteAppendsABlockAndPlacesTheWidgetLast(t *testing.T
 	if !strings.Contains(h.Screen(), "Added Calendar") {
 		t.Errorf("no toast for the added Widget:\n%s", h.Screen())
 	}
+	noLayoutFile(t, h)
 }
 
 func TestRemoveWidgetCommentsOutItsBlockAndTakesItOffTheDashboard(t *testing.T) {
@@ -76,6 +77,7 @@ func TestRemoveWidgetCommentsOutItsBlockAndTakesItOffTheDashboard(t *testing.T) 
 	if _, _, ok := h.Find("╭─ Clock "); !ok {
 		t.Errorf("Clock left the dashboard too:\n%s", h.Screen())
 	}
+	noLayoutFile(t, h)
 }
 
 func TestAConfigEditThatWouldNotReadBackIsRefusedWithAToast(t *testing.T) {

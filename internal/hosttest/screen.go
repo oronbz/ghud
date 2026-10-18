@@ -50,7 +50,6 @@ func (h *Host) Screen() string {
 	return strings.Join(lines, "\n")
 }
 
-// Line is one row of Screen.
 func (h *Host) Line(y int) string {
 	lines := strings.Split(h.Screen(), "\n")
 	if y < 0 || y >= len(lines) {

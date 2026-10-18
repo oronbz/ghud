@@ -25,7 +25,6 @@ var Type = widget.Type{
 
 type clock struct{ seconds, twelve bool }
 
-// Next is the next second, or the next minute without seconds.
 func (c clock) Next(now time.Time) time.Time {
 	d := time.Minute
 	if c.seconds {

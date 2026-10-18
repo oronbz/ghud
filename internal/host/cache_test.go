@@ -291,6 +291,57 @@ func TestAnInstanceSkipsTheFetchAnotherIsMakingAndShowsItsResult(t *testing.T) {
 	}
 }
 
+// wire is the News Widgets' push channel; each Widget built listens on it.
+type wire struct {
+	mu   sync.Mutex
+	push []func(widget.Push)
+}
+
+func (w *wire) send(text string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	p := widget.Payload{Lines: []widget.Line{widget.Text(theme.Fg, text)}}
+	for _, push := range w.push {
+		push(widget.Push{Payload: &p})
+	}
+}
+
+type liveNews struct {
+	news
+	w *wire
+}
+
+func (n liveNews) Listen(push func(widget.Push)) {
+	n.w.mu.Lock()
+	defer n.w.mu.Unlock()
+	n.w.push = append(n.w.push, push)
+}
+
+func TestAPushIsWrittenToTheCacheForOtherInstances(t *testing.T) {
+	root, u, w := t.TempDir(), &upstream{}, &wire{}
+	typ := newsType(u)
+	typ.New = func(c widget.Config) widget.Widget {
+		return liveNews{news{up: u, topic: c.Settings.String("topic")}, w}
+	}
+	at := func(now time.Time) *hosttest.Host {
+		return hosttest.New(t, hosttest.Options{Root: root, Now: now, Width: 60, Height: 8, Types: []widget.Type{typ}})
+	}
+	a := at(hosttest.DefaultNow)
+	w.send("breaking news")
+	a.Receive()
+	if !strings.Contains(a.Screen(), "breaking news") {
+		t.Fatalf("a shows:\n%s\nwant the pushed payload", a.Screen())
+	}
+
+	b := at(hosttest.DefaultNow.Add(time.Minute))
+	if !strings.Contains(b.Screen(), "breaking news") {
+		t.Errorf("an instance started after the push shows:\n%s\nwant the pushed payload from the cache", b.Screen())
+	}
+	if u.count() != 1 {
+		t.Errorf("fetched %d times, want 1: the push counts as fresh data", u.count())
+	}
+}
+
 func TestPRsMeetingsAndRemindersAreCachedWidgets(t *testing.T) {
 	for _, typ := range []widget.Type{prs.Type, meetings.Type, reminders.Type} {
 		t.Run(typ.Name, func(t *testing.T) {

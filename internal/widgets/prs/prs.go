@@ -47,11 +47,14 @@ type prs struct {
 func (prs) Credential() string { return credential }
 
 func (w prs) client(ctx context.Context, now time.Time) (client, error) {
-	tok, stored, err := token(ctx, w.ports)
+	tok, from, err := token(ctx, w.ports)
 	if err != nil {
 		return client{}, err
 	}
-	return client{http: w.ports.HTTP, endpoints: w.ports.Endpoints, token: tok, stored: stored, now: now}, nil
+	if fineGrained(tok) {
+		return client{}, refused(w.ports, from)
+	}
+	return client{http: w.ports.HTTP, endpoints: w.ports.Endpoints, token: tok, from: from, now: now}, nil
 }
 
 // query fetches the viewer and both searches in one request.
@@ -129,8 +132,8 @@ func (w prs) Refresh(ctx context.Context, now time.Time) (widget.Payload, error)
 		"requested": filter + " review-requested:@me",
 		"involved":  filter + " review-involves:@me",
 	}, &d)
-	if c.stored && errors.As(err, new(authError)) {
-		return widget.Payload{}, rejected()
+	if errors.As(err, new(authError)) {
+		return widget.Payload{}, rejected(w.ports, c.from)
 	}
 	if err != nil {
 		return widget.Payload{}, err

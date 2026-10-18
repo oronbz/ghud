@@ -54,7 +54,6 @@ func freshUntil(checked time.Time, fails int, interval time.Duration, midnight b
 	return at
 }
 
-// fresh reports whether Source id's data, cached or fetched, isn't due yet.
 func (m Model) fresh(id string, now time.Time) bool {
 	s := m.sched[id]
 	return s.key != "" && now.Before(freshUntil(s.checked, s.fails, s.interval, m.widgets[id].typ.Midnight))
@@ -78,21 +77,48 @@ func (m Model) fetchCached(id string, src widget.Source, now time.Time, force bo
 		ctx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
 		defer cancel()
 		p, err := src.Refresh(ctx, now)
-		e.CheckedAt, e.Status = now, statusOf(err)
-		var setup *widget.SetupError
-		var limited *widget.RateLimitError
-		switch {
-		case err == nil:
-			e.Payload, e.FetchedAt, e.Fails = p, now, 0
-		case errors.As(err, &setup):
-			e.Fails = 0
-		case !errors.As(err, &limited):
-			e.Fails++
-		}
 		// The cache only saves a fetch; failing to write it is no reason to drop the data.
-		_ = store.Save(key, e)
+		_ = store.Save(key, record(e, p, err, now))
 		return refreshedMsg{id: id, payload: p, err: err, at: now}
 	}
+}
+
+// record is entry e after a fetch or push at now gave p or err.
+func record(e cache.Entry, p widget.Payload, err error, now time.Time) cache.Entry {
+	e.CheckedAt, e.Status = now, statusOf(err)
+	var setup *widget.SetupError
+	var limited *widget.RateLimitError
+	switch {
+	case err == nil:
+		e.Payload, e.FetchedAt, e.Fails = p, now, 0
+	case errors.As(err, &setup):
+		e.Fails = 0
+	case !errors.As(err, &limited):
+		e.Fails++
+	}
+	return e
+}
+
+// cachePush writes what Source id pushed at now to its entry, as a fetch would.
+func (m Model) cachePush(id string, push widget.Push, now time.Time) sched {
+	s := m.sched[id]
+	if s.key == "" {
+		return s
+	}
+	e, _ := m.cache.Load(s.key)
+	if push.Lost {
+		e.Payload, e.FetchedAt = widget.Payload{}, time.Time{}
+	}
+	if push.Payload != nil || push.Err != nil {
+		var p widget.Payload
+		if push.Payload != nil {
+			p = *push.Payload
+		}
+		e = record(e, p, push.Err, now)
+	}
+	_ = m.cache.Save(s.key, e)
+	s.checked = e.CheckedAt
+	return s
 }
 
 // adopt takes Source id's data and Status from its cache entry: written by
@@ -128,7 +154,6 @@ func (m Model) adoptChanged(files []string) (Model, []tea.Cmd) {
 	return m, cmds
 }
 
-// cleanCache deletes the entries of Widgets no longer configured, once they're old.
 func (m Model) cleanCache() tea.Cmd {
 	var keep []string
 	for _, s := range m.sched {

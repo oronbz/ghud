@@ -15,7 +15,6 @@ type Pointer struct {
 	// Seam is the hovered or dragged seam, matched to a seam Zone by Kind,
 	// Row and Index.
 	Seam *Zone
-	// Drag is a title being dragged.
 	Drag *Drag
 }
 
@@ -24,8 +23,7 @@ type Drag struct {
 	ID string
 	// X and Y are the pointer; DX and DY where it holds the tile, from its corner.
 	X, Y, DX, DY int
-	// Drop is where the Widget would land if released now.
-	Drop *Drop
+	Drop         *Drop
 }
 
 // Drop is where a dragged Widget lands: on Side of Target. Left and Right
@@ -51,7 +49,6 @@ func (f Frame) Hit(x, y int) (Zone, bool) {
 	return Zone{}, false
 }
 
-// Tile is the tile drawn for id.
 func (f Frame) Tile(id string) (Tile, bool) {
 	for _, t := range f.Tiles {
 		if t.ID == id {
@@ -84,7 +81,6 @@ func (f Frame) DropAt(id string, x, y int) (Drop, bool) {
 	return Drop{}, false
 }
 
-// Drop moves id to where d says.
 func (l Layout) Drop(id string, d Drop) Layout {
 	tr, tc := l.Find(d.Target)
 	if tr < 0 || id == d.Target {

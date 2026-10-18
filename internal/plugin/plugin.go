@@ -27,20 +27,17 @@ import (
 	"github.com/oronbz/ghud/internal/widget"
 )
 
-// Protocol is the protocol version this ghud speaks.
 const Protocol = 1
 
 const (
-	// firstRestart is the wait before restarting a crashed Plugin; each
-	// crash in a row doubles it, up to maxRestart.
+	// Each crash in a row doubles the wait before a restart, up to maxRestart.
 	firstRestart = time.Second
 	maxRestart   = time.Minute
 	// steady is how long a process must run for its crash to count as a first one again.
 	steady           = time.Minute
 	handshakeTimeout = 10 * time.Second
 	invokeTimeout    = time.Minute
-	// exitWait is how long ghud waits for a Plugin to exit once told to.
-	exitWait = time.Second
+	exitWait         = time.Second
 )
 
 // Registry is every Plugin ghud found, keyed by directory, so finding them
@@ -49,8 +46,7 @@ type Registry struct {
 	mu      sync.Mutex
 	plugins map[string]*Plugin
 	// gone are stand-ins for the types of Plugins whose directories vanished.
-	gone map[string]widget.Type
-	// restarted are the types of Plugins the last Discover restarted.
+	gone      map[string]widget.Type
 	restarted []string
 }
 
@@ -58,8 +54,7 @@ func NewRegistry() *Registry {
 	return &Registry{plugins: map[string]*Plugin{}, gone: map[string]widget.Type{}}
 }
 
-// Dirs are the Plugin directories to read: each directory under
-// pluginsDir holding a manifest, then paths as listed.
+// Dirs are the directories under pluginsDir holding a manifest, then paths.
 func Dirs(pluginsDir string, paths []string) []string {
 	var dirs []string
 	entries, _ := os.ReadDir(pluginsDir)
@@ -76,9 +71,8 @@ func Dirs(pluginsDir string, paths []string) []string {
 	return append(dirs, paths...)
 }
 
-// Discover reads the manifests in dirs and returns the Widget types they
-// provide, leaving out type names in taken (the built-ins) and any a Plugin
-// read earlier provides. Problems name the manifest and what's wrong.
+// Discover returns the Widget types the manifests in dirs provide, leaving
+// out type names in taken and any a Plugin read earlier provides.
 func (r *Registry) Discover(dirs []string, taken []string) ([]widget.Type, []string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -119,9 +113,9 @@ func (r *Registry) Discover(dirs []string, taken []string) ([]widget.Type, []str
 	return types, problems
 }
 
-// Bundled returns the Widget types of the Plugins ghud ships with, read
-// from their built-in manifests. A type name in taken is left out quietly,
-// so an installed or path-listed Plugin of the same name takes its place.
+// Bundled returns the Widget types of the Plugins ghud ships with. A type
+// name in taken is left out quietly, so an installed or path-listed Plugin
+// of the same name takes its place.
 func (r *Registry) Bundled(ms []Manifest, taken []string) []widget.Type {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -134,7 +128,7 @@ func (r *Registry) Bundled(ms []Manifest, taken []string) []widget.Type {
 }
 
 // provide registers m's Plugin under key, restarting the one already there
-// when its manifest or record changed, and returns its Widget types not in taken.
+// when its manifest or record changed.
 func (r *Registry) provide(key string, m Manifest, rec Record, taken *[]string, isTaken func(typ string)) []widget.Type {
 	p := r.plugins[key]
 	switch {
@@ -163,8 +157,8 @@ func (r *Registry) provide(key string, m Manifest, rec Record, taken *[]string, 
 	return types
 }
 
-// Gone are stand-ins for the Widget types of Plugins that were found once
-// and whose directories have since vanished, such as uninstalled ones.
+// Gone are stand-ins for the Widget types of Plugins whose directories
+// vanished since they were found, such as uninstalled ones.
 func (r *Registry) Gone() []widget.Type {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -179,7 +173,6 @@ func (r *Registry) Restarted() []string {
 	return slices.Clone(r.restarted)
 }
 
-// Close stops every Plugin's process and waits a moment for them to exit.
 func (r *Registry) Close() {
 	r.mu.Lock()
 	plugins := slices.Collect(maps.Values(r.plugins))
@@ -202,9 +195,8 @@ type Plugin struct {
 	clock ports.Clock
 	proc  *process
 	// fails counts crashes in a row; retry is when the process may start again.
-	fails int
-	retry time.Time
-	// stopped is why the last process crashed.
+	fails   int
+	retry   time.Time
 	stopped error
 	closed  bool
 	// tap, when set, sees every message in (out false) and out, as sent.
@@ -238,8 +230,7 @@ func (p *Plugin) widget(typ string, schema []widget.Setting, c widget.Config) *p
 	return w
 }
 
-// connect returns the running process, starting it if it isn't, with
-// Widget w opened on it.
+// connect returns the running process, started if need be, with w open on it.
 func (p *Plugin) connect(ctx context.Context, w *pluginWidget) (*process, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -248,10 +239,10 @@ func (p *Plugin) connect(ctx context.Context, w *pluginWidget) (*process, error)
 	}
 	if p.proc == nil {
 		if p.closed {
-			return nil, p.named(errClosed)
+			return nil, p.withName(errClosed)
 		}
 		if now := p.clock.Now(); now.Before(p.retry) {
-			return nil, p.down(now)
+			return nil, p.stoppedErr(now)
 		}
 		proc, err := p.start(ctx)
 		if err != nil {
@@ -271,7 +262,6 @@ func (p *Plugin) connect(ctx context.Context, w *pluginWidget) (*process, error)
 	return p.proc, nil
 }
 
-// start runs the Plugin's command and shakes hands with it.
 func (p *Plugin) start(ctx context.Context) (*process, error) {
 	proc, err := p.spawn()
 	if err != nil {
@@ -283,7 +273,6 @@ func (p *Plugin) start(ctx context.Context) (*process, error) {
 	return proc, nil
 }
 
-// spawn runs the Plugin's command with a session on its stdio.
 func (p *Plugin) spawn() (*process, error) {
 	name := p.m.Command[0]
 	if strings.ContainsAny(name, `/\`) && !filepath.IsAbs(name) {
@@ -306,7 +295,7 @@ func (p *Plugin) spawn() (*process, error) {
 		return nil, err
 	}
 	if err := cmd.Start(); err != nil {
-		return nil, p.named(fmt.Errorf("didn't start: %w", err))
+		return nil, p.withName(fmt.Errorf("didn't start: %w", err))
 	}
 	proc.stdin = stdin
 	proc.conn = newConn(stdout, stdin, p.tap, p.notified, func(err error) { p.ended(proc, err) })
@@ -321,7 +310,7 @@ func (p *Plugin) handshake(ctx context.Context, proc *process) error {
 	if err := proc.conn.Call(ctx, "initialize", initializeParams{Protocol: Protocol, Ghud: version.Version}, &res); err != nil {
 		proc.stop()
 		<-proc.exited
-		return p.named(fmt.Errorf("failed its handshake: %w", proc.why(err)))
+		return p.withName(fmt.Errorf("failed its handshake: %w", proc.exitReason(err)))
 	}
 	if res.Protocol != Protocol {
 		proc.stop()
@@ -347,14 +336,7 @@ func (p *Plugin) restart(m Manifest, rec Record) {
 	}
 }
 
-// missing is the needs-setup hint for the Plugin's Widgets once it's gone.
-func (p *Plugin) missing() string {
-	hint := fmt.Sprintf("Plugin `%s` isn't installed", p.name)
-	if p.record.Source != "" {
-		hint += "; run `" + p.record.InstallCommand() + "`"
-	}
-	return hint
-}
+func (p *Plugin) missing() string { return missing(p.name, p.record) }
 
 // ended handles the end of proc's session: a crash fails its Widgets and
 // sets when the process may start again.
@@ -382,8 +364,8 @@ func (p *Plugin) ended(proc *process, err error) {
 	if err == nil {
 		err = errors.New("exited")
 	}
-	p.stopped = proc.stderr.with(err)
-	retry, crash := p.retry, p.down(now)
+	p.stopped = proc.stderr.withLastLine(err)
+	retry, crash := p.retry, p.stoppedErr(now)
 	p.mu.Unlock()
 	for _, w := range p.listed() {
 		w.deliver(widget.Push{Err: crash, Lost: true, Retry: retry})
@@ -398,8 +380,8 @@ func restartDelay(fails int) time.Duration {
 	return min(d, maxRestart)
 }
 
-// down is the error a stopped Plugin's Widgets show until it restarts.
-func (p *Plugin) down(now time.Time) error {
+// stoppedErr is what a stopped Plugin's Widgets show until it restarts.
+func (p *Plugin) stoppedErr(now time.Time) error {
 	hint := "Restarting it in " + widget.ShortDuration(p.retry.Sub(now).Round(time.Second))
 	return failure{msg: fmt.Sprintf("Plugin `%s` stopped: %v", p.name, p.stopped), reason: "plugin stopped", hint: hint}
 }
@@ -414,7 +396,6 @@ func (p *Plugin) listed() []*pluginWidget {
 	return ws
 }
 
-// notified handles a notification from the Plugin.
 func (p *Plugin) notified(method string, params json.RawMessage) {
 	if method != "widget/update" {
 		return
@@ -430,12 +411,12 @@ func (p *Plugin) notified(method string, params json.RawMessage) {
 		return
 	}
 	payload, err := u.read()
-	w.deliver(widget.Push{Payload: payload, Err: p.named(err)})
+	w.deliver(widget.Push{Payload: payload, Err: p.withName(err)})
 }
 
-// named puts the Plugin's name in front of errors ghud found, leaving the
-// ones the Plugin reported as they are.
-func (p *Plugin) named(err error) error {
+// withName puts the Plugin's name in front of errors ghud found; ones the
+// Plugin reported itself already read right.
+func (p *Plugin) withName(err error) error {
 	var f failure
 	var setup *widget.SetupError
 	var limited *widget.RateLimitError
@@ -446,15 +427,14 @@ func (p *Plugin) named(err error) error {
 	return fmt.Errorf("Plugin `%s` %w", p.name, err)
 }
 
-// callErr is a failed call's error: a stopped process says so.
 func (p *Plugin) callErr(err error) error {
 	if errors.Is(err, io.EOF) || errors.Is(err, errClosed) {
-		return p.named(errors.New("stopped"))
+		return p.withName(errors.New("stopped"))
 	}
-	return p.named(err)
+	return p.withName(err)
 }
 
-// release lets go of Widget w, stopping the process once no Widget needs it.
+// release lets go of w, stopping the process once no Widget needs it.
 func (p *Plugin) release(w *pluginWidget, on *process) {
 	p.wmu.Lock()
 	// A Widget rebuilt under the same id has taken w's place, so the Plugin keeps it.
@@ -490,8 +470,7 @@ func (p *Plugin) shutdown() {
 	}
 }
 
-// stop ends a process on purpose: closing stdin asks it to quit, and the
-// kill that follows makes sure it does.
+// stop asks the process to quit by closing stdin, then makes sure with a kill.
 func (proc *process) stop() {
 	proc.stopping.Store(true)
 	proc.conn.Close()
@@ -499,11 +478,11 @@ func (proc *process) stop() {
 	_ = proc.cmd.Process.Kill()
 }
 
-// why is the reason a call failed: how the process ended, when it did.
-func (proc *process) why(err error) error {
+// exitReason is how the process ended, when that's why a call failed.
+func (proc *process) exitReason(err error) error {
 	if errors.Is(err, io.EOF) || errors.Is(err, errClosed) {
 		<-proc.exited
-		return proc.stderr.with(proc.cmd.ProcessState)
+		return proc.stderr.withLastLine(proc.cmd.ProcessState)
 	}
 	return err
 }
@@ -524,8 +503,7 @@ func (t *tail) Write(b []byte) (int, error) {
 	return len(b), nil
 }
 
-// with is err followed by the last line the Plugin wrote to stderr.
-func (t *tail) with(err any) error {
+func (t *tail) withLastLine(err any) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	lines := strings.Split(strings.TrimSpace(string(t.buf)), "\n")
@@ -546,8 +524,7 @@ type pluginWidget struct {
 	shown  widget.Shown
 	push   func(widget.Push)
 	closed bool
-	// on is the process the Widget is open on.
-	on *process
+	on     *process
 }
 
 func (w *pluginWidget) Refresh(ctx context.Context, _ time.Time) (widget.Payload, error) {
@@ -562,9 +539,9 @@ func (w *pluginWidget) Refresh(ctx context.Context, _ time.Time) (widget.Payload
 	p, err := u.read()
 	switch {
 	case err != nil:
-		return widget.Payload{}, w.p.named(err)
+		return widget.Payload{}, w.p.withName(err)
 	case p == nil:
-		return widget.Payload{}, w.p.named(errors.New("answered widget/refresh with no payload"))
+		return widget.Payload{}, w.p.withName(errors.New("answered widget/refresh with no payload"))
 	}
 	return *p, nil
 }
@@ -586,7 +563,7 @@ func (w *pluginWidget) Invoke(ctx context.Context, inv widget.Invocation) (widge
 	}
 	settings, err := res.settings(w.schema)
 	if err != nil {
-		return widget.Result{}, w.p.named(err)
+		return widget.Result{}, w.p.withName(err)
 	}
 	res.Result.Settings = settings
 	return res.Result, nil

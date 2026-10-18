@@ -93,10 +93,13 @@ func TestPluginCheckFailsTheStepThatBreaksTheProtocol(t *testing.T) {
 		manifest string
 		step     string
 		want     []string
+		// timeout is how long each step waits; only a Plugin that never
+		// answers needs it short, so a slow machine can't fail earlier steps.
+		timeout string
 	}{
 		"invalid manifest": {manifest: "name = \"broken\"\nprotocol = 1\n", step: "manifest", want: []string{"ghud-plugin.toml: missing properties 'command', 'widget'"}},
 		"newer protocol":   {o: plugintest.Options{Protocol: 2}, step: "manifest", want: []string{"declares protocol 2, but this ghud speaks 1"}},
-		"no handshake":     {o: plugintest.Options{Args: []string{"-handshake", "silent"}}, step: "handshake", want: []string{"failed its handshake: didn't answer initialize"}},
+		"no handshake":     {o: plugintest.Options{Args: []string{"-handshake", "silent"}}, step: "handshake", want: []string{"failed its handshake: didn't answer initialize"}, timeout: "300ms"},
 		"empty handshake":  {o: plugintest.Options{Args: []string{"-handshake", "empty"}}, step: "handshake", want: []string{"speaks protocol 0", "answer to initialize breaks the schema: result: missing property 'protocol'"}},
 		"malformed":        {o: plugintest.Options{Mode: "malformed"}, step: "refresh fixture", want: []string{"sent a malformed message"}},
 		"raw colours":      {o: plugintest.Options{Mode: "raw-colour"}, step: "refresh fixture", want: []string{`"#ff0000" is not a theme token`, "answer to widget/refresh breaks the schema: result: payload.lines.0.spans.0.token"}},
@@ -109,7 +112,10 @@ func TestPluginCheckFailsTheStepThatBreaksTheProtocol(t *testing.T) {
 			} else {
 				plugintest.Write(t, dir, c.o)
 			}
-			s.Args = []string{"plugin", "check", "--timeout", "500ms", dir}
+			if c.timeout == "" {
+				c.timeout = "1m"
+			}
+			s.Args = []string{"plugin", "check", "--timeout", c.timeout, dir}
 
 			if code := cli.Run(s); code != 1 {
 				t.Fatalf("exit %d, want 1\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)

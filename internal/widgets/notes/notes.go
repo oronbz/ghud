@@ -4,8 +4,6 @@ package notes
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -13,8 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/gofrs/flock"
 
 	"github.com/oronbz/ghud/internal/theme"
 	"github.com/oronbz/ghud/internal/widget"
@@ -31,8 +27,7 @@ var Type = widget.Type{
 	}},
 	New: func(c widget.Config) widget.Widget {
 		file := c.DataFile(c.Settings.String("file"), "notes.md")
-		sum := sha256.Sum256([]byte(file))
-		return notes{file: file, lock: filepath.Join(c.DataDir, "locks", "notes-"+hex.EncodeToString(sum[:8])+".lock")}
+		return notes{file: file, lock: c.EditLock("notes", file)}
 	},
 }
 
@@ -96,7 +91,6 @@ func (n notes) copyForEditor() (widget.Result, error) {
 	return widget.Result{Edit: cp, Then: &widget.Action{ID: "editor-save", Label: "$EDITOR", Value: src}}, nil
 }
 
-// saveEditorCopy saves the editor's copy over the note, if the user changed it.
 func (n notes) saveEditorCopy(cp, base string, now time.Time) (widget.Result, error) {
 	b, err := os.ReadFile(cp)
 	if err != nil {
@@ -116,14 +110,11 @@ func (n notes) save(text, base string, now time.Time) (widget.Result, error) {
 	if text != "" && !strings.HasSuffix(text, "\n") {
 		text += "\n"
 	}
-	if err := os.MkdirAll(filepath.Dir(n.lock), 0o755); err != nil {
+	unlock, err := widget.Lock(n.lock)
+	if err != nil {
 		return widget.Result{}, err
 	}
-	l := flock.New(n.lock)
-	if err := l.Lock(); err != nil {
-		return widget.Result{}, err
-	}
-	defer l.Unlock()
+	defer unlock()
 
 	disk, err := n.read()
 	if err != nil {
@@ -162,10 +153,4 @@ func (n notes) keep(other string, now time.Time) (string, error) {
 	}
 }
 
-func (n notes) read() (string, error) {
-	b, err := os.ReadFile(n.file)
-	if errors.Is(err, fs.ErrNotExist) {
-		return "", nil
-	}
-	return string(b), err
-}
+func (n notes) read() (string, error) { return widget.ReadFile(n.file) }

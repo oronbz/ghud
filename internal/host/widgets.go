@@ -25,19 +25,17 @@ type configEditedMsg struct {
 	err   error
 }
 
-// addEntries are the palette's Add Widget Actions, one per Widget type.
 func (m Model) addEntries() []entry {
 	var es []entry
-	for _, t := range m.edits.Types {
+	for _, t := range m.configEditor.Types {
 		a := bound{Action: widget.Action{ID: "add", Label: "add " + t.Title + " Widget"}, by: addWidget, typ: t.Name}
 		es = append(es, entry{title: dashboard, action: a})
 	}
 	return es
 }
 
-// editConfig makes a host Action's edit to config.toml.
 func (m Model) editConfig(id string, a bound) tea.Cmd {
-	edits, ref := m.edits, m.widgets[id].ref
+	edits, ref := m.configEditor, m.widgets[id].ref
 	return func() tea.Msg {
 		msg := configEditedMsg{id: id, action: a}
 		switch a.by {
@@ -52,16 +50,14 @@ func (m Model) editConfig(id string, a bound) tea.Cmd {
 	}
 }
 
-// saveSettings writes settings an Action of Widget id returned into its block.
 func (m Model) saveSettings(id string, a widget.Action, settings widget.Settings, toast string) tea.Cmd {
-	edits, p := m.edits, m.widgets[id]
+	edits, p := m.configEditor, m.widgets[id]
 	return func() tea.Msg {
 		_, err := edits.SetSettings(p.typ.Name, p.ref, settings)
 		return configEditedMsg{id: id, action: bound{Action: a, by: saveSettings}, toast: toast, err: err}
 	}
 }
 
-// configEdited brings the dashboard in line with an edit to config.toml.
 func (m Model) configEdited(msg configEditedMsg) (Model, tea.Cmd) {
 	if msg.err != nil {
 		return m.say(capitalise(msg.action.Label)+" failed: "+msg.err.Error(), theme.Bad)
@@ -70,7 +66,7 @@ func (m Model) configEdited(msg configEditedMsg) (Model, tea.Cmd) {
 	case saveSettings:
 		return m.settingsSaved(msg.id, msg.toast)
 	case editSettings:
-		return m, m.opts.Ports.Editor.Edit(m.edits.Path, msg.line, func(err error) tea.Msg { return editedMsg{id: msg.id, err: err} })
+		return m, m.opts.Ports.Editor.Edit(m.configEditor.Path, msg.line, func(err error) tea.Msg { return editedMsg{id: msg.id, err: err} })
 	case removeWidget:
 		return m.removed(msg.id)
 	}
@@ -104,7 +100,6 @@ func (m Model) added(wc config.Widget) (Model, tea.Cmd) {
 	m.widgets[wc.ID] = p
 	m.schedule(wc.ID, wc.Refresh)
 	m.layout = m.layout.Join(m.ids())
-	m = m.saveLayout()
 	m, toast := m.say("Added "+p.title, theme.Fg)
 	m, fetch := m.whenDue(wc.ID)
 	m, beat := m.beat()
@@ -136,6 +131,5 @@ func (m Model) removed(id string) (Model, tea.Cmd) {
 		m.last = ""
 	}
 	m.layout = m.layout.Join(m.ids())
-	m = m.saveLayout()
 	return m.say("Removed "+gone.title, theme.Fg)
 }

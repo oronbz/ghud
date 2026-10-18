@@ -25,9 +25,8 @@ type Entry struct {
 	FetchedAt time.Time `json:"fetchedAt"`
 	// CheckedAt is when the last fetch started, whatever its outcome.
 	CheckedAt time.Time `json:"checkedAt"`
-	// Fails counts the failed fetches since the last success.
-	Fails  int    `json:"fails,omitempty"`
-	Status Status `json:"status"`
+	Fails     int       `json:"fails,omitempty"`
+	Status    Status    `json:"status"`
 }
 
 // Status is how the last fetch went, as far as it outlives the error itself.
@@ -39,8 +38,7 @@ type Status struct {
 	// Setup, with Error as its hint, is a fetch that needs setup, fixed by Action.
 	Setup  bool           `json:"setup,omitempty"`
 	Action *widget.Action `json:"action,omitempty"`
-	// Until is when a rate limit lifts.
-	Until time.Time `json:"until,omitzero"`
+	Until  time.Time      `json:"until,omitzero"`
 }
 
 // Store is the cache directory, ~/.cache/ghud/widgets.

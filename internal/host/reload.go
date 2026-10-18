@@ -10,13 +10,12 @@ import (
 	"github.com/oronbz/ghud/internal/theme"
 )
 
-// filesChangedMsg says files ghud watches changed on disk.
 type filesChangedMsg struct{ files []string }
 
 // watch points the file watcher at every file ghud reads: config.toml,
 // layout.json, the plugins directory and each Watcher Widget's files.
 func (m Model) watch() Model {
-	files := []string{m.edits.Path, m.layoutFile(), m.pluginsDir()}
+	files := []string{m.configEditor.Path, m.layoutFile(), m.pluginsDir()}
 	for _, id := range m.ids() {
 		if key := m.sched[id].key; key != "" {
 			files = append(files, m.cache.File(key))
@@ -37,12 +36,11 @@ func (m Model) nextChange() tea.Cmd {
 	return m.opts.Ports.Watcher.Next(func(files []string) tea.Msg { return filesChangedMsg{files} })
 }
 
-// filesChanged reloads what the changed files hold.
 func (m Model) filesChanged(msg filesChangedMsg) (Model, tea.Cmd) {
 	cmds := []tea.Cmd{m.nextChange()}
 	var fresh, restarted []string
 	// Installing, updating or uninstalling a Plugin changes which Widget types exist.
-	if slices.Contains(msg.files, m.edits.Path) || slices.Contains(msg.files, m.pluginsDir()) {
+	if slices.Contains(msg.files, m.configEditor.Path) || slices.Contains(msg.files, m.pluginsDir()) {
 		var cmd tea.Cmd
 		m, fresh, cmd = m.reloadConfig()
 		cmds = append(cmds, cmd)
@@ -73,12 +71,12 @@ func (m Model) filesChanged(msg filesChangedMsg) (Model, tea.Cmd) {
 // built afresh, which need a refresh. A config that doesn't parse leaves
 // everything as it was and says why until it parses again.
 func (m Model) reloadConfig() (Model, []string, tea.Cmd) {
-	cfg, err, types, problems := m.loadConfig(m.edits.Path, m.baseTypes())
+	cfg, err, types, problems := m.loadConfig(m.configEditor.Path, m.baseTypes())
 	if err != nil {
-		m.sticky = err.Error()
+		m.configProblem = err.Error()
 		return m, nil, nil
 	}
-	m.edits.Types = types
+	m.configEditor.Types = types
 	var cmds []tea.Cmd
 	if cfg.Theme != m.colors.name && !m.colors.pinned {
 		m.colors.asking = true
@@ -88,7 +86,7 @@ func (m Model) reloadConfig() (Model, []string, tea.Cmd) {
 	m = m.resolveTheme()
 
 	m, ids, fresh, clamped := m.placeAll(cfg)
-	m.sticky = toastOf(slices.Concat(cfg.Problems, problems, clamped))
+	m.configProblem = toastOf(slices.Concat(cfg.Problems, problems, clamped))
 	m.layout = m.layout.Join(ids)
 	if m.arranging {
 		m.before = m.before.Join(ids)

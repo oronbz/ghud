@@ -82,7 +82,6 @@ func (c *calendar) Payload(f widget.Frame) widget.Payload {
 	}}
 }
 
-// column is where day d sits in a week starting on c.first.
 func (c *calendar) column(d time.Weekday) int { return (int(d) - int(c.first) + 7) % 7 }
 
 func (c *calendar) header() widget.Line {

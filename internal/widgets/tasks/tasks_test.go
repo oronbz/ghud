@@ -380,6 +380,25 @@ file = "lists/today.md"
 	}
 }
 
+func TestATildeFileIsUnderTheHomeGhudIsGiven(t *testing.T) {
+	home := t.TempDir()
+	h := hosttest.New(t, hosttest.Options{Width: 50, Height: 7, Env: map[string]string{"HOME": home}, Config: `
+[[widget]]
+type = "tasks"
+file = "~/lists/today.md"
+`})
+	h.Press("tab", "a")
+	typeText(h, "Plan the week")
+	h.Press("enter")
+	b, err := os.ReadFile(filepath.Join(home, "lists", "today.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := string(b), "- [ ] Plan the week\n"; got != want {
+		t.Errorf("file holds %q, want %q", got, want)
+	}
+}
+
 func TestEditingTasksMdOutsideGhudUpdatesTheWidget(t *testing.T) {
 	h := withTasks(t, "- [ ] Call the bank\n", hosttest.Options{Width: 40, Height: 7})
 

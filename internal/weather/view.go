@@ -30,7 +30,6 @@ type block struct {
 	lines []line
 }
 
-// hourWidth is the cells one hour takes in the hourly rows.
 const hourWidth = 5
 
 // payload draws r to fit sz, the Widget's inner size; a zero size is unknown.

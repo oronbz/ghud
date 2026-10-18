@@ -8,12 +8,16 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
 	"time"
 
+	"github.com/gofrs/flock"
+
 	"github.com/oronbz/ghud/internal/config"
+	"github.com/oronbz/ghud/internal/github"
 	"github.com/oronbz/ghud/internal/host"
 	"github.com/oronbz/ghud/internal/paths"
 	"github.com/oronbz/ghud/internal/plugin"
@@ -21,16 +25,21 @@ import (
 	"github.com/oronbz/ghud/internal/ports"
 )
 
-// fetchTimeout bounds one download of a Plugin's repository.
 const fetchTimeout = 5 * time.Minute
 
-// pluginManage runs `ghud plugin install|update|uninstall|list <args>`.
 func pluginManage(s System, pp ports.Ports, p paths.Paths, configFile string, locale config.Locale, args []string) int {
 	c := pluginCLI{s: s, in: bufio.NewReader(s.Stdin), installer: install.Installer{
 		Dir:     filepath.Join(p.Data, "plugins"),
 		Fetcher: githubFetcher(s.Getenv, pp),
 		Log:     s.Stderr,
 	}}
+	if args[0] != "list" {
+		unlock, err := lockPlugins(p.Data)
+		if err != nil {
+			return c.fail(err)
+		}
+		defer unlock()
+	}
 	switch args[0] {
 	case "install":
 		return c.install(args[1:])
@@ -42,6 +51,24 @@ func pluginManage(s System, pp ports.Ports, p paths.Paths, configFile string, lo
 	return c.list(host.PluginPaths(configFile, locale, s.Getenv))
 }
 
+// lockPlugins keeps two `ghud plugin` commands from changing the plugins
+// directory at once; the second fails rather than waiting on a slow build.
+func lockPlugins(dataDir string) (unlock func(), err error) {
+	dir := filepath.Join(dataDir, "locks")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	l := flock.New(filepath.Join(dir, "plugins.lock"))
+	ok, err := l.TryLock()
+	switch {
+	case err != nil:
+		return nil, fmt.Errorf("can't lock the plugins directory: %w", err)
+	case !ok:
+		return nil, errors.New("another `ghud plugin` command is running; try again once it's done")
+	}
+	return func() { _ = l.Unlock() }, nil
+}
+
 func githubFetcher(getenv func(string) string, pp ports.Ports) install.GitHub {
 	client := &http.Client{Timeout: fetchTimeout}
 	if pp.HTTP != nil {
@@ -49,24 +76,11 @@ func githubFetcher(getenv func(string) string, pp ports.Ports) install.GitHub {
 		c.Timeout = fetchTimeout
 		client = &c
 	}
-	return install.GitHub{HTTP: client, API: pp.Endpoints.GitHubREST, Token: githubToken(getenv, pp.Commands)}
-}
-
-// githubToken is the token gh and GitHub's tools use, if any; Plugins
-// from public repositories need none.
-func githubToken(getenv func(string) string, c ports.Commands) string {
-	for _, k := range []string{"GH_TOKEN", "GITHUB_TOKEN"} {
-		if v := getenv(k); v != "" {
-			return v
-		}
-	}
+	// Plugins from public repositories need no token.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	out, err := c.Output(ctx, "gh", "auth", "token")
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(out))
+	tok, _ := github.Token(ctx, getenv, pp.Commands)
+	return install.GitHub{HTTP: client, API: pp.Endpoints.GitHubREST, Token: tok}
 }
 
 type pluginCLI struct {
@@ -204,7 +218,6 @@ func (c *pluginCLI) list(listed []string) int {
 	return 0
 }
 
-// trust shows what a Plugin provides and runs, and asks whether to go on.
 func (c *pluginCLI) trust(plan install.Plan) bool {
 	out := c.s.Stdout
 	m := plan.Manifest

@@ -63,8 +63,7 @@ func For(getenv func(string) string, version string) (Installer, error) {
 type Report struct {
 	// Installed are the skill folders written; Linked, the symlinks to them.
 	Installed, Linked []string
-	// Removed are the folders and symlinks Uninstall deleted.
-	Removed []string
+	Removed           []string
 	// Kept are notes on paths left alone because ghud didn't put them there.
 	Kept []string
 }
@@ -328,7 +327,6 @@ func digest(files map[string][]byte) string {
 // stampRe matches the stamp exactly as stamp writes it, last in the frontmatter.
 var stampRe = regexp.MustCompile(`\nmetadata:\n  ghud-version: "([^"\n]*)"\n  ghud-digest: "([^"\n]*)"\n---\n`)
 
-// stamp adds ghud's metadata to the end of a SKILL.md's frontmatter.
 func stamp(md []byte, version, digest string) ([]byte, error) {
 	end := frontmatterEnd(md)
 	if end < 0 {

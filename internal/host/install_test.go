@@ -73,6 +73,29 @@ func TestUninstallingPutsTheWidgetsInNeedsSetupNamingTheInstallCommand(t *testin
 	hides(t, in.h, "hello alpha", "unknown Widget type")
 }
 
+func TestAnInstanceStartedAfterAnUninstallStillNamesTheInstallCommand(t *testing.T) {
+	in := newInstalls(t)
+	in.install()
+	if _, err := in.ins.Uninstall("greet"); err != nil {
+		t.Fatal(err)
+	}
+
+	started := func() *hosttest.Host {
+		return hosttest.New(t, hosttest.Options{Root: in.h.Root, Width: 100, Height: 12, Types: []widget.Type{}})
+	}
+	later := started()
+	shows(t, later, "needs setup", "Plugin `greet` isn't installed", "ghud plugin install octo/greet")
+	hides(t, later, "unknown Widget type")
+
+	in.install()
+	again := started()
+	shows(t, again, "hello alpha")
+	hides(t, again, "needs setup")
+	if got := in.ins.List(); len(got) != 1 {
+		t.Errorf("installed %v, want greet alone", got)
+	}
+}
+
 func TestARunningInstanceRestartsThePluginAfterAnUpdate(t *testing.T) {
 	in := newInstalls(t)
 	in.install()

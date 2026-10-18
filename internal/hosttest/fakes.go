@@ -47,7 +47,6 @@ func (c *Clock) After(d time.Duration, msg func(time.Time) tea.Msg) tea.Cmd {
 	}
 }
 
-// Pending is the number of armed timers.
 func (c *Clock) Pending() int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -135,7 +134,6 @@ func (w *Watcher) Next(msg func([]string) tea.Msg) tea.Cmd {
 	}
 }
 
-// Files are the files the app watches.
 func (w *Watcher) Files() []string {
 	w.mu.Lock()
 	defer w.mu.Unlock()

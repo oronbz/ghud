@@ -24,7 +24,6 @@ type pushedMsg struct {
 	push widget.Push
 }
 
-// retryMsg is the time a Widget asked to be refreshed again arriving.
 type retryMsg struct {
 	id   string
 	from widget.Widget
@@ -45,23 +44,28 @@ func (m Model) loadConfig(file string, base []widget.Type) (config.Config, error
 	for _, p := range cfg.Plugins {
 		paths = append(paths, m.pluginPath(file, p.Path))
 	}
-	taken := make([]string, 0, len(base))
-	for _, t := range base {
-		taken = append(taken, t.Name)
-	}
-	found, problems := m.plugins.Discover(plugin.Dirs(m.pluginsDir(), paths), taken)
-	for _, t := range found {
-		taken = append(taken, t.Name)
-	}
-	found = append(found, m.plugins.Bundled(m.bundled(), taken)...)
+	found, problems := m.plugins.Discover(plugin.Dirs(m.pluginsDir(), paths), names(base))
+	found = append(found, m.plugins.Bundled(m.bundled(), names(base, found))...)
 	gone := m.plugins.Gone()
+	gone = append(gone, plugin.Buried(m.pluginsDir(), names(base, found, gone))...)
+	gone = append(gone, unavailable(names(base, found, gone))...)
 	if len(found) == 0 && len(gone) == 0 {
 		return cfg, err, base, problems
 	}
 	types := append(append([]widget.Type{}, base...), found...)
-	// The stand-ins for uninstalled Plugins' types only tell config what their Widgets need.
+	// The stand-ins for missing types only tell config what their Widgets need.
 	cfg, err = config.Load(file, append(slices.Clip(types), gone...), m.opts.Locale)
 	return cfg, err, types, problems
+}
+
+func names(lists ...[]widget.Type) []string {
+	var out []string
+	for _, l := range lists {
+		for _, t := range l {
+			out = append(out, t.Name)
+		}
+	}
+	return out
 }
 
 // Types are the built-in Widget types plus those of the Plugins installed in
@@ -101,7 +105,6 @@ func (m Model) pluginPath(configFile, p string) string {
 // Close stops every Plugin's process.
 func (m Model) Close() { m.plugins.Close() }
 
-// listen starts the deliveries of the Pushers among ids.
 func (m Model) listen(ids []string) tea.Cmd {
 	var cmds []tea.Cmd
 	for _, id := range ids {
@@ -141,6 +144,7 @@ func (m Model) pushed(msg pushedMsg) (Model, tea.Cmd) {
 	}
 	s, _ = m.settle(msg.id, s, p, fetched, msg.push.Err)
 	m.sched[msg.id] = s
+	m.sched[msg.id] = m.cachePush(msg.id, msg.push, now)
 	m.clampList(msg.id)
 	if at := msg.push.Retry; !at.IsZero() {
 		id, from := msg.id, msg.from
@@ -156,7 +160,6 @@ func (m Model) retried(msg retryMsg) (Model, tea.Cmd) {
 	return m.start(msg.id)
 }
 
-// observe tells every Observer how it's shown now, when that changed.
 func (m Model) observe() {
 	// Until the terminal reports its size, any size would be a guess, and a
 	// Plugin would fit its first payload to it.
@@ -185,7 +188,6 @@ func (m Model) observe() {
 	}
 }
 
-// closeDropped closes the Widgets in old that m no longer holds.
 func (m Model) closeDropped(old map[string]placed) {
 	for id, p := range old {
 		if c, ok := p.widget.(widget.Closer); ok && m.widgets[id].widget != p.widget {

@@ -24,14 +24,13 @@ type Tile struct {
 	Handle  bool
 	Payload widget.Payload
 	// List is how a list Payload is selected and scrolled.
-	List List
-	// Hints are the key hints drawn in the bottom border.
-	Hints []Hint
-	// Status is drawn at the right of the top border.
+	List   List
+	Hints  []Hint
 	Status Status
 }
 
-// Status is a Widget's health as its top border shows it.
+// Status is how a tile's top border decorates its Widget's Status: the
+// spinner while refreshing, the stale marker, or the age of cached data.
 type Status struct {
 	// Spinner is the spinner frame while the Widget refreshes, or "".
 	Spinner string

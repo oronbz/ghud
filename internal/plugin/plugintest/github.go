@@ -20,12 +20,10 @@ import (
 type GitHub struct {
 	*httptest.Server
 
-	mu    sync.Mutex
-	repos map[string]*repo
-	// tarballs counts downloads per repository.
+	mu       sync.Mutex
+	repos    map[string]*repo
 	tarballs map[string]int
-	// auth is the Authorization header of every request, in order.
-	auth []string
+	auth     []string
 }
 
 type repo struct {
@@ -34,7 +32,6 @@ type repo struct {
 	commits map[string]map[string]string
 }
 
-// NewGitHub starts a fake GitHub that lives as long as the test.
 func NewGitHub(t testing.TB) *GitHub {
 	g := &GitHub{repos: map[string]*repo{}, tarballs: map[string]int{}}
 	g.Server = httptest.NewServer(http.HandlerFunc(g.serve))
@@ -64,14 +61,12 @@ func (g *GitHub) Push(repoName, ref string, files map[string]string) string {
 	return sha
 }
 
-// Tarballs is how many times repo's files were downloaded.
 func (g *GitHub) Tarballs(repoName string) int {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	return g.tarballs[repoName]
 }
 
-// Auth is the Authorization header each request carried.
 func (g *GitHub) Auth() []string {
 	g.mu.Lock()
 	defer g.mu.Unlock()

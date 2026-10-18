@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gofrs/flock"
+
 	"github.com/oronbz/ghud/internal/cli"
 	"github.com/oronbz/ghud/internal/plugin/plugintest"
 )
@@ -292,7 +294,7 @@ func TestPluginUninstallDeletesTheFolder(t *testing.T) {
 		t.Fatalf("exit %d, stderr:\n%s", code, stderr)
 	}
 	contains(t, "stdout", stdout, "Uninstalled greet")
-	if got := in.installed(); strings.Join(got, " ") != ".staging" {
+	if got := in.installed(); strings.Join(got, " ") != ".staging .uninstalled" {
 		t.Errorf("plugins directory holds %v after uninstall", got)
 	}
 	code, _, stderr = in.ghud("", "plugin", "uninstall", "greet")
@@ -302,6 +304,46 @@ func TestPluginUninstallDeletesTheFolder(t *testing.T) {
 	contains(t, "stderr", stderr, "Plugin `greet` isn't installed")
 	if _, _, stderr := in.ghud("", "plugin", "uninstall", "../../.."); !strings.Contains(stderr, "isn't a Plugin name") {
 		t.Errorf("a path as the name: %s", stderr)
+	}
+}
+
+func TestPluginCommandsRefuseToRunWhileAnotherHoldsThePluginsLock(t *testing.T) {
+	in := newInstalls(t)
+	in.gh.Push("octo/greet", "main", greetPlugin(t, "", nil))
+	in.ghud("", "plugin", "install", "-y", "octo/greet")
+
+	// Another `ghud plugin` command, in another process, holds the lock.
+	locks := filepath.Join(in.home, ".local", "share", "ghud", "locks")
+	if err := os.MkdirAll(locks, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	other := flock.New(filepath.Join(locks, "plugins.lock"))
+	if ok, err := other.TryLock(); !ok || err != nil {
+		t.Fatalf("couldn't take the lock: %v", err)
+	}
+	for _, args := range [][]string{
+		{"plugin", "install", "-y", "octo/greet"},
+		{"plugin", "update", "-y"},
+		{"plugin", "uninstall", "greet"},
+	} {
+		code, _, stderr := in.ghud("", args...)
+		if code != 1 {
+			t.Errorf("%v: exit %d, want 1", args, code)
+		}
+		contains(t, strings.Join(args, " ")+" stderr", stderr, "another `ghud plugin` command is running")
+	}
+	if got := in.installed(); !strings.Contains(strings.Join(got, " "), "greet") {
+		t.Errorf("plugins directory holds %v, want greet untouched", got)
+	}
+	if code, stdout, _ := in.ghud("", "plugin", "list"); code != 0 || !strings.Contains(stdout, "greet") {
+		t.Errorf("plugin list: exit %d, stdout %q; listing needs no lock", code, stdout)
+	}
+
+	if err := other.Unlock(); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, stderr := in.ghud("", "plugin", "uninstall", "greet"); code != 0 {
+		t.Errorf("once the lock is free: exit %d, stderr:\n%s", code, stderr)
 	}
 }
 

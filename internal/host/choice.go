@@ -73,7 +73,6 @@ func (m Model) chose(msg choicesMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// promptOf titles a choice Action's menu: its Prompt, else its label.
 func promptOf(a bound) string {
 	if a.Prompt != "" {
 		return a.Prompt

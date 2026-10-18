@@ -64,7 +64,6 @@ func (t Token) String() string {
 	return names[t]
 }
 
-// Lookup finds a token by its config name.
 func Lookup(name string) (Token, bool) {
 	for i, n := range names {
 		if n == name {
@@ -102,7 +101,6 @@ func ParseColor(s string) (color.Color, bool) {
 	return lipgloss.Color("#" + h), true
 }
 
-// Hex formats c as "#rrggbb".
 func Hex(c color.Color) string {
 	r, g, b, _ := c.RGBA()
 	return fmt.Sprintf("#%02x%02x%02x", r>>8, g>>8, b>>8)

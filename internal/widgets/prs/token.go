@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/oronbz/ghud/internal/github"
 	"github.com/oronbz/ghud/internal/ports"
 	"github.com/oronbz/ghud/internal/widget"
 )
@@ -14,14 +15,14 @@ import (
 // on one pauses them all. It's also the account of ghud's keyring item.
 const credential = "github:github.com"
 
-// service is the keyring service ghud keeps its own credentials under.
 const service = "ghud"
 
-// tokenPage creates a classic token with repo scope.
 const tokenPage = "https://github.com/settings/tokens/new?scopes=repo&description=ghud"
 
-// pasteToken is the setup Action that stores a pasted classic token.
 const pasteToken = "paste-token"
+
+// fromKeyring is how setup hints name the token pasted into ghud.
+const fromKeyring = "the saved token"
 
 var (
 	errNoToken   = errors.New("no GitHub token")
@@ -29,35 +30,37 @@ var (
 )
 
 // token borrows a GitHub token from GH_TOKEN, GITHUB_TOKEN or `gh auth token`,
-// else reads the one pasted into ghud from the keyring; stored says which.
-// It's read afresh each time and never kept, so a `gh auth login` is picked
-// up on the next refresh.
-func token(ctx context.Context, p ports.Ports) (tok string, stored bool, err error) {
-	if p.Getenv != nil {
-		for _, k := range []string{"GH_TOKEN", "GITHUB_TOKEN"} {
-			if t := strings.TrimSpace(p.Getenv(k)); t != "" {
-				return t, false, nil
-			}
-		}
-	}
-	if out, err := p.Commands.Output(ctx, "gh", "auth", "token"); err == nil {
-		if t := strings.TrimSpace(string(out)); t != "" {
-			return t, false, nil
-		}
+// else reads the one pasted into ghud from the keyring; from names where it
+// came from. It's read afresh each time and never kept, so a `gh auth login`
+// is picked up on the next refresh.
+func token(ctx context.Context, p ports.Ports) (tok, from string, err error) {
+	if tok, from := github.Token(ctx, p.Getenv, p.Commands); tok != "" {
+		return tok, from, nil
 	}
 	if p.Keyring == nil {
-		return "", false, errNoKeyring
+		return "", "", errNoKeyring
 	}
 	t, err := p.Keyring.Get(service, credential)
 	switch {
 	case errors.Is(err, ports.ErrSecretNotFound):
-		return "", false, errNoToken
+		return "", "", errNoToken
 	case err != nil:
-		return "", false, errNoKeyring
+		return "", "", errNoKeyring
 	case strings.TrimSpace(t) == "":
-		return "", false, errNoToken
+		return "", "", errNoToken
 	}
-	return strings.TrimSpace(t), true, nil
+	return strings.TrimSpace(t), fromKeyring, nil
+}
+
+// fineGrained reports a github_pat_ token, which can't search other orgs' PRs.
+func fineGrained(tok string) bool { return strings.HasPrefix(tok, "github_pat_") }
+
+func canStore(p ports.Ports) bool {
+	if p.Keyring == nil {
+		return false
+	}
+	_, err := p.Keyring.Get(service, credential)
+	return err == nil || errors.Is(err, ports.ErrSecretNotFound)
 }
 
 // needsToken is the Status of a Widget with no token to use, err being why.
@@ -68,12 +71,24 @@ func needsToken(err error) *widget.SetupError {
 	return &widget.SetupError{Hint: "Run `gh auth login`, or press Enter to paste a classic token", Action: pasteAction()}
 }
 
-// rejected is the Status of a Widget whose stored token GitHub turned down.
-func rejected() *widget.SetupError {
+// unusable is the Status of a Widget whose token can't be used, problem
+// saying why; it offers the same setup Action as having no token.
+func unusable(p ports.Ports, problem string) *widget.SetupError {
+	if !canStore(p) {
+		return &widget.SetupError{Hint: problem + ". Set GH_TOKEN to a classic token with repo scope"}
+	}
 	return &widget.SetupError{
-		Hint:   "GitHub rejected the saved token. Run `gh auth login`, or press Enter to paste a classic token",
+		Hint:   problem + ". Run `gh auth login`, or press Enter to paste a classic token",
 		Action: pasteAction(),
 	}
+}
+
+func rejected(p ports.Ports, from string) *widget.SetupError {
+	return unusable(p, "GitHub rejected "+from)
+}
+
+func refused(p ports.Ports, from string) *widget.SetupError {
+	return unusable(p, from+" is a fine-grained token. Use a classic token with repo scope")
 }
 
 func pasteAction() *widget.Action {
@@ -83,13 +98,12 @@ func pasteAction() *widget.Action {
 	}
 }
 
-// store keeps a pasted classic token in the keyring.
 func store(p ports.Ports, text string) (widget.Result, error) {
 	tok := strings.TrimSpace(text)
 	switch {
 	case tok == "":
 		return widget.Result{}, errors.New("no token pasted")
-	case strings.HasPrefix(tok, "github_pat_"):
+	case fineGrained(tok):
 		return widget.Result{}, errors.New("Use a classic token with repo scope")
 	case p.Keyring == nil:
 		return widget.Result{}, errors.New("no keyring to keep the token in; set GH_TOKEN instead")

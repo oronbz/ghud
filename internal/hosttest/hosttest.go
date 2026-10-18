@@ -47,6 +47,9 @@ type Options struct {
 	// Keyring, when set, is the keyring fake the app starts with, so its
 	// first refresh already sees the stored secrets (or Err).
 	Keyring *Keyring
+	// Commands, when set, is the command fake the app starts with, so its
+	// first refresh already sees the scripted outputs.
+	Commands *Commands
 	// Env is the process environment the app sees; it's empty by default.
 	Env map[string]string
 	// Version is the ghud version the app runs as (see host.Options.Version).
@@ -99,6 +102,9 @@ func New(t testing.TB, o Options) *Host {
 	if o.Keyring == nil {
 		o.Keyring = &Keyring{}
 	}
+	if o.Commands == nil {
+		o.Commands = &Commands{}
+	}
 	var th theme.Theme
 	if o.Theme != nil {
 		th = *o.Theme
@@ -112,7 +118,7 @@ func New(t testing.TB, o Options) *Host {
 		Clipboard: &Clipboard{},
 		Editor:    &Editor{},
 		Keyring:   o.Keyring,
-		Commands:  &Commands{},
+		Commands:  o.Commands,
 		EventKit:  o.EventKit,
 		Machine:   &Machine{},
 		Watcher:   &Watcher{},
@@ -250,7 +256,6 @@ func (h *Host) Changed(files ...string) {
 	h.Send(msg)
 }
 
-// receiveWait is how long Receive waits for a message from outside the app.
 const receiveWait = 10 * time.Second
 
 // Receive waits for the next message that arrives on its own from outside

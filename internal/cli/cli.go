@@ -70,7 +70,6 @@ or GHUD_CONFIG, or --config.
 of two: --close-key cmd+shift+g --close-key 'ctrl+b d'.
 `
 
-// Run runs ghud and returns its exit code.
 func Run(s System) int {
 	fs := flag.NewFlagSet("ghud", flag.ContinueOnError)
 	fs.SetOutput(s.Stderr)
@@ -140,7 +139,7 @@ func Run(s System) int {
 		return configInit(s, configFile, reference())
 	case "auth jira":
 		types, _ := host.Types(p, configFile, bundle, locale, s.Getenv)
-		return authJira(s, pp, config.Editor{Path: configFile, LockDir: filepath.Join(p.Data, "locks"), Types: types, Locale: locale})
+		return authJira(s, pp, config.NewEditor(configFile, p.Data, types, locale))
 	default:
 		fmt.Fprintf(s.Stderr, "ghud: unknown command %q\n\n%s", strings.Join(fs.Args(), " "), usage)
 		return 2

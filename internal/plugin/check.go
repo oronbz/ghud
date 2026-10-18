@@ -18,7 +18,6 @@ import (
 	"github.com/oronbz/ghud/internal/widget"
 )
 
-// CheckOptions shape a conformance check.
 type CheckOptions struct {
 	Clock ports.Clock
 	// Timeout bounds each step's wait on the Plugin; zero is 10s.
@@ -30,9 +29,8 @@ type CheckOptions struct {
 const checkAction = "ghud-plugin-check"
 
 // Check is `ghud plugin check`: it runs the Plugin in dir through the same
-// host code ghud uses (handshake, each Widget type's lifecycle, a refresh
-// and an Action round-trip), checks every message against the shipped
-// schema, and prints a line per step to out. It reports whether all passed.
+// host code ghud uses, checks every message against the shipped schema and
+// prints a line per step to out.
 func Check(dir string, o CheckOptions, out io.Writer) bool {
 	if o.Timeout <= 0 {
 		o.Timeout = handshakeTimeout
@@ -87,7 +85,7 @@ func Check(dir string, o CheckOptions, out io.Writer) bool {
 		}
 		defer func() { proc = nil }()
 		if st := proc.cmd.ProcessState; !st.Success() {
-			return "", proc.stderr.with(fmt.Sprintf("exited with %v once its stdin closed", st))
+			return "", proc.stderr.withLastLine(fmt.Sprintf("exited with %v once its stdin closed", st))
 		}
 		return "exited once its stdin closed", nil
 	})
@@ -99,8 +97,6 @@ func Check(dir string, o CheckOptions, out io.Writer) bool {
 	return true
 }
 
-// lifecycle opens a Widget of type wt, refreshes it, runs an Action
-// round-trip on it and closes it.
 func (c *checker) lifecycle(p *Plugin, wt WidgetType) {
 	t, _ := wt.widgetType()
 	w := p.widget(t.Name, t.Settings, widget.Config{ID: t.Name, Settings: widget.Defaults(t.Settings), Ports: ports.Ports{Clock: p.clock}})
@@ -264,7 +260,6 @@ func (c *checker) tap(out bool, raw []byte) {
 	}
 }
 
-// resultDefs names the schema of each request's result.
 var resultDefs = map[string]string{
 	"initialize":     "initializeResult",
 	"widget/refresh": "refreshResult",

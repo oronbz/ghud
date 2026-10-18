@@ -19,13 +19,11 @@ type palette struct {
 	sel, top int
 }
 
-// entry is one Action in the palette, with the Widget it belongs to.
 type entry struct {
 	widget, title string
 	action        bound
 }
 
-// paletteRows caps how many entries the palette shows at once.
 const paletteRows = 12
 
 // entries are the Actions matching the query, best first; with no query,
@@ -94,8 +92,6 @@ func (m Model) paletteKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// paletteLayer draws the query line and the matching entries, each as its
-// Widget's title, the Action's label and the key that runs it.
 func (m Model) paletteLayer() *lipgloss.Layer {
 	p := m.palette
 	es := m.entries()

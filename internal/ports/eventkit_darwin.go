@@ -107,7 +107,7 @@ func (k *macEventKit) Reminders(_ context.Context) ([]Reminder, error) {
 	return out, nil
 }
 
-// reminderOf converts r. EventKit keeps a due day without a time as date
+// EventKit keeps a due day without a time as date
 // components, which go-eventkit returns as local midnight.
 func reminderOf(r reminders.Reminder) Reminder {
 	out := Reminder{ID: r.ID, Title: r.Title, List: r.List}

@@ -41,8 +41,7 @@ func Rows(p widget.Payload) []int {
 // List is how a list is drawn: which Item is selected and the first line shown.
 type List struct {
 	Selected, Top int
-	// Focused highlights the selected Item.
-	Focused bool
+	Focused       bool
 }
 
 // minFlex is the narrowest a flex column gets before other columns drop.

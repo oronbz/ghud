@@ -34,8 +34,17 @@ func Binary(t testing.TB) string {
 		if runtime.GOOS == "windows" {
 			binary += ".exe"
 		}
+		src := filepath.Join(filepath.Dir(here), "testdata", "fixture")
+		// The test binary doesn't link the fixture, so reading its sources is
+		// what tells go test's cache that a change to them matters.
+		files, _ := os.ReadDir(src)
+		for _, f := range files {
+			if !f.IsDir() {
+				_, _ = os.ReadFile(filepath.Join(src, f.Name()))
+			}
+		}
 		cmd := exec.Command("go", "build", "-o", binary, ".")
-		cmd.Dir = filepath.Join(filepath.Dir(here), "testdata", "fixture")
+		cmd.Dir = src
 		if out, err := cmd.CombinedOutput(); err != nil {
 			buildErr = fmt.Errorf("building the fixture Plugin: %v\n%s", err, out)
 		}
@@ -46,7 +55,6 @@ func Binary(t testing.TB) string {
 	return binary
 }
 
-// Options shape a fixture Plugin's manifest.
 type Options struct {
 	// Name defaults to "fixture", which is also its Widget type's name.
 	Name string
@@ -62,8 +70,7 @@ type Options struct {
 	Mode string
 	// Command replaces the built fixture (and Args) as the command.
 	Command []string
-	// Build are the manifest's [[build]] steps.
-	Build [][]string
+	Build   [][]string
 }
 
 // Write lays out a fixture Plugin in dir: its ghud-plugin.toml, whose
@@ -79,7 +86,6 @@ func Write(t testing.TB, dir string, o Options) string {
 	return dir
 }
 
-// Manifest is the ghud-plugin.toml Write lays out.
 func Manifest(t testing.TB, o Options) string {
 	t.Helper()
 	if o.Name == "" {

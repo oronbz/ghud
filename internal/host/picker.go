@@ -20,7 +20,7 @@ var pickerKeys = struct{ Down, Up, Toggle, Close key.Binding }{
 	Close:  key.NewBinding(key.WithKeys("w", "esc", "q")),
 }
 
-// pickerKey handles a key in the w list. Every toggle is written at once.
+// pickerKey writes every toggle at once.
 func (m Model) pickerKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	ids := m.pickerIDs()
 	switch {
