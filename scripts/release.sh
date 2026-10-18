@@ -94,6 +94,18 @@ verify_snapshot() {
             expect "$target linking" "$(file "$bin")" "statically linked"
         fi
     done
+    bin=$(binary 'ghud-weather-universal_darwin_all' ghud-weather)
+    expect "weather darwin archs" "$(lipo -info "$bin")" "x86_64 arm64"
+    for target in linux_amd64 linux_arm64 windows_amd64 windows_arm64; do
+        local name=ghud-weather
+        if [[ "$target" == windows_* ]]; then name=ghud-weather.exe; fi
+        bin=$(binary "ghud-weather-other_${target}*" "$name")
+        expect "weather $target pure Go" "$(go version -m "$bin")" "CGO_ENABLED=0"
+    done
+    expect "darwin archive" "$(tar -tzf "dist/ghud_${want}_darwin_all.tar.gz")" "ghud-weather"
+    expect "linux archive" "$(tar -tzf "dist/ghud_${want}_linux_amd64.tar.gz")" "ghud-weather"
+    expect "windows archive" "$(unzip -l "dist/ghud_${want}_windows_amd64.zip")" "ghud-weather.exe"
+    expect "formula" "$(cat dist/homebrew/ghud.rb)" 'bin.install "ghud-weather"'
     for pattern in "ghud_${want}_darwin_all.tar.gz" "ghud_${want}_linux_amd64.tar.gz" "ghud_${want}_linux_arm64.tar.gz" \
         "ghud_${want}_windows_amd64.zip" "ghud_${want}_windows_arm64.zip" '*.deb' '*.rpm' '*.apk' checksums.txt homebrew/ghud.rb; do
         compgen -G "dist/$pattern" >/dev/null || die "Missing dist/$pattern"

@@ -26,19 +26,38 @@ builds:
     ldflags:
       - -s -w -X github.com/oronbz/ghud/internal/version.Version={{.Version}}
 
-  # Weather Plugin (#49/#55): add ghud-weather-darwin (cgo, ./cmd/ghud-weather,
-  # binary ghud-weather) and ghud-weather-other mirroring the two builds above,
-  # then the matching universal_binaries entry, nfpms ids and brews install line.
+  # The Weather Plugin ships beside ghud, which finds it there. Pure Go everywhere.
+  - id: ghud-weather-darwin
+    main: ./cmd/ghud-weather
+    binary: ghud-weather
+    env: [CGO_ENABLED=0]
+    goos: [darwin]
+    goarch: [arm64, amd64]
+    flags: [-trimpath]
+    ldflags: [-s -w]
+
+  - id: ghud-weather-other
+    main: ./cmd/ghud-weather
+    binary: ghud-weather
+    env: [CGO_ENABLED=0]
+    goos: [linux, windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: [-s -w]
 
 universal_binaries:
   - id: ghud-universal
     ids: [ghud-darwin]
     name_template: ghud
     replace: true
+  - id: ghud-weather-universal
+    ids: [ghud-weather-darwin]
+    name_template: ghud-weather
+    replace: true
 
 archives:
   - id: ghud
-    ids: [ghud-universal, ghud-other]
+    ids: [ghud-universal, ghud-other, ghud-weather-universal, ghud-weather-other]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     formats: [tar.gz]
     format_overrides:
@@ -47,7 +66,7 @@ archives:
 
 nfpms:
   - id: ghud
-    ids: [ghud-other]
+    ids: [ghud-other, ghud-weather-other]
     package_name: ghud
     file_name_template: "{{ .ConventionalFileName }}"
     formats: [deb, rpm, apk]
@@ -89,5 +108,6 @@ brews:
     commit_msg_template: "Update ghud to {{ .Version }}"
     install: |
       bin.install "ghud"
+      bin.install "ghud-weather"
     test: |
       assert_match version.to_s, shell_output("#{bin}/ghud --version")
