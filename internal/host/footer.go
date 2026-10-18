@@ -16,11 +16,19 @@ const footerHeight = 1
 
 func (m Model) footer() string {
 	th := m.opts.Theme
-	badge := th.Fg(theme.Bg).Background(th.Color(theme.Accent)).Bold(true).Render(" NORMAL ")
+	mode, modeTok := "NORMAL", theme.Accent
 	hints := "Tab/hl focus · 1–9 jump · ? keys · q quit"
 	if m.focus != "" {
 		hints = "Tab rows · hl widgets · HJKL any direction · esc unfocus · ? keys"
 	}
+	if o := m.overlay; o != nil {
+		mode, modeTok = "INPUT", theme.Ok
+		if o.kind == confirming {
+			mode, modeTok = "CONFIRM", theme.Warn
+		}
+		hints = "⏎ " + o.action.Label + " · esc cancel"
+	}
+	badge := th.Fg(theme.Bg).Background(th.Color(modeTok)).Bold(true).Render(" " + mode + " ")
 	switch m.held {
 	case tea.ModShift:
 		hints = modifierHints("Shift", isShifted)
