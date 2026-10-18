@@ -312,6 +312,13 @@ func (c *Commands) Output(_ context.Context, name string, args ...string) ([]byt
 	return []byte(r.out), r.err
 }
 
+// Ran is a copy of Calls, safe to take while commands may still run.
+func (c *Commands) Ran() [][]string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return slices.Clone(c.Calls)
+}
+
 // EventKit fakes macOS calendars and reminders. Access defaults to AccessUnsupported.
 type EventKit struct {
 	mu       sync.Mutex
