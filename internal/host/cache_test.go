@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/oronbz/ghud/internal/cache"
 	"github.com/oronbz/ghud/internal/hosttest"
+	"github.com/oronbz/ghud/internal/paths"
 	"github.com/oronbz/ghud/internal/theme"
 	"github.com/oronbz/ghud/internal/widget"
 )
@@ -77,5 +80,111 @@ func TestTheFirstFrameDrawsTheCachedEntryWithItsAgeUntilFreshDataLands(t *testin
 	h.Advance(2 * time.Minute)
 	if top, body := h.Line(0), h.Screen(); !strings.Contains(body, "world edition 2") || strings.Contains(top, "m ─╮") {
 		t.Errorf("after the next refresh:\n%s\nwant edition 2 and no age", body)
+	}
+}
+
+// entryFile is the one cache entry under root.
+func entryFile(t *testing.T, root string) string {
+	t.Helper()
+	files, _ := filepath.Glob(filepath.Join(paths.Under(root).Cache, "widgets", "*.json"))
+	if len(files) != 1 {
+		t.Fatalf("cache entries %v, want one", files)
+	}
+	return files[0]
+}
+
+func TestTwoInstancesOnOneCacheFetchADueWidgetOnceAndBothShowIt(t *testing.T) {
+	root, u := t.TempDir(), &upstream{}
+	a := newsHost(t, u, root, hosttest.DefaultNow)
+	b := newsHost(t, u, root, hosttest.DefaultNow)
+	if u.count() != 1 {
+		t.Fatalf("two instances starting together fetched %d times, want 1", u.count())
+	}
+	for name, h := range map[string]*hosttest.Host{"a": a, "b": b} {
+		if !strings.Contains(h.Screen(), "world edition 1") {
+			t.Errorf("%s shows:\n%s\nwant edition 1", name, h.Screen())
+		}
+	}
+
+	a.Advance(3 * time.Minute)
+	b.Changed(entryFile(t, root))
+	if !strings.Contains(b.Screen(), "world edition 2") {
+		t.Errorf("b shows:\n%s\nwant edition 2 adopted from a's fetch", b.Screen())
+	}
+	b.Advance(3 * time.Minute)
+	if u.count() != 2 {
+		t.Errorf("fetched %d times once due again, want 2", u.count())
+	}
+	if !strings.Contains(a.Screen(), "world edition 2") {
+		t.Errorf("a shows:\n%s\nwant edition 2", a.Screen())
+	}
+}
+
+func TestAnInstanceWhoseTimerFiresFirstFetchesAndTheOtherTakesItsEntry(t *testing.T) {
+	root, u := t.TempDir(), &upstream{}
+	a := newsHost(t, u, root, hosttest.DefaultNow)
+	b := newsHost(t, u, root, hosttest.DefaultNow)
+
+	// b fetches first; a's timer then finds the entry fresh without being told it changed.
+	b.Advance(3 * time.Minute)
+	a.Advance(3 * time.Minute)
+	if u.count() != 2 {
+		t.Errorf("fetched %d times, want 2", u.count())
+	}
+	if !strings.Contains(a.Screen(), "world edition 2") {
+		t.Errorf("a shows:\n%s\nwant edition 2", a.Screen())
+	}
+}
+
+// lockEntry takes root's one cache entry's fetch lock at at, as an instance that then died would.
+func lockEntry(t *testing.T, root string, at time.Time) {
+	t.Helper()
+	file := entryFile(t, root)
+	store := cache.Store{Dir: filepath.Dir(file)}
+	if _, ok := store.Lock(strings.TrimSuffix(filepath.Base(file), ".json"), at, time.Minute); !ok {
+		t.Fatal("the entry's lock is taken")
+	}
+}
+
+func TestALockHeldByAnotherInstanceHoldsOffTheFetchUntilItsAbandoned(t *testing.T) {
+	root, u := t.TempDir(), &upstream{}
+	h := newsHost(t, u, root, hosttest.DefaultNow)
+	lockEntry(t, root, hosttest.DefaultNow.Add(90*time.Second))
+
+	h.Advance(2*time.Minute + 30*time.Second)
+	if u.count() != 1 {
+		t.Errorf("fetched %d times while another instance held the lock, want 1", u.count())
+	}
+	h.Advance(2 * time.Minute)
+	if u.count() != 2 || !strings.Contains(h.Screen(), "world edition 2") {
+		t.Errorf("fetched %d times once the lock was over a minute old, want 2; screen:\n%s", u.count(), h.Screen())
+	}
+}
+
+func TestAnAbandonedLockDoesntBlockFetching(t *testing.T) {
+	root, u := t.TempDir(), &upstream{}
+	h := newsHost(t, u, root, hosttest.DefaultNow)
+	lockEntry(t, root, hosttest.DefaultNow)
+
+	h.Advance(2*time.Minute + 30*time.Second)
+	if u.count() != 2 || !strings.Contains(h.Screen(), "world edition 2") {
+		t.Errorf("fetched %d times past a lock older than the fetch timeout, want 2; screen:\n%s", u.count(), h.Screen())
+	}
+}
+
+func TestAnInstanceSkipsTheFetchAnotherIsMakingAndShowsItsResult(t *testing.T) {
+	root, u := t.TempDir(), &upstream{}
+	var b *hosttest.Host
+	u.during = func() {
+		u.during = nil
+		b = newsHost(t, u, root, hosttest.DefaultNow)
+	}
+	newsHost(t, u, root, hosttest.DefaultNow)
+	if u.count() != 1 {
+		t.Fatalf("fetched %d times, want 1: b started while a's fetch held the lock", u.count())
+	}
+	b.Changed(entryFile(t, root))
+	if !strings.Contains(b.Screen(), "world edition 1") {
+		t.Errorf("b shows:\n%s\nwant edition 1 from a's fetch", b.Screen())
 	}
 }
