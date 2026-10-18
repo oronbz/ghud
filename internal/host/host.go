@@ -25,6 +25,7 @@ import (
 	"github.com/oronbz/ghud/internal/widgets/calendar"
 	"github.com/oronbz/ghud/internal/widgets/clock"
 	"github.com/oronbz/ghud/internal/widgets/cpu"
+	"github.com/oronbz/ghud/internal/widgets/notes"
 	"github.com/oronbz/ghud/internal/widgets/tasks"
 )
 
@@ -70,6 +71,8 @@ type Model struct {
 	due map[string]int
 	// overlay is the open confirm or text prompt, which takes every key.
 	overlay *overlay
+	// editing is INSERT mode's editor, which takes every key but insertHostKeys.
+	editing *editing
 	// palette is the open ^K Action palette.
 	palette *palette
 	// held is the modifier (Shift or Ctrl) held on its own, which swaps the
@@ -89,7 +92,7 @@ type placed struct {
 type tickMsg struct{ at time.Time }
 
 // Builtins are the Widget types compiled into ghud, in reference order.
-var Builtins = []widget.Type{clock.Type, calendar.Type, tasks.Type, cpu.Type}
+var Builtins = []widget.Type{clock.Type, calendar.Type, tasks.Type, cpu.Type, notes.Type}
 
 func New(o Options) Model {
 	m := Model{opts: o, now: o.Ports.Clock.Now(), widgets: map[string]placed{},
@@ -154,12 +157,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		for _, id := range m.ids() {
 			m.clampList(id)
 		}
+		m.sizeEditor()
+	case tea.PasteMsg:
+		if m.editing != nil && m.overlay == nil && m.palette == nil {
+			return m.editKey(msg)
+		}
 	case refreshedMsg:
 		return m.refreshed(msg)
 	case refreshDueMsg:
 		return m, m.refreshDue(msg)
 	case actedMsg:
 		return m.acted(msg)
+	case editedMsg:
+		return m.edited(msg)
 	case toastExpiredMsg:
 		if m.toast.seq == msg.seq {
 			m.toast = toast{}
@@ -226,6 +236,10 @@ func (m Model) View() tea.View {
 			}
 			if tile.Focused && !m.arranging {
 				tile.Hints = m.hints(t.ID)
+			}
+			if m.editing != nil && t.ID == m.editing.widget {
+				tile.Payload, tile.Hints = widget.Payload{}, []render.Hint{{Key: "esc", Label: "save"}}
+				layers = append(layers, m.editorLayer(t.X, t.Y))
 			}
 			layers = append(layers, lipgloss.NewLayer(render.Draw(m.opts.Theme, tile)).X(t.X).Y(t.Y))
 		}

@@ -34,17 +34,7 @@ var Type = widget.Type{
 }
 
 func newTasks(c widget.Config) widget.Widget {
-	file := c.Settings.String("file")
-	switch {
-	case file == "":
-		file = filepath.Join(c.DataDir, "tasks.md")
-	case strings.HasPrefix(file, "~/"):
-		if home, err := os.UserHomeDir(); err == nil {
-			file = filepath.Join(home, file[2:])
-		}
-	case !filepath.IsAbs(file):
-		file = filepath.Join(c.DataDir, file)
-	}
+	file := c.DataFile(c.Settings.String("file"), "tasks.md")
 	sum := sha256.Sum256([]byte(file))
 	return tasks{file: file, lock: filepath.Join(c.DataDir, "locks", "tasks-"+hex.EncodeToString(sum[:8])+".lock")}
 }
@@ -147,32 +137,8 @@ func (t tasks) read() (string, error) {
 	return string(b), err
 }
 
-// write replaces the file atomically, so a reader never sees half of it.
 func (t tasks) write(d doc) error {
-	if err := os.MkdirAll(filepath.Dir(t.file), 0o755); err != nil {
-		return err
-	}
-	tmp, err := os.CreateTemp(filepath.Dir(t.file), ".tasks-*.md")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(tmp.Name())
-	mode := fs.FileMode(0o644)
-	if fi, err := os.Stat(t.file); err == nil {
-		mode = fi.Mode().Perm()
-	}
-	if _, err := tmp.WriteString(strings.Join(d.lines, "")); err != nil {
-		tmp.Close()
-		return err
-	}
-	if err := tmp.Chmod(mode); err != nil {
-		tmp.Close()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	return os.Rename(tmp.Name(), t.file)
+	return widget.WriteFile(t.file, []byte(strings.Join(d.lines, "")))
 }
 
 // doc is a checklist file as lines, each with its own line ending, so lines

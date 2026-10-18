@@ -49,6 +49,12 @@ type refreshedMsg struct {
 	err     error
 }
 
+// editedMsg says $EDITOR exited after editing Widget id's file.
+type editedMsg struct {
+	id  string
+	err error
+}
+
 type actedMsg struct {
 	id     string
 	action widget.Action
@@ -120,6 +126,11 @@ func (m Model) clampList(id string) {
 	}
 	p := m.payloadIn(id, r)
 	st := m.lists[id]
+	h := max(1, r.H-2)
+	if p.Wrap && !p.IsList() {
+		m.lists[id] = listState{top: min(max(st.top, 0), max(0, render.TextRows(p, r.W-2)-h))}
+		return
+	}
 	if len(p.Items) == 0 {
 		m.lists[id] = listState{}
 		return
@@ -127,7 +138,6 @@ func (m Model) clampList(id string) {
 	st.idx = min(max(st.idx, 0), len(p.Items)-1)
 	st.sel = p.Items[st.idx].ID
 	rows := render.Rows(p)
-	h := max(1, r.H-2)
 	line := slices.Index(rows, st.idx)
 	want := line
 	if line > 0 && rows[line-1] == render.Header && h > 1 {
@@ -143,7 +153,8 @@ func (m Model) clampList(id string) {
 	m.lists[id] = st
 }
 
-// moveSelection moves the focused list's selection to index i, clamped.
+// moveSelection moves the focused list's selection to index i, clamped. A
+// wrapped text Widget scrolls instead, i being its top line out of n.
 func (m Model) moveSelection(i func(st listState, n int) int) {
 	id := m.focus
 	r, ok := m.rects()[id]
@@ -151,6 +162,11 @@ func (m Model) moveSelection(i func(st listState, n int) int) {
 		return
 	}
 	p := m.payloadIn(id, r)
+	if p.Wrap && !p.IsList() {
+		m.lists[id] = listState{top: i(listState{idx: m.lists[id].top}, render.TextRows(p, r.W-2))}
+		m.clampList(id)
+		return
+	}
 	if len(p.Items) == 0 {
 		return
 	}
@@ -259,6 +275,8 @@ func (m Model) run(id string, a bound) (Model, tea.Cmd) {
 		m.overlay = &overlay{kind: confirming, widget: id, action: a}
 	case a.Input == widget.TextInput:
 		m.overlay = &overlay{kind: prompting, widget: id, action: a, value: []rune(a.Value), cursor: utf8.RuneCountInString(a.Value)}
+	case a.Input == widget.InlineInput:
+		return m.startEditing(id, a)
 	default:
 		return m.invoke(id, a, "")
 	}
@@ -291,7 +309,7 @@ func (m Model) invoke(id string, a bound, text string) (Model, tea.Cmd) {
 }
 
 // acted toasts an Action's result and, after a success, refreshes its Widget
-// and every Widget sharing a file with it.
+// and every Widget sharing a file with it, or first hands a file to $EDITOR.
 func (m Model) acted(msg actedMsg) (Model, tea.Cmd) {
 	if msg.err != nil {
 		return m.say(capitalise(msg.action.Label)+" failed: "+msg.err.Error(), theme.Bad)
@@ -299,16 +317,33 @@ func (m Model) acted(msg actedMsg) (Model, tea.Cmd) {
 	if msg.byHost {
 		return m, nil
 	}
+	if f := msg.result.Edit; f != "" {
+		return m, m.opts.Ports.Editor.Edit(f, func(err error) tea.Msg { return editedMsg{id: msg.id, err: err} })
+	}
+	return m.after(msg.id, msg.result.Toast)
+}
+
+// edited refreshes the Widget whose file the editor just had, or says why it failed.
+func (m Model) edited(msg editedMsg) (Model, tea.Cmd) {
+	if msg.err != nil {
+		return m.say("$EDITOR failed: "+msg.err.Error(), theme.Bad)
+	}
+	return m.after(msg.id, "")
+}
+
+// after toasts a change to Widget id and refreshes it and every Widget
+// sharing a file with it.
+func (m Model) after(id, toast string) (Model, tea.Cmd) {
 	var cmds []tea.Cmd
-	if msg.result.Toast != "" {
+	if toast != "" {
 		var cmd tea.Cmd
-		m, cmd = m.say(msg.result.Toast, theme.Fg)
+		m, cmd = m.say(toast, theme.Fg)
 		cmds = append(cmds, cmd)
 	}
-	files := watched(m.widgets[msg.id].widget)
-	for _, id := range m.ids() {
-		if id == msg.id || slices.ContainsFunc(watched(m.widgets[id].widget), func(f string) bool { return slices.Contains(files, f) }) {
-			cmds = append(cmds, m.refresh(id))
+	files := watched(m.widgets[id].widget)
+	for _, other := range m.ids() {
+		if other == id || slices.ContainsFunc(watched(m.widgets[other].widget), func(f string) bool { return slices.Contains(files, f) }) {
+			cmds = append(cmds, m.refresh(other))
 		}
 	}
 	return m, tea.Batch(cmds...)

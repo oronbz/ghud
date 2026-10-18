@@ -30,6 +30,21 @@ var loneModifiers = map[string]tea.KeyPressMsg{
 	"leftsuper": {Code: tea.KeyLeftSuper, Mod: tea.ModSuper}, "rightsuper": {Code: tea.KeyRightSuper, Mod: tea.ModSuper},
 }
 
+// Type presses one key per character of text, as typing it would; "\n" is enter.
+func (h *Host) Type(text string) {
+	h.t.Helper()
+	for _, r := range text {
+		switch r {
+		case '\n':
+			h.Send(Key("enter"))
+		case ' ':
+			h.Send(Key("space"))
+		default:
+			h.Send(tea.KeyPressMsg{Code: r, Text: string(r)})
+		}
+	}
+}
+
 // Key builds the press a terminal would deliver for s, written the way
 // tea.KeyPressMsg.String() prints it: "q", "Q", "enter", "ctrl+k", "shift+tab", "shift+super+g",
 // or a lone modifier ("leftshift", "rightctrl").

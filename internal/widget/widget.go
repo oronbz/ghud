@@ -94,6 +94,9 @@ type Invocation struct {
 type Result struct {
 	// Toast is shown in the footer.
 	Toast string
+	// Edit is a file for the host to open in $EDITOR, with the TUI
+	// suspended; the Widget refreshes once the editor exits.
+	Edit string
 }
 
 type Size struct{ W, H int }
@@ -112,6 +115,9 @@ type Payload struct {
 	Lines []Line
 	// Center centres the block vertically and each line horizontally.
 	Center bool
+	// Wrap word-wraps Lines to the Widget's width instead of truncating
+	// them, and lets the user scroll them with j/k.
+	Wrap bool
 
 	// Columns make the Payload a list: every Item has one Field per Column.
 	Columns []Column
@@ -196,6 +202,9 @@ const (
 	NoInput Input = iota
 	// TextInput asks for one line in the host prompt.
 	TextInput
+	// InlineInput edits Value in the host's multi-line editor over the
+	// Widget's body (INSERT mode); esc ends it and passes the text on.
+	InlineInput
 )
 
 type Line struct {
