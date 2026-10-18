@@ -1,0 +1,38 @@
+name = "weather"
+description = "Weather from Open-Meteo, for a city or where your IP address places you"
+protocol = 1
+command = "ghud-weather"
+
+[[widget]]
+type = "weather"
+title = "Weather"
+description = "Current conditions, high/low, wind, humidity and hourly temperatures, from Open-Meteo"
+refresh = "15m"
+floor = "5m"
+default = true
+
+[[widget.setting]]
+name = "units"
+kind = "string"
+default = "metric"
+choices = ["metric", "imperial"]
+description = "metric (°C, km/h) or imperial (°F, mph)"
+
+[[widget.setting]]
+name = "city"
+kind = "string"
+default = ""
+description = "The place to show, such as \"Petah Tikva\" or \"Paris, Texas\"; empty finds you by IP address"
+why = "An IP address can place you in the wrong city, especially behind a VPN"
+
+[[widget.setting]]
+name = "lat"
+kind = "string"
+default = ""
+description = "Latitude, such as \"32.08\"; with lon it wins over city, which then only names the place"
+
+[[widget.setting]]
+name = "lon"
+kind = "string"
+default = ""
+description = "Longitude, such as \"34.88\""

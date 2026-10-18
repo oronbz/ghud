@@ -49,6 +49,9 @@ type Options struct {
 	Keyring *Keyring
 	// Env is the process environment the app sees; it's empty by default.
 	Env map[string]string
+	// BundleDir stands in for the directory ghud is installed in, where it
+	// finds the Plugins it ships with; empty ships none.
+	BundleDir string
 }
 
 var DefaultNow = time.Date(2026, 10, 18, 14, 5, 9, 0, time.UTC)
@@ -134,6 +137,7 @@ func New(t testing.TB, o Options) *Host {
 		Paths:     h.Paths,
 		Theme:     th,
 		Types:     o.Types,
+		BundleDir: o.BundleDir,
 		Ports: ports.Ports{
 			Clock:     h.Clock,
 			Opener:    h.Opener,
