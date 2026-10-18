@@ -11,3 +11,5 @@
 **Action**: Something the user can do, either to an Item (open, approve, complete) or to a whole Widget (add a task, change the calendar month, edit the note). Some Actions ask for confirmation before they run because they can't be taken back.
 
 **Layout**: The saved arrangement and sizes of Widgets on the dashboard, including which Widgets are hidden. Hiding a Widget changes only the Layout; removing a Widget takes it off the dashboard.
+
+**Status**: How current and healthy a Widget's data is: *loading* (nothing to show yet), *ok*, *stale* (the data shown is old or its last refresh failed), *error* (nothing to show because fetching failed), or *needs setup* (missing access or settings, with a way to fix it).
