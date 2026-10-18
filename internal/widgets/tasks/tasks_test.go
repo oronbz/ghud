@@ -377,6 +377,23 @@ func TestEditingTasksMdOutsideGhudUpdatesTheWidget(t *testing.T) {
 	}
 }
 
+func TestTwoInstancesCompletingDifferentTasksBothLand(t *testing.T) {
+	a := withTasks(t, "- [ ] Call the bank\n- [ ] Water plants\n- [ ] Pay rent\n", hosttest.Options{Width: 40, Height: 7})
+	b := hosttest.New(t, hosttest.Options{Width: 40, Height: 7, Root: a.Root})
+
+	a.Press("tab", "space")
+	// b hasn't heard of a's change yet, so it still lists all three.
+	b.Press("tab", "G", "space")
+
+	if got, want := readTasks(t, a), "- [x] Call the bank\n- [ ] Water plants\n- [x] Pay rent\n"; got != want {
+		t.Fatalf("tasks.md = %q, want %q", got, want)
+	}
+	a.Changed(tasksFile(a.Root))
+	if got := strings.Split(tile(a), "\n")[1]; !strings.Contains(got, "Water plants") || strings.Contains(tile(a), "Pay rent") {
+		t.Errorf("a after b's change:\n%s", tile(a))
+	}
+}
+
 // typeText presses one key per character of s.
 func typeText(h *hosttest.Host, s string) {
 	for _, r := range s {
