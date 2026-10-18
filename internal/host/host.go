@@ -79,6 +79,10 @@ type Model struct {
 	// footer to that modifier's keys; only kitty-protocol terminals report it.
 	held   tea.KeyMod
 	colors colors
+	// edits is how host Actions change config.toml.
+	edits config.Editor
+	// base is what every Widget is built with, besides its settings.
+	base widget.Config
 }
 
 type placed struct {
@@ -87,6 +91,8 @@ type placed struct {
 	widget widget.Widget
 	// setup, when set, is the needs-setup hint drawn instead of the Widget.
 	setup string
+	// ref finds the Widget's block in config.toml.
+	ref config.Ref
 }
 
 type tickMsg struct{ at time.Time }
@@ -113,21 +119,16 @@ func New(o Options) Model {
 	m.toast = toast{text: toastOf(append(problems, cfg.Problems...)), tok: theme.Warn}
 	m.colors = colors{pinned: !o.Theme.IsZero(), name: cfg.Theme, over: cfg.Colors, asking: o.Theme.IsZero()}
 	m = m.resolveTheme()
+	m.edits = config.Editor{Path: file, LockDir: filepath.Join(o.Paths.Data, "locks"), Types: types, Locale: o.Locale}
+	m.base = widget.Config{TimeFormat: cfg.TimeFormat, WeekStart: cfg.WeekStart, DataDir: o.Paths.Data, Ports: o.Ports}
 	var ids []string
 	for _, wc := range cfg.Widgets {
-		id := wc.ID
+		id, ref := wc.ID, config.Ref{ID: wc.ID}
 		// Widgets sharing an id are all in needs setup; suffixes keep them apart on screen only.
 		for n := 2; m.widgets[id].title != ""; n++ {
-			id = fmt.Sprintf("%s~%d", wc.ID, n)
+			id, ref.N = fmt.Sprintf("%s~%d", wc.ID, n), n-1
 		}
-		p := placed{title: wc.Title, setup: wc.Setup}
-		if i := slices.IndexFunc(types, func(t widget.Type) bool { return t.Name == wc.Type }); i >= 0 {
-			p.typ = types[i]
-		}
-		if p.setup == "" {
-			p.widget = p.typ.New(widget.Config{Settings: wc.Settings, TimeFormat: cfg.TimeFormat, WeekStart: cfg.WeekStart, DataDir: o.Paths.Data, Ports: o.Ports})
-		}
-		m.widgets[id] = p
+		m.widgets[id] = m.place(wc, ref)
 		ids = append(ids, id)
 	}
 	// An unreadable layout.json falls back to the default rather than blocking launch.
@@ -137,6 +138,20 @@ func New(o Options) Model {
 	}
 	m.layout = saved.Join(ids)
 	return m
+}
+
+// place builds the Widget a [[widget]] block configures, unless it needs setup.
+func (m Model) place(wc config.Widget, ref config.Ref) placed {
+	p := placed{title: wc.Title, setup: wc.Setup, ref: ref}
+	if i := slices.IndexFunc(m.edits.Types, func(t widget.Type) bool { return t.Name == wc.Type }); i >= 0 {
+		p.typ = m.edits.Types[i]
+	}
+	if p.setup == "" {
+		c := m.base
+		c.Settings = wc.Settings
+		p.widget = p.typ.New(c)
+	}
+	return p
 }
 
 func (m Model) Init() tea.Cmd {
@@ -170,6 +185,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.acted(msg)
 	case editedMsg:
 		return m.edited(msg)
+	case configEditedMsg:
+		return m.configEdited(msg)
 	case toastExpiredMsg:
 		if m.toast.seq == msg.seq {
 			m.toast = toast{}

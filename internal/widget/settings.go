@@ -31,6 +31,9 @@ type Setting struct {
 	Why string
 	// Choices, when set, are the only values a String accepts.
 	Choices []string
+	// Required settings are written, at their defaults, into the block Add
+	// Widget appends, so the user sees what to fill in.
+	Required bool
 }
 
 // Check converts a decoded TOML value to the setting's Go type, or says why it doesn't fit.

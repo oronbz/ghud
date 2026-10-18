@@ -2,9 +2,13 @@ package ports
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os/exec"
+	"path/filepath"
 	"runtime"
+	"strconv"
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -59,12 +63,13 @@ func (osc52) Copy(text string) tea.Cmd { return tea.SetClipboard(text) }
 
 type execEditor struct{ getenv func(string) string }
 
-func (e execEditor) Edit(path string, done func(error) tea.Msg) tea.Cmd {
-	return tea.ExecProcess(editorCommand(e.getenv, runtime.GOOS, path), func(err error) tea.Msg { return done(err) })
+func (e execEditor) Edit(path string, line int, done func(error) tea.Msg) tea.Cmd {
+	return tea.ExecProcess(editorCommand(e.getenv, runtime.GOOS, path, line), func(err error) tea.Msg { return done(err) })
 }
 
-// editorCommand opens path in $VISUAL, else $EDITOR, else vi.
-func editorCommand(getenv func(string) string, goos, path string) *exec.Cmd {
+// editorCommand opens path in $VISUAL, else $EDITOR, else vi, at line when
+// it's above zero.
+func editorCommand(getenv func(string) string, goos, path string, line int) *exec.Cmd {
 	editor := getenv("VISUAL")
 	if editor == "" {
 		editor = getenv("EDITOR")
@@ -73,10 +78,25 @@ func editorCommand(getenv func(string) string, goos, path string) *exec.Cmd {
 		editor = "vi"
 	}
 	if goos == "windows" {
-		return exec.Command(editor, path)
+		args := []string{path}
+		if line > 0 {
+			args = []string{"+" + strconv.Itoa(line), path}
+		}
+		return exec.Command(editor, args...)
 	}
 	// Through the shell so that EDITOR="code -w" works; the path stays out of the script as $0.
-	return exec.Command("sh", "-c", editor+` "$0"`, path)
+	script := editor + ` "$0"`
+	if line > 0 {
+		switch filepath.Base(strings.Fields(editor)[0]) {
+		case "code", "code-insiders", "codium", "cursor", "windsurf":
+			script = fmt.Sprintf(`%s -g "$0:%d"`, editor, line)
+		case "subl", "zed", "hx", "helix":
+			script = fmt.Sprintf(`%s "$0:%d"`, editor, line)
+		default:
+			script = fmt.Sprintf(`%s +%d "$0"`, editor, line)
+		}
+	}
+	return exec.Command("sh", "-c", script, path)
 }
 
 type osKeyring struct{}
