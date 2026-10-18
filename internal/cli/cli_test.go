@@ -57,6 +57,17 @@ func TestGhudDrawsTheClockAndQuitsOnQ(t *testing.T) {
 	}
 }
 
+func TestVersionFlagPrintsTheVersionWithoutStartingTheTUI(t *testing.T) {
+	s, stdout, stderr := system(t, "", "--version")
+
+	if code := run(t, s); code != 0 {
+		t.Fatalf("exit code %d, stderr: %s", code, stderr)
+	}
+	if got, want := stdout.String(), "ghud dev\n"; got != want {
+		t.Errorf("stdout %q, want %q", got, want)
+	}
+}
+
 func TestUnknownArgumentIsAUsageError(t *testing.T) {
 	s, _, stderr := system(t, "", "--nope")
 
