@@ -19,7 +19,6 @@ import (
 	"github.com/oronbz/ghud/internal/host"
 	"github.com/oronbz/ghud/internal/paths"
 	"github.com/oronbz/ghud/internal/ports"
-	"github.com/oronbz/ghud/internal/theme"
 	"github.com/oronbz/ghud/internal/version"
 )
 
@@ -92,7 +91,7 @@ func Run(s System) int {
 	if s.Ports != nil {
 		pp = *s.Ports
 	}
-	m := host.New(host.Options{Paths: p, ConfigFile: configFile, Locale: locale, Ports: pp, Theme: theme.Dark()})
+	m := host.New(host.Options{Paths: p, ConfigFile: configFile, Locale: locale, Ports: pp})
 	var opts []tea.ProgramOption
 	// Real files get Bubble Tea's defaults, which open /dev/tty when stdin is piped.
 	if _, isFile := s.Stdin.(*os.File); !isFile {

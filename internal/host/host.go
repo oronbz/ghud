@@ -33,7 +33,10 @@ type Options struct {
 	// Locale gives time_format and week_start their defaults.
 	Locale config.Locale
 	Ports  ports.Ports
-	Theme  theme.Theme
+	// Theme, when set, pins the palette (tests use sentinel colours). Left
+	// zero, New fills it from config.toml and the terminal's colours, and it
+	// stays the theme in use as answers arrive.
+	Theme theme.Theme
 	// Types replaces the built-in Widget types; with no config.toml there is
 	// one Widget of each. Tests use it to stage Layouts the built-ins can't fill.
 	Types []widget.Type
@@ -53,7 +56,8 @@ type Model struct {
 	toast string
 	// held is the modifier (Shift or Ctrl) held on its own, which swaps the
 	// footer to that modifier's keys; only kitty-protocol terminals report it.
-	held tea.KeyMod
+	held   tea.KeyMod
+	colors colors
 }
 
 type placed struct {
@@ -85,6 +89,10 @@ func New(o Options) Model {
 		problems = append(problems, err.Error())
 	}
 	m.toast = toastOf(append(problems, cfg.Problems...))
+	m.colors = colors{pinned: !o.Theme.IsZero(), name: cfg.Theme, asking: o.Theme.IsZero()}
+	if !m.colors.pinned {
+		m.opts.Theme = theme.Resolve(m.colors.name, m.colors.term)
+	}
 	var ids []string
 	for _, wc := range cfg.Widgets {
 		id := wc.ID
@@ -111,9 +119,12 @@ func New(o Options) Model {
 	return m
 }
 
-func (m Model) Init() tea.Cmd { return m.nextTick() }
+func (m Model) Init() tea.Cmd { return tea.Batch(m.nextTick(), m.queryColors()) }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m, ok := m.colorAnswer(msg); ok {
+		return m, nil
+	}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
@@ -149,7 +160,9 @@ func (m Model) nextTick() tea.Cmd {
 func (m Model) View() tea.View {
 	v := tea.NewView("")
 	v.AltScreen = true
-	v.BackgroundColor = m.opts.Theme.Color(theme.Bg)
+	if !m.colors.asking {
+		v.BackgroundColor = m.opts.Theme.Color(theme.Bg)
+	}
 	// Report-all-keys and event types make lone modifier presses and releases
 	// arrive, for the modifier footer.
 	v.KeyboardEnhancements = tea.KeyboardEnhancements{
