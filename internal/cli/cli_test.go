@@ -2,6 +2,9 @@ package cli_test
 
 import (
 	"bytes"
+	"net/http"
+	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -10,14 +13,40 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/oronbz/ghud/internal/cli"
+	"github.com/oronbz/ghud/internal/hosttest"
+	"github.com/oronbz/ghud/internal/ports"
 )
+
+// hermetic are the real ports with every way out of the machine faked:
+// other CLIs (such as gh) aren't installed, the keyring is empty, and every
+// HTTP endpoint is a server that fails the test if anything reaches it.
+func hermetic(t *testing.T, getenv func(string) string) (*ports.Ports, *hosttest.Commands) {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("ghud reached the network: %s %s", r.Method, r.URL)
+		http.Error(w, "offline", http.StatusServiceUnavailable)
+	}))
+	t.Cleanup(srv.Close)
+	pp := ports.System(getenv)
+	cmds := &hosttest.Commands{}
+	pp.Commands = cmds
+	pp.Keyring = &hosttest.Keyring{}
+	e := reflect.ValueOf(&pp.Endpoints).Elem()
+	for i := range e.NumField() {
+		e.Field(i).SetString(srv.URL)
+	}
+	return &pp, cmds
+}
 
 func system(t *testing.T, stdin string, args ...string) (cli.System, *bytes.Buffer, *bytes.Buffer) {
 	home := t.TempDir()
+	getenv := func(k string) string { return map[string]string{"HOME": home}[k] }
+	pp, _ := hermetic(t, getenv)
 	var stdout, stderr bytes.Buffer
 	return cli.System{
 		Args:   args,
-		Getenv: func(k string) string { return map[string]string{"HOME": home}[k] },
+		Getenv: getenv,
+		Ports:  pp,
 		Stdin:  strings.NewReader(stdin),
 		Stdout: &stdout,
 		Stderr: &stderr,

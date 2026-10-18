@@ -10,7 +10,6 @@ import (
 
 	"github.com/oronbz/ghud/internal/cli"
 	"github.com/oronbz/ghud/internal/hosttest"
-	"github.com/oronbz/ghud/internal/ports"
 )
 
 // inHerdr is a ghud run with env set and herdr faked.
@@ -23,10 +22,8 @@ func inHerdr(t *testing.T, stdin string, env map[string]string, args ...string) 
 		}
 		return env[k]
 	}
-	pp := ports.System(s.Getenv)
-	cmds := &hosttest.Commands{}
-	pp.Commands = cmds
-	s.Ports = &pp
+	var cmds *hosttest.Commands
+	s.Ports, cmds = hermetic(t, s.Getenv)
 	return s, cmds
 }
 
