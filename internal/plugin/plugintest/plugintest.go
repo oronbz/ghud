@@ -60,11 +60,27 @@ type Options struct {
 	Default bool
 	// Mode is the `mode` setting's default; "" is "items".
 	Mode string
+	// Command replaces the built fixture (and Args) as the command.
+	Command []string
+	// Build are the manifest's [[build]] steps.
+	Build [][]string
 }
 
 // Write lays out a fixture Plugin in dir: its ghud-plugin.toml, whose
 // command runs the built fixture. It returns dir.
 func Write(t testing.TB, dir string, o Options) string {
+	t.Helper()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "ghud-plugin.toml"), []byte(Manifest(t, o)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+// Manifest is the ghud-plugin.toml Write lays out.
+func Manifest(t testing.TB, o Options) string {
 	t.Helper()
 	if o.Name == "" {
 		o.Name = "fixture"
@@ -78,11 +94,14 @@ func Write(t testing.TB, dir string, o Options) string {
 	if o.Mode == "" {
 		o.Mode = "items"
 	}
-	command := []string{fmt.Sprintf("%q", Binary(t))}
-	for _, a := range o.Args {
-		command = append(command, fmt.Sprintf("%q", a))
+	if o.Command == nil {
+		o.Command = append([]string{Binary(t)}, o.Args...)
 	}
-	manifest := fmt.Sprintf(`name = %q
+	var build strings.Builder
+	for _, step := range o.Build {
+		fmt.Fprintf(&build, "\n[[build]]\nrun = [%s]\n", quoted(step))
+	}
+	return fmt.Sprintf(`name = %q
 description = "Scripted protocol behaviours for tests"
 protocol = %d
 command = [%s]
@@ -107,12 +126,13 @@ kind = "string"
 default = %q
 description = "What refreshes return"
 choices = ["items", "lines", "raw-colour", "malformed", "unknown-field", "setup", "error"]
-`, o.Name, o.Protocol, strings.Join(command, ", "), o.Name, o.Refresh, o.Default, o.Mode)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
+%s`, o.Name, o.Protocol, quoted(o.Command), o.Name, o.Refresh, o.Default, o.Mode, build.String())
+}
+
+func quoted(args []string) string {
+	q := make([]string, len(args))
+	for i, a := range args {
+		q[i] = fmt.Sprintf("%q", a)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "ghud-plugin.toml"), []byte(manifest), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	return dir
+	return strings.Join(q, ", ")
 }

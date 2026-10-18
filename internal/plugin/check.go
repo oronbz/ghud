@@ -53,7 +53,7 @@ func Check(dir string, o CheckOptions, out io.Writer) bool {
 		}
 		return fmt.Sprintf("`%s`, Widget types: %s", m.Name, strings.Join(types, ", ")), nil
 	})
-	p := &Plugin{m: m, clock: o.Clock, widgets: map[string]*pluginWidget{}, tap: c.tap}
+	p := &Plugin{name: m.Name, m: m, clock: o.Clock, widgets: map[string]*pluginWidget{}, tap: c.tap}
 	var proc *process
 	defer func() {
 		if proc != nil {

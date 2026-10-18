@@ -66,6 +66,9 @@ func (f *fsWatcher) Watch(files []string) error {
 func (f *fsWatcher) addDirs() ([]string, error) {
 	want := map[string]bool{}
 	for abs := range f.files {
+		if fi, err := os.Stat(abs); err == nil && fi.IsDir() {
+			want[abs] = true
+		}
 		d := filepath.Dir(abs)
 		for {
 			if fi, err := os.Stat(d); err == nil && fi.IsDir() {
@@ -146,19 +149,24 @@ func (f *fsWatcher) hits(ev fsnotify.Event) []string {
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if file, ok := f.files[filepath.Clean(ev.Name)]; ok {
+	name := filepath.Clean(ev.Name)
+	var added []string
+	if ev.Has(fsnotify.Create) {
+		added, _ = f.addDirs()
+	}
+	if file, ok := f.files[name]; ok {
 		return []string{file}
 	}
-	if !ev.Has(fsnotify.Create) {
-		return nil
+	// A watched directory changes when an entry comes or goes, not when one is written to.
+	if dir, ok := f.files[filepath.Dir(name)]; ok && f.dirs[filepath.Dir(name)] && ev.Has(fsnotify.Create|fsnotify.Remove|fsnotify.Rename) {
+		return []string{dir}
 	}
 	// A directory on the way to a watched file appeared; the file may have
 	// been written into it before the new watch was in place.
-	added, _ := f.addDirs()
 	var hits []string
 	for abs, file := range f.files {
 		for _, d := range added {
-			if filepath.Dir(abs) == d {
+			if filepath.Dir(abs) == d || abs == d {
 				if _, err := os.Stat(abs); err == nil {
 					hits = append(hits, file)
 				}
