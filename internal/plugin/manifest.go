@@ -26,6 +26,8 @@ type Manifest struct {
 	Widgets     []WidgetType `toml:"widget"`
 	// Dir is the Plugin's directory, the command's working directory.
 	Dir string `toml:"-"`
+	// Env is added to the environment the process inherits from ghud.
+	Env []string `toml:"-"`
 }
 
 // Build is a step `ghud plugin install` runs.
@@ -72,6 +74,19 @@ func ReadManifest(dir string) (Manifest, error) {
 		return Manifest{}, fmt.Errorf("%s: %w", file, err)
 	}
 	m.Dir = dir
+	return m, nil
+}
+
+// Bundle reads a manifest built into ghud for a Plugin it ships with, whose
+// executable is exe: the command runs exe, wherever the manifest says.
+func Bundle(src []byte, exe string, env []string) (Manifest, error) {
+	m, err := parseManifest(src)
+	if err != nil {
+		return Manifest{}, fmt.Errorf("%s: %w", exe, err)
+	}
+	m.Command[0] = exe
+	m.Dir = filepath.Dir(exe)
+	m.Env = env
 	return m, nil
 }
 

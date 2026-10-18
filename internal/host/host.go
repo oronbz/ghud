@@ -52,6 +52,9 @@ type Options struct {
 	Types []widget.Type
 	// CloseKeys quit ghud from any mode (--close-key).
 	CloseKeys []closekey.Seq
+	// BundleDir is the directory ghud's executable is installed in, where
+	// the Plugins it ships with sit; empty ships none.
+	BundleDir string
 }
 
 type Model struct {

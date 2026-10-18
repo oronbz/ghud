@@ -49,6 +49,10 @@ func (m Model) loadConfig(file string, base []widget.Type) (config.Config, error
 		taken = append(taken, t.Name)
 	}
 	found, problems := m.plugins.Discover(plugin.Dirs(filepath.Join(m.opts.Paths.Data, "plugins"), paths), taken)
+	for _, t := range found {
+		taken = append(taken, t.Name)
+	}
+	found = append(found, m.plugins.Bundled(m.bundled(), taken)...)
 	if len(found) == 0 {
 		return cfg, err, base, problems
 	}
@@ -58,10 +62,10 @@ func (m Model) loadConfig(file string, base []widget.Type) (config.Config, error
 }
 
 // Types are the built-in Widget types plus those of the Plugins installed in
-// p's data dir or listed in configFile, with the Plugins' problems. No
-// Plugin is started.
-func Types(p paths.Paths, configFile string, loc config.Locale, getenv func(string) string) ([]widget.Type, []string) {
-	m := Model{opts: Options{Paths: p, Locale: loc, Ports: ports.Ports{Getenv: getenv}}, plugins: plugin.NewRegistry()}
+// p's data dir, listed in configFile or shipped in bundleDir, with the
+// Plugins' problems. No Plugin is started.
+func Types(p paths.Paths, configFile, bundleDir string, loc config.Locale, getenv func(string) string) ([]widget.Type, []string) {
+	m := Model{opts: Options{Paths: p, Locale: loc, BundleDir: bundleDir, Ports: ports.Ports{Getenv: getenv}}, plugins: plugin.NewRegistry()}
 	_, _, types, problems := m.loadConfig(configFile, Builtins)
 	return types, problems
 }
@@ -140,6 +144,11 @@ func (m Model) retried(msg retryMsg) (Model, tea.Cmd) {
 
 // observe tells every Observer how it's shown now, when that changed.
 func (m Model) observe() {
+	// Until the terminal reports its size, any size would be a guess, and a
+	// Plugin would fit its first payload to it.
+	if m.w == 0 || m.h == 0 {
+		return
+	}
 	var rects map[string]layout.Rect
 	for _, id := range m.ids() {
 		w := m.widgets[id].widget

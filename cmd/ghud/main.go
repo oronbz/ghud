@@ -7,11 +7,13 @@ import (
 )
 
 func main() {
+	exe, _ := os.Executable()
 	os.Exit(cli.Run(cli.System{
-		Args:   os.Args[1:],
-		Getenv: os.Getenv,
-		Stdin:  os.Stdin,
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
+		Executable: exe,
+		Args:       os.Args[1:],
+		Getenv:     os.Getenv,
+		Stdin:      os.Stdin,
+		Stdout:     os.Stdout,
+		Stderr:     os.Stderr,
 	}))
 }

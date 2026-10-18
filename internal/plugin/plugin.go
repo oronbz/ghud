@@ -86,23 +86,47 @@ func (r *Registry) Discover(dirs []string, taken []string) ([]widget.Type, []str
 			continue
 		}
 		names = append(names, m.Name)
-		p := r.plugins[dir]
-		if p == nil || !reflect.DeepEqual(p.m, m) {
-			p = &Plugin{m: m, widgets: map[string]*pluginWidget{}}
-			r.plugins[dir] = p
-		}
-		for _, wt := range m.Widgets {
-			if slices.Contains(taken, wt.Type) {
-				problems = append(problems, fmt.Sprintf("%s: Widget type `%s` is taken; it's left out", file, wt.Type))
-				continue
-			}
-			taken = append(taken, wt.Type)
-			t, _ := wt.widgetType()
-			t.New = func(c widget.Config) widget.Widget { return p.widget(t.Name, t.Settings, c) }
-			types = append(types, t)
-		}
+		types = append(types, r.provide(dir, m, &taken, func(typ string) {
+			problems = append(problems, fmt.Sprintf("%s: Widget type `%s` is taken; it's left out", file, typ))
+		})...)
 	}
 	return types, problems
+}
+
+// Bundled returns the Widget types of the Plugins ghud ships with, read
+// from their built-in manifests. A type name in taken is left out quietly,
+// so an installed or path-listed Plugin of the same name takes its place.
+func (r *Registry) Bundled(ms []Manifest, taken []string) []widget.Type {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	taken = slices.Clone(taken)
+	var types []widget.Type
+	for _, m := range ms {
+		types = append(types, r.provide("bundled:"+m.Name, m, &taken, func(string) {})...)
+	}
+	return types
+}
+
+// provide registers m's Plugin under key, keeping the one already there
+// while its manifest is unchanged, and returns its Widget types not in taken.
+func (r *Registry) provide(key string, m Manifest, taken *[]string, isTaken func(typ string)) []widget.Type {
+	p := r.plugins[key]
+	if p == nil || !reflect.DeepEqual(p.m, m) {
+		p = &Plugin{m: m, widgets: map[string]*pluginWidget{}}
+		r.plugins[key] = p
+	}
+	var types []widget.Type
+	for _, wt := range m.Widgets {
+		if slices.Contains(*taken, wt.Type) {
+			isTaken(wt.Type)
+			continue
+		}
+		*taken = append(*taken, wt.Type)
+		t, _ := wt.widgetType()
+		t.New = func(c widget.Config) widget.Widget { return p.widget(t.Name, t.Settings, c) }
+		types = append(types, t)
+	}
+	return types
 }
 
 // Close stops every Plugin's process and waits a moment for them to exit.
@@ -199,6 +223,9 @@ func (p *Plugin) start(ctx context.Context) (*process, error) {
 	}
 	cmd := exec.Command(name, p.m.Command[1:]...)
 	cmd.Dir = p.m.Dir
+	if len(p.m.Env) > 0 {
+		cmd.Env = append(os.Environ(), p.m.Env...)
+	}
 	cmd.WaitDelay = exitWait
 	proc := &process{cmd: cmd, started: p.clock.Now(), stderr: &tail{}, exited: make(chan struct{})}
 	cmd.Stderr = proc.stderr
