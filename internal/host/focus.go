@@ -88,6 +88,10 @@ func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	var close closekey.Outcome
 	switch m.closing, close = m.closing.Press(msg, m.opts.Ports.Clock.Now()); close {
 	case closekey.Close:
+		if m.editing != nil {
+			m, save := m.saveEdit()
+			return m, tea.Sequence(save, tea.Quit)
+		}
 		return m, tea.Quit
 	case closekey.Swallow:
 		return m, nil

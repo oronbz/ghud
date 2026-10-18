@@ -68,18 +68,24 @@ func (m Model) sizeEditor() {
 
 // editKey types into the editor; esc leaves INSERT mode, saving a changed text.
 func (m Model) editKey(msg tea.Msg) (Model, tea.Cmd) {
-	e := *m.editing
 	if k, ok := msg.(tea.KeyPressMsg); ok && k.String() == "esc" {
-		m.editing = nil
-		if text := e.ta.Value(); text != e.start {
-			return m.invoke(e.widget, e.action, text)
-		}
-		return m, nil
+		return m.saveEdit()
 	}
+	e := *m.editing
 	var cmd tea.Cmd
 	e.ta, cmd = e.ta.Update(msg)
 	m.editing = &e
 	return m, cmd
+}
+
+// saveEdit leaves INSERT mode, saving a changed text.
+func (m Model) saveEdit() (Model, tea.Cmd) {
+	e := *m.editing
+	m.editing = nil
+	if text := e.ta.Value(); text != e.start {
+		return m.invoke(e.widget, e.action, text)
+	}
+	return m, nil
 }
 
 func editsKey(msg tea.KeyPressMsg) bool { return !slices.Contains(insertHostKeys, msg.String()) }
