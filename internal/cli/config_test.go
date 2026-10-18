@@ -190,6 +190,30 @@ func TestConfigDefaultPrintsTheFullyCommentedReference(t *testing.T) {
 	}
 }
 
+func TestConfigDefaultSaysWhichWidgetsAnEmptyConfigShows(t *testing.T) {
+	s, _, stdout, stderr := sandbox(t, nil, "", "config", "default")
+	if code := run(t, s); code != 0 {
+		t.Fatalf("exit code %d, stderr: %s", code, stderr)
+	}
+	ref := stdout.String()
+	if strings.Contains(ref, "every type") {
+		t.Errorf("reference claims an empty config shows every type:\n%s", ref)
+	}
+	i := strings.Index(ref, "the built-in default Widgets")
+	if i < 0 {
+		t.Fatalf("reference doesn't say an empty config shows the built-in defaults:\n%s", ref)
+	}
+	defaults, _, _ := strings.Cut(ref[i:], "\n# Every block")
+	for _, want := range []string{"Clock", "Calendar", "CPU + memory", "Review requests"} {
+		if !strings.Contains(defaults, want) {
+			t.Errorf("the default Widgets %q lack %s", defaults, want)
+		}
+	}
+	if strings.Contains(defaults, "Script") {
+		t.Errorf("the default Widgets %q name the opt-in Script", defaults)
+	}
+}
+
 func TestConfigDefaultDocumentsTheThemeAndEveryColourToken(t *testing.T) {
 	s, _, stdout, stderr := sandbox(t, nil, "", "config", "default")
 	if code := run(t, s); code != 0 {
