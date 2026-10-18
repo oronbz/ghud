@@ -1,0 +1,1159 @@
+<title>dash Visual Prototype</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,700;1,400&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
+<!-- PROTOTYPE, throwaway. Three variants of the dash dashboard on a strict cell grid, switchable from the bottom bar or with [ and ]. -->
+<style>
+/* Layout: page note, one Ghostty-like window holding the cell canvas, a state strip under it, a floating variant switcher */
+:root{
+  --page:#e8ecf1; --ink:#1b2129; --muted:#596271; --rule:#c9d0da; --chrome:#dbe1e8; --chrome-ink:#4b5462;
+  --pill:#1b2129; --pill-ink:#eef2f6; --focus:#3656d0;
+  --t-bg:#f4f6f9; --t-sel:#dbe3f0; --t-line:#bcc4d0; --t-faint:#98a1ae; --t-dim:#646d7c; --t-fg:#1d232c; --t-bright:#05080d;
+  --t-accent:#3656d0; --t-warn:#9a5f00; --t-ok:#26763d; --t-bad:#c03838; --t-info:#6a46d4; --t-team:#0b7590;
+  --mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --sans:"Figtree", system-ui, -apple-system, sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --page:#0c0f13; --ink:#dfe4ea; --muted:#8a93a1; --rule:#262c35; --chrome:#191e25; --chrome-ink:#8a93a1;
+    --pill:#eef2f6; --pill-ink:#11151a; --focus:#8aa9ff;
+    --t-bg:#13171d; --t-sel:#222a36; --t-line:#303845; --t-faint:#4e5766; --t-dim:#7e8797; --t-fg:#d3d9e2; --t-bright:#f5f7fa;
+    --t-accent:#8aa9ff; --t-warn:#e4ae5c; --t-ok:#86c497; --t-bad:#ef7d7d; --t-info:#b59dff; --t-team:#6cc3d8;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --page:#0c0f13; --ink:#dfe4ea; --muted:#8a93a1; --rule:#262c35; --chrome:#191e25; --chrome-ink:#8a93a1;
+  --pill:#eef2f6; --pill-ink:#11151a; --focus:#8aa9ff;
+  --t-bg:#13171d; --t-sel:#222a36; --t-line:#303845; --t-faint:#4e5766; --t-dim:#7e8797; --t-fg:#d3d9e2; --t-bright:#f5f7fa;
+  --t-accent:#8aa9ff; --t-warn:#e4ae5c; --t-ok:#86c497; --t-bad:#ef7d7d; --t-info:#b59dff; --t-team:#6cc3d8;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--page);color:var(--ink);font:15px/1.5 var(--sans);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 84px}
+.wrap{max-width:1960px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 28px;justify-content:space-between}
+h1{font:600 18px/1.2 var(--sans);margin:0 0 4px}
+header p{margin:0;color:var(--muted);max-width:72ch;font-size:14px;text-wrap:pretty}
+kbd{font:12px var(--mono);border:1px solid var(--rule);border-radius:4px;padding:0 4px}
+.sizes{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--muted)}
+button{font:12px var(--mono);background:transparent;color:var(--ink);border:1px solid var(--rule);border-radius:6px;padding:4px 9px;cursor:pointer}
+button[aria-pressed="true"]{background:var(--ink);color:var(--page);border-color:var(--ink)}
+button:focus-visible,canvas:focus-visible,summary:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.window{border:1px solid var(--rule);border-radius:10px;overflow:hidden;background:var(--t-bg);min-width:0}
+.titlebar{display:flex;align-items:center;gap:8px;height:28px;padding:0 12px;background:var(--chrome);color:var(--chrome-ink);font:12px var(--mono)}
+.dots{display:flex;gap:6px;width:45px}.dots i{width:11px;height:11px;border-radius:50%;background:var(--rule)}
+.titlebar span{flex:1;text-align:center}
+.titlebar .pad{width:45px}
+.scroller{overflow-x:auto}
+canvas{display:block;outline:none;margin:4px}
+.state{display:flex;flex-wrap:wrap;gap:4px 22px;font:12px var(--mono);color:var(--muted)}
+.state b{color:var(--ink);font-weight:400}
+details{font:12px var(--mono);color:var(--muted)}
+summary{cursor:pointer}
+pre{margin:8px 0 0;padding:10px 12px;border:1px solid var(--rule);border-radius:8px;max-height:280px;overflow:auto;color:var(--ink);font:12px/1.5 var(--mono)}
+.switcher{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;gap:2px;
+  background:var(--pill);color:var(--pill-ink);border-radius:999px;padding:4px;box-shadow:0 6px 24px rgba(0,0,0,.28);font:13px var(--sans);z-index:5;max-width:calc(100vw - 32px)}
+.switcher button{border:0;color:inherit;border-radius:999px;width:32px;height:32px;padding:0;font:18px var(--sans)}
+.switcher span{min-width:min(300px,60vw);text-align:center;padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.switcher small{opacity:.65}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>dash, visual prototype</h1>
+      <p>Everything inside the window is drawn as terminal cells, using only glyphs Ghostty renders (box drawing, blocks, braille). Click the window, then use the keys or the mouse. Press <kbd>?</kbd> inside for the key map, and <kbd>[</kbd> <kbd>]</kbd> to switch variants. All data is example data.</p>
+    </div>
+    <div class="sizes" role="group" aria-label="Terminal size">
+      <span>cells</span>
+      <button data-size="fit" aria-pressed="true">fit</button>
+      <button data-size="110x34" aria-pressed="false">110×34</button>
+      <button data-size="160x45" aria-pressed="false">160×45</button>
+      <button data-size="210x56" aria-pressed="false">210×56</button>
+    </div>
+  </header>
+  <div class="window">
+    <div class="titlebar"><div class="dots"><i></i><i></i><i></i></div><span id="wintitle">dash</span><div class="pad"></div></div>
+    <div class="scroller"><canvas id="term" tabindex="0" aria-label="Dashboard prototype drawn as a terminal. Focus it and press question mark for keys."></canvas></div>
+  </div>
+  <div class="state" id="state"></div>
+  <details><summary>Saved Layout (what dash would persist for this variant)</summary><pre id="layout"></pre></details>
+</div>
+<div class="switcher" role="group" aria-label="Prototype variant">
+  <button id="prev" aria-label="Previous variant">‹</button>
+  <span id="vlabel"></span>
+  <button id="next" aria-label="Next variant">›</button>
+</div>
+
+<script>
+(() => {
+const FONT = '"JetBrains Mono", ui-monospace, Menlo, monospace';
+const FS = 13;
+let CW = 8, CH = 17, COLS = 160, ROWS = 45, DPR = 1, SCR = null, D = true;
+const cv = document.getElementById('term'), cx = cv.getContext('2d');
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const len = t => [...t].length;
+const pad = (t, n) => { const l = len(t); return l >= n ? t : t + ' '.repeat(n - l); };
+const segsLen = a => a.reduce((n, [t]) => n + len(t), 0);
+const dirty = () => { D = true; };
+
+// ---------- palette ----------
+const TOK = ['bg','sel','line','faint','dim','fg','bright','accent','warn','ok','bad','info','team'];
+let PAL = {}; const MIX = new Map();
+function readPal(){ const cs = getComputedStyle(document.documentElement); TOK.forEach(k => PAL[k] = cs.getPropertyValue('--t-' + k).trim()); MIX.clear(); dirty(); }
+const rgb = h => { h = h.replace('#',''); return [0,2,4].map(i => parseInt(h.slice(i, i + 2), 16)); };
+function color(tok, dim, isBg){
+  const base = PAL[tok] || tok; if (!dim) return base;
+  const key = base + (isBg ? 'b' : 'f'); let v = MIX.get(key);
+  if (!v){ const a = rgb(base), b = rgb(PAL.bg), t = isBg ? 0.6 : 0.52; v = `rgb(${a.map((c, i) => Math.round(c * (1 - t) + b[i] * t)).join(',')})`; MIX.set(key, v); }
+  return v;
+}
+
+// ---------- cell buffer ----------
+class Screen {
+  constructor(c, r){ this.c = c; this.r = r; this.clear(); }
+  clear(){ const n = this.c * this.r; this.cells = new Array(n); for (let i = 0; i < n; i++) this.cells[i] = {ch:' ', fg:'fg', bg:null, b:0, d:0, i:0, u:0, uc:null}; this.cl = null; }
+  ok(x, y){ const k = this.cl; return x >= 0 && y >= 0 && x < this.c && y < this.r && (!k || (x >= k.x && y >= k.y && x < k.x + k.w && y < k.y + k.h)); }
+  cell(x, y){ return this.cells[y * this.c + x]; }
+  put(x, y, ch, st){ if (!this.ok(x, y)) return; const c = this.cell(x, y); st = st || {}; c.ch = ch; if (st.fg) c.fg = st.fg; if (st.bg !== undefined) c.bg = st.bg; c.b = st.b ? 1 : 0; c.d = st.d ? 1 : 0; c.i = st.i ? 1 : 0; c.u = st.u || 0; c.uc = st.uc || null; }
+  text(x, y, t, st, max){ let a = [...t]; if (max != null){ if (max <= 0) return x; if (a.length > max){ a = a.slice(0, max); a[max - 1] = '…'; } } for (let i = 0; i < a.length; i++) this.put(x + i, y, a[i], st); return x + a.length; }
+  segs(x, y, arr, max){ let left = max == null ? 1e9 : max; for (const [t, st] of arr){ if (left <= 0) break; const n = len(t); this.text(x, y, t, st || {}, left); const u = Math.min(n, left); x += u; left -= u; } return x; }
+  fill(x, y, w, h, ch, st){ for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) this.put(x + i, y + j, ch, st); }
+  bgRect(x, y, w, h, bg){ for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) if (this.ok(x + i, y + j)) this.cell(x + i, y + j).bg = bg; }
+  dimRect(x, y, w, h){ for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) if (this.ok(x + i, y + j)) this.cell(x + i, y + j).d = 1; }
+  tint(x, y, w, h, fg){ for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) if (this.ok(x + i, y + j)){ const c = this.cell(x + i, y + j), p = c.ch.codePointAt(0); if (p >= 0x2500 && p <= 0x257F){ c.fg = fg; c.d = 0; } } }
+  hline(x, y, w, ch, st){ for (let i = 0; i < w; i++) this.put(x + i, y, ch, st); }
+  vline(x, y, h, ch, st){ for (let j = 0; j < h; j++) this.put(x, y + j, ch, st); }
+  box(x, y, w, h, st, kind){
+    const c = {round:'╭╮╰╯─│', heavy:'┏┓┗┛━┃', dash:'╭╮╰╯┄┆'}[kind || 'round'];
+    if (w < 2 || h < 2) return;
+    this.put(x, y, c[0], st); this.put(x + w - 1, y, c[1], st); this.put(x, y + h - 1, c[2], st); this.put(x + w - 1, y + h - 1, c[3], st);
+    for (let i = 1; i < w - 1; i++){ this.put(x + i, y, c[4], st); this.put(x + i, y + h - 1, c[4], st); }
+    for (let j = 1; j < h - 1; j++){ this.put(x, y + j, c[5], st); this.put(x + w - 1, y + j, c[5], st); }
+  }
+  clip(r){ this.cl = r; } unclip(){ this.cl = null; }
+}
+
+// ---------- painter: box drawing, blocks and braille are drawn procedurally, like Ghostty does ----------
+const LINES = {};
+((chars, w) => { const A = [[0,1,0,1],[1,0,1,0],[0,1,1,0],[0,0,1,1],[1,1,0,0],[1,0,0,1],[1,1,1,0],[1,0,1,1],[0,1,1,1],[1,1,0,1],[1,1,1,1],[0,0,0,1],[1,0,0,0],[0,1,0,0],[0,0,1,0]];
+  [...chars].forEach((c, i) => LINES[c] = A[i].map(v => v * w)); })('─│┌┐└┘├┤┬┴┼╴╵╶╷', 1);
+((chars, w) => { const A = [[0,1,0,1],[1,0,1,0],[0,1,1,0],[0,0,1,1],[1,1,0,0],[1,0,0,1],[1,1,1,0],[1,0,1,1],[0,1,1,1],[1,1,0,1],[1,1,1,1],[0,0,0,1],[1,0,0,0],[0,1,0,0],[0,0,1,0]];
+  [...chars].forEach((c, i) => LINES[c] = A[i].map(v => v * w)); })('━┃┏┓┗┛┣┫┳┻╋╸╹╺╻', 2);
+const DASH = {'┄':{h:1,n:3,w:1},'┈':{h:1,n:4,w:1},'╌':{h:1,n:2,w:1},'┆':{h:0,n:3,w:1},'┊':{h:0,n:4,w:1},'╎':{h:0,n:2,w:1}};
+const QUAD = {0x2596:4,0x2597:8,0x2598:1,0x2599:13,0x259A:9,0x259B:7,0x259C:11,0x259D:2,0x259E:6,0x259F:14};
+function boxGlyph(ch, x, y, fg){
+  const t1 = Math.max(1, Math.round(CW / 8)), t2 = t1 * 2, L = LINES[ch];
+  if (L){
+    for (let d = 0; d < 4; d++){ const w = L[d]; if (!w) continue; const t = w === 2 ? t2 : t1, ox = x + Math.floor((CW - t) / 2), oy = y + Math.floor((CH - t) / 2);
+      if (d === 0) cx.fillRect(ox, y, t, oy - y + t); else if (d === 1) cx.fillRect(ox, oy, x + CW - ox, t); else if (d === 2) cx.fillRect(ox, oy, t, y + CH - oy); else cx.fillRect(x, oy, ox - x + t, t); }
+    return true;
+  }
+  const Dd = DASH[ch];
+  if (Dd){ const t = t1;
+    if (Dd.h){ const oy = y + Math.floor((CH - t) / 2), seg = CW / Dd.n; for (let i = 0; i < Dd.n; i++) cx.fillRect(Math.round(x + i * seg), oy, Math.max(1, Math.round(seg * 0.6)), t); }
+    else { const ox = x + Math.floor((CW - t) / 2), seg = CH / Dd.n; for (let i = 0; i < Dd.n; i++) cx.fillRect(ox, Math.round(y + i * seg), t, Math.max(1, Math.round(seg * 0.6))); }
+    return true; }
+  if ('╭╮╯╰'.includes(ch)){
+    const t = t1, cxp = x + Math.floor((CW - t) / 2) + t / 2, cyp = y + Math.floor((CH - t) / 2) + t / 2, r = Math.min(CW, CH) / 2;
+    const hx = (ch === '╭' || ch === '╰') ? x + CW : x, vy = (ch === '╭' || ch === '╮') ? y + CH : y;
+    cx.strokeStyle = fg; cx.lineWidth = t; cx.beginPath(); cx.moveTo(hx, cyp); cx.arcTo(cxp, cyp, cxp, vy, r); cx.lineTo(cxp, vy); cx.stroke();
+    return true;
+  }
+  return false;
+}
+function blockGlyph(cp, x, y){
+  const h2 = Math.round(CH / 2), w2 = Math.round(CW / 2);
+  if (cp === 0x2580){ cx.fillRect(x, y, CW, h2); return true; }
+  if (cp >= 0x2581 && cp <= 0x2587){ const hh = Math.round(CH * (cp - 0x2580) / 8); cx.fillRect(x, y + CH - hh, CW, hh); return true; }
+  if (cp === 0x2588){ cx.fillRect(x, y, CW, CH); return true; }
+  if (cp >= 0x2589 && cp <= 0x258F){ cx.fillRect(x, y, Math.round(CW * (8 - (cp - 0x2588)) / 8), CH); return true; }
+  if (cp === 0x2590){ cx.fillRect(x + w2, y, CW - w2, CH); return true; }
+  if (cp >= 0x2591 && cp <= 0x2593){ const a = cx.globalAlpha; cx.globalAlpha = a * (cp - 0x2590) / 4; cx.fillRect(x, y, CW, CH); cx.globalAlpha = a; return true; }
+  if (cp === 0x2594){ cx.fillRect(x, y, CW, Math.max(1, Math.round(CH / 8))); return true; }
+  if (cp === 0x2595){ const w = Math.max(1, Math.round(CW / 8)); cx.fillRect(x + CW - w, y, w, CH); return true; }
+  const q = QUAD[cp];
+  if (q){ if (q & 1) cx.fillRect(x, y, w2, h2); if (q & 2) cx.fillRect(x + w2, y, CW - w2, h2); if (q & 4) cx.fillRect(x, y + h2, w2, CH - h2); if (q & 8) cx.fillRect(x + w2, y + h2, CW - w2, CH - h2); return true; }
+  return false;
+}
+const BR = [[0,0],[0,1],[0,2],[1,0],[1,1],[1,2],[0,3],[1,3]];
+function braille(b, x, y){ const r = Math.max(0.9, CW / 7.5); for (let i = 0; i < 8; i++) if (b & (1 << i)){ const [c, rw] = BR[i]; cx.beginPath(); cx.arc(x + CW * (c ? 0.7 : 0.3), y + CH * (0.125 + rw * 0.25), r, 0, 7); cx.fill(); } }
+function glyph(ch, x, y, fg){
+  const cp = ch.codePointAt(0);
+  if (cp >= 0x2500 && cp <= 0x257F) return boxGlyph(ch, x, y, fg);
+  if (cp >= 0x2580 && cp <= 0x259F) return blockGlyph(cp, x, y);
+  if (cp > 0x2800 && cp <= 0x28FF){ braille(cp - 0x2800, x, y); return true; }
+  return false;
+}
+function underline(c, x, y, col){
+  cx.fillStyle = col; cx.strokeStyle = col; const yy = y + CH - 2;
+  if (c.u === 's') cx.fillRect(x, yy, CW, 1);
+  else if (c.u === 'd'){ for (let i = 0; i < CW; i += 2) cx.fillRect(x + i, yy, 1, 1); }
+  else if (c.u === 'c'){ cx.lineWidth = 1; cx.beginPath(); for (let i = 0; i <= CW; i++){ const v = yy - 0.5 + Math.sin((x + i) / 1.7) * 1.3; i ? cx.lineTo(x + i, v) : cx.moveTo(x + i, v); } cx.stroke(); }
+  else if (c.u === 'x') cx.fillRect(x, y + Math.round(CH / 2), CW, 1);
+}
+function paint(){
+  const s = SCR; cx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  cx.fillStyle = PAL.bg; cx.fillRect(0, 0, COLS * CW, ROWS * CH);
+  for (let y = 0; y < s.r; y++) for (let x = 0; x < s.c; x++){ const c = s.cells[y * s.c + x]; if (c.bg){ cx.fillStyle = color(c.bg, c.d, true); cx.fillRect(x * CW, y * CH, CW, CH); } }
+  cx.textAlign = 'center'; cx.textBaseline = 'middle'; let lf = '';
+  for (let y = 0; y < s.r; y++) for (let x = 0; x < s.c; x++){
+    const c = s.cells[y * s.c + x]; if (c.ch === ' ' && !c.u) continue;
+    const fg = color(c.fg, c.d), px = x * CW, py = y * CH; cx.fillStyle = fg;
+    if (c.ch !== ' ' && !glyph(c.ch, px, py, fg)){ const f = `${c.i ? 'italic ' : ''}${c.b ? 700 : 400} ${FS}px ${FONT}`; if (f !== lf){ cx.font = f; lf = f; } cx.fillText(c.ch, px + CW / 2, py + CH / 2 + 1); }
+    if (c.u) underline(c, px, py, c.uc ? color(c.uc, c.d) : fg);
+  }
+}
+
+// ---------- example data ----------
+const T0 = new Date(); T0.setSeconds(0, 0); T0.setMinutes(T0.getMinutes() - T0.getMinutes() % 5);
+const rm = m => new Date(T0.getTime() + m * 60000);
+const dayAt = (off, h, m) => { const d = new Date(T0); d.setDate(d.getDate() + off); d.setHours(h, m, 0, 0); return d; };
+const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MON = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const sameDay = (a, b) => a.toDateString() === b.toDateString();
+const p2 = n => String(n).padStart(2, '0');
+const fmtT = d => p2(d.getHours()) + ':' + p2(d.getMinutes());
+const rel = m => m < 60 ? `${m}m` : (m % 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m / 60}h`);
+const dayShort = d => `${DOW[d.getDay()]} ${d.getDate()} ${MON[d.getMonth()].slice(0, 3)}`;
+function week(d){ const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const n = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - n); const y = new Date(Date.UTC(t.getUTCFullYear(), 0, 1)); return Math.ceil(((t - y) / 86400000 + 1) / 7); }
+
+const DATA = {
+  prs: [
+    {repo:'gtforge/rider-ios', n:4821, title:'Fix ETA banner flicker on socket reconnect', author:'maya-l', why:'you', ci:'pass', add:84, del:31, files:6, comments:3, age:'2h',
+     checks:[['pass','unit tests','4m 12s'],['pass','snapshot tests','6m 40s'],['pass','swiftlint','38s']],
+     body:'The banner re-rendered on every socket reconnect event even when the ETA had not changed. Updates are now debounced and compared with the last value shown. Tested by toggling airplane mode 20 times on an iPhone 17 simulator: no flicker.'},
+    {repo:'gtforge/core-ios', n:1290, title:'GettUI: Dynamic Type support for PillButton', author:'itamar-k', why:'team', team:'@ios-core', ci:'run', add:212, del:40, files:9, comments:0, age:'5h',
+     checks:[['pass','swiftlint','41s'],['run','unit tests','running, 3m'],['run','snapshot tests','queued']],
+     body:'PillButton now scales its label and insets with the content size category, capped at accessibility XL. Snapshot references were regenerated for all five sizes.'},
+    {repo:'gtforge/rider-ios', n:4815, title:'Move trip history to async/await', author:'noa-b', why:'owner', ci:'fail', add:640, del:512, files:23, comments:11, age:'1d',
+     checks:[['fail','unit tests','TripHistoryStoreTests.testCancel'],['pass','snapshot tests','7m 02s'],['pass','swiftlint','44s']],
+     body:'Replaces the RxSwift chain in TripHistoryStore with an actor and an AsyncSequence for paging. Cancellation is still flaky when the list is dismissed mid-page; see the failing test.'},
+    {repo:'gtforge/driver-ios', n:2207, title:'Queue status changes while offline', author:'omer-s', why:'you', ci:'pass', add:301, del:12, files:8, comments:2, age:'2d',
+     checks:[['pass','unit tests','5m 30s'],['pass','swiftlint','36s']],
+     body:'Status changes made without a connection go into a persistent queue and replay in order on reconnect. Conflicts with server state resolve in favour of the server.'},
+    {repo:'gtforge/core-ios', n:1284, title:'Bump RxSwift to 6.9.0', author:'renovate', why:'team', team:'@ios-core', ci:'pass', add:4, del:4, files:2, comments:0, age:'3d',
+     checks:[['pass','unit tests','4m 01s']], body:'Updates RxSwift from 6.8.0 to 6.9.0. Release notes list no breaking changes.'},
+    {repo:'gtforge/core-ios', n:1281, title:'Fix snapshot tests on Xcode 27', author:'lior-m', why:'team', team:'@ios-core', ci:'pass', handled:true, by:'itamar-k', add:58, del:22, files:4, comments:1, age:'4h',
+     checks:[['pass','snapshot tests','6m 12s']], body:'Pins the simulator runtime used for snapshots and re-records the three references that changed with the new SF Pro metrics.'},
+    {repo:'gtforge/rider-ios', n:4802, title:'Remove the legacy promo carousel', author:'dana-r', why:'team', team:'@rider', ci:'pass', handled:true, by:'maya-l', add:12, del:880, files:31, comments:4, age:'1d',
+     checks:[['pass','unit tests','4m 50s']], body:'Deletes PromoCarouselViewController and its assets. The new promo surface shipped in 8.14.'},
+  ],
+  jira: [
+    {key:'GETT-4410', summary:'ETA banner shows a stale value after reconnect', status:'In Progress', pri:'high', type:'Bug', pts:3, desc:'After the socket reconnects the banner keeps the ETA from before the drop until the next push arrives, up to 60 seconds later.'},
+    {key:'GETT-4398', summary:'Trip history: page with an AsyncSequence', status:'In Review', pri:'med', type:'Story', pts:5, desc:'Replace the paging observable with an AsyncSequence so the list can cancel cleanly when dismissed.'},
+    {key:'GETT-4377', summary:'VoiceOver labels on the fare breakdown', status:'To Do', pri:'med', type:'Story', pts:2, desc:'Each fare line should read as one element: label, then amount, then currency.'},
+    {key:'GETT-4352', summary:'Crash in the MapKit overlay on iOS 27 beta 3', status:'Blocked', pri:'high', type:'Bug', pts:3, desc:'Waiting on Apple feedback FB15520331. Reproduces only on beta 3.'},
+    {key:'GETT-4290', summary:'Live Activity for ride status', status:'To Do', pri:'low', type:'Story', pts:8, desc:'Show driver ETA and plate on the Lock Screen while a ride is active.'},
+    {key:'GETT-4261', summary:'Remove the legacy promo carousel', status:'In Review', pri:'low', type:'Task', pts:1, desc:'Code removal after the new promo surface shipped.'},
+  ],
+  meetings: [
+    {title:'Rider guild sync', start:rm(-150), mins:45, loc:'Zoom', who:'maya-l, noa-b, itamar-k and 6 others', notes:'Monthly. Demo of the new trip history list.'},
+    {title:'Design review: ETA banner', start:rm(-15), mins:45, loc:'Rothschild room', who:'maya-l, dana-r, a designer', notes:'Walk through the reconnect states and the stale-value treatment.'},
+    {title:'1:1 with Dana', start:rm(40), mins:30, loc:'Zoom', who:'dana-r', notes:'Q4 OKR draft, interview loop.'},
+    {title:'Sprint 42 planning', start:rm(115), mins:60, loc:'Dizengoff room', who:'Rider squad', notes:'Bring estimates for GETT-4290.'},
+    {title:'Focus: review queue', start:rm(200), mins:90, loc:'', who:'just you', notes:''},
+    {title:'Daily standup', start:dayAt(1, 9, 30), mins:15, loc:'Zoom', who:'Rider squad', notes:''},
+    {title:'iOS chapter', start:dayAt(1, 11, 0), mins:60, loc:'Allenby room', who:'iOS chapter', notes:'Swift 6.2 strict concurrency rollout.'},
+    {title:'Interview: senior iOS engineer', start:dayAt(1, 15, 0), mins:60, loc:'Zoom', who:'a candidate, omer-s', notes:'System design round.'},
+    {title:'Daily standup', start:dayAt(2, 9, 30), mins:15, loc:'Zoom', who:'Rider squad', notes:''},
+    {title:'Quarterly roadmap review', start:dayAt(2, 13, 0), mins:90, loc:'Rothschild room', who:'Product and engineering leads', notes:''},
+  ],
+  rem: [
+    {title:'Pick up dry cleaning', list:'Home', due:rm(-90), notes:''},
+    {title:'Send Q4 OKR draft to Dana', list:'Work', due:dayAt(0, 17, 0), notes:'Use the template from last quarter.'},
+    {title:'Renew car insurance', list:'Home', due:dayAt(1, 10, 0), notes:'Compare with last year: 3,140 ILS.'},
+    {title:'Reply to the herdr maintainer about an idle hook', list:'Work', due:dayAt(2, 10, 0), notes:''},
+    {title:'Book a dentist appointment', list:'Home', due:null, notes:''},
+  ],
+  tasks: [
+    {title:'Sketch the herdr overlay keymap', due:dayAt(0, 18, 0), done:false},
+    {title:'Try kitty graphics avatars in Ghostty', due:null, done:false},
+    {title:'Read the mirador plugin protocol', due:dayAt(2, 12, 0), done:false},
+    {title:'Pick a name: docket or ondeck', due:null, done:false},
+    {title:'Collect Ghostty capability notes', due:null, done:true},
+  ],
+  note: ['# scratch', '- #4815 needs a second pass on cancellation', '- ask Noa about `TripHistoryStore` actor isolation', '- try `m` arrange, then drag a title', '', '## standup', 'yesterday: ETA banner fix', 'today: review queue, planning'],
+};
+const WX = {city:'Tel Aviv', temp:24, cond:'clear', hi:27, lo:19, wind:'12 km/h NW', hum:58, hours:[24,24,23,23,22,21,20,20,19,19,19,20]};
+const cpuH = []; let cpuV = 22; for (let i = 0; i < 400; i++){ cpuV = clamp(cpuV + (Math.random() * 12 - 6) + (Math.random() < 0.04 ? 30 : 0) - (cpuV > 60 ? 6 : 0), 4, 96); cpuH.push(cpuV); }
+let memF = 0.70;
+function tick(){ cpuV = clamp(cpuV + (Math.random() * 12 - 6) + (Math.random() < 0.05 ? 28 : 0) - (cpuV > 60 ? 7 : 0), 4, 96); cpuH.push(cpuV); if (cpuH.length > 600) cpuH.shift(); memF = clamp(memF + (Math.random() - 0.5) * 0.01, 0.62, 0.78); dirty(); }
+
+// ---------- widgets ----------
+const A = (k, label, run, primary) => ({k, label, run, primary});
+const ref = p => `${p.repo.split('/')[1]}#${p.n}`;
+const CI = {pass:['✓','ok'], fail:['✗','bad'], run:['◌','warn']};
+const WHY = {you:['@you','warn','asked you directly'], team:['team','team','asked your team'], owner:['owner','info','you own these files']};
+const STATUS = {'To Do':'dim','In Progress':'accent','In Review':'info','Blocked':'bad','Done':'ok'};
+const PRI = {high:['▲','bad','High'], med:['■','warn','Medium'], low:['▼','faint','Low']};
+const UI = {handled:false, calOff:0, cur:{r:0, c:0}};
+const LS = {};
+const ls = id => LS[id] || (LS[id] = {sel:0, top:0, last:-1});
+function rowLR(s, r, L, R){
+  const rw = segsLen(R); let rx = r.x + r.w - rw;
+  if (rw < r.w) for (const [t, st] of R) rx = s.text(rx, r.y, t, st || {});
+  s.segs(r.x, r.y, L, Math.max(0, r.w - rw - 1));
+}
+function wrap(t, w){ const out = []; for (const para of t.split('\n')){ let line = ''; for (const word of para.split(' ')){ if (!line) line = word; else if (len(line) + 1 + len(word) <= w) line += ' ' + word; else { out.push(line); line = word; } } out.push(line); } return out; }
+function dueTxt(d){ if (!d) return ['', 'faint']; const n = new Date(); if (d < n) return ['overdue', 'bad']; if (sameDay(d, n)) return [fmtT(d), 'warn']; const t = new Date(n); t.setDate(t.getDate() + 1); if (sameDay(d, t)) return ['tomorrow', 'dim']; return [DOW[d.getDay()], 'dim']; }
+function parseDue(v){
+  const m = v.match(/\s+due\s+(\w+)$/i); if (!m) return [v, null];
+  const w = m[1].toLowerCase(); let off = null;
+  if (w === 'today') off = 0; else if (w === 'tomorrow') off = 1; else { const i = DOW.findIndex(d => d.toLowerCase() === w.slice(0, 3)); if (i >= 0) off = (i - new Date().getDay() + 7) % 7 || 7; }
+  return off == null ? [v, null] : [v.slice(0, m.index), dayAt(off, 18, 0)];
+}
+function detailWriter(s, r){ let y = r.y; return segs => { if (y < r.y + r.h) s.segs(r.x, y, segs, r.w); y++; }; }
+
+const W = {};
+W.prs = {
+  title:'Review requests', short:'PRs', list:true,
+  items(){
+    const act = DATA.prs.filter(p => !p.gone && !p.handled), h = DATA.prs.filter(p => !p.gone && p.handled), out = [...act];
+    if (!act.length) out.push({sep:'Nothing is waiting on you'});
+    if (h.length){ out.push({sep: UI.handled ? 'Handled by a teammate' : `${h.length} more handled by a teammate (t)`}); if (UI.handled) out.push(...h); }
+    return out;
+  },
+  count(){ return DATA.prs.filter(p => !p.gone && !p.handled).length; },
+  row(s, r, p, hl){
+    const c = CI[p.ci], L = [[c[0] + ' ', {fg:c[1]}]];
+    if (r.w >= 58) L.push([ref(p) + ' ', {fg:'dim'}]); else if (r.w >= 40) L.push(['#' + p.n + ' ', {fg:'dim'}]);
+    L.push([p.title, {fg: p.handled ? 'dim' : hl ? 'bright' : 'fg', b:hl}]);
+    const R = [];
+    if (p.handled) R.push([`✓ ${p.by}  `, {fg:'ok'}]);
+    else {
+      if (r.w >= 84) R.push([`+${p.add}`, {fg:'ok'}], [` −${p.del}  `, {fg:'bad'}]);
+      if (r.w >= 68) R.push([p.author + '  ', {fg:'dim'}]);
+      if (r.w >= 50){ const w = WHY[p.why]; R.push([pad(p.why === 'team' ? p.team : w[0], 9), {fg:w[1]}]); }
+    }
+    R.push([p.age.padStart(3), {fg:'faint'}]);
+    rowLR(s, r, L, R);
+  },
+  actions(p){
+    if (p.handled) return [A('⏎', 'open', () => toast(`Opened ${ref(p)} in the browser`), true)];
+    return [
+      A('⏎', 'open', () => toast(`Opened ${ref(p)} in the browser`), true),
+      A('a', 'approve', () => { p.gone = true; toast(`Approved ${ref(p)}`, () => { p.gone = false; }); }),
+      A('c', 'comment', () => ask(`Comment on ${ref(p)}`, 'comment', v => toast(`Commented on ${ref(p)}: “${v}”`))),
+      A('x', 'request changes', () => ask(`Request changes on ${ref(p)}`, 'send', v => { p.gone = true; toast(`Requested changes on ${ref(p)}`, () => { p.gone = false; }); })),
+      A('C', 'checkout', () => toast(`Checked out ${ref(p)} to ~/wt/${p.repo.split('/')[1]}-${p.n}`)),
+    ];
+  },
+  extra:[A('t', 'teammates', () => { UI.handled = !UI.handled; })],
+  summary(){ const a = DATA.prs.filter(p => !p.gone && !p.handled), f = a.filter(p => p.ci === 'fail').length, y = a.filter(p => p.why === 'you').length;
+    return [[`@you ${y}`, {fg:'warn'}], ['   '], [f ? `✗ ${f} failing` : '✓ all green', {fg: f ? 'bad' : 'ok'}]]; },
+  detail(s, r, p){
+    const put = detailWriter(s, r);
+    put([[p.repo + '#' + p.n, {fg:'accent', u:'d'}], ['   ' + p.author, {fg:'dim'}], ['   ' + p.age + ' ago', {fg:'faint'}]]);
+    for (const l of wrap(p.title, r.w)) put([[l, {fg:'bright', b:1}]]);
+    put([[p.handled ? `${p.by} already reviewed for your team` : WHY[p.why][2] + (p.team ? ' ' + p.team : ''), {fg: p.handled ? 'ok' : WHY[p.why][1]}]]);
+    put([[`+${p.add}`, {fg:'ok'}], [` −${p.del}`, {fg:'bad'}], [`   ${p.files} files   ${p.comments} comments`, {fg:'dim'}]]);
+    put([]);
+    put([['Checks', {fg:'fg', b:1}]]);
+    for (const c of p.checks) put([[CI[c[0]][0] + ' ', {fg:CI[c[0]][1]}], [pad(c[1], 18), {fg:'fg'}], [c[2], c[0] === 'fail' ? {fg:'bad', u:'c', uc:'bad'} : {fg:'faint'}]]);
+    put([]);
+    put([['Description', {fg:'fg', b:1}]]);
+    for (const l of wrap(p.body, r.w)) put([[l, {fg:'dim'}]]);
+  },
+};
+W.jira = {
+  title:'Jira', short:'Jira', list:true,
+  items(){ return DATA.jira.filter(j => !j.gone); },
+  count(){ return DATA.jira.filter(j => !j.gone && j.status !== 'Done').length; },
+  row(s, r, j, hl){
+    const pr = PRI[j.pri], L = [[pr[0] + ' ', {fg:pr[1]}]];
+    if (r.w >= 40) L.push([j.key + ' ', {fg:'dim'}]);
+    L.push([j.summary, {fg: hl ? 'bright' : 'fg', b:hl}]);
+    const R = r.w >= 34 ? [[pad(j.status, 11), {fg:STATUS[j.status]}]] : [['●', {fg:STATUS[j.status]}]];
+    rowLR(s, r, L, R);
+  },
+  actions(j){
+    return [
+      A('⏎', 'open', () => toast(`Opened ${j.key} in the browser`), true),
+      A('t', 'transition', () => menu(`Move ${j.key} to`, Object.keys(STATUS).filter(st => st !== j.status).map(st => ({label:st, fg:STATUS[st], run(){
+        if (st === 'Done') toast(`Done needs a Resolution, so ${j.key} opened in the browser`);
+        else { const old = j.status; j.status = st; toast(`Moved ${j.key} to ${st}`, () => { j.status = old; }); }
+      }})))),
+    ];
+  },
+  summary(){ const ip = DATA.jira.filter(j => j.status === 'In Progress').length, rv = DATA.jira.filter(j => j.status === 'In Review').length, bl = DATA.jira.filter(j => j.status === 'Blocked').length;
+    return [[`${ip} in progress`, {fg:'accent'}], [`   ${rv} in review`, {fg:'info'}], ...(bl ? [[`   ${bl} blocked`, {fg:'bad'}]] : [])]; },
+  detail(s, r, j){
+    const put = detailWriter(s, r), pr = PRI[j.pri];
+    put([[j.key, {fg:'accent', u:'d'}], ['   ' + j.type, {fg:'dim'}], ['   ' + pr[0] + ' ' + pr[2], {fg:pr[1]}]]);
+    for (const l of wrap(j.summary, r.w)) put([[l, {fg:'bright', b:1}]]);
+    put([[j.status, {fg:STATUS[j.status], b:1}], [`   Sprint 42   ${j.pts} points   assigned to you`, {fg:'dim'}]]);
+    put([]);
+    put([['Description', {fg:'fg', b:1}]]);
+    for (const l of wrap(j.desc, r.w)) put([[l, {fg:'dim'}]]);
+  },
+};
+W.meetings = {
+  title:'Meetings', short:'Meetings', list:true,
+  items(){
+    const n = Date.now(), tk = new Date().toDateString(), out = []; let day = null, nowDone = false;
+    for (const m of [...DATA.meetings].sort((a, b) => a.start - b.start)){
+      const dk = m.start.toDateString();
+      if (dk !== day){ if (day === tk && !nowDone){ out.push({now:true}); nowDone = true; } const t = new Date(); t.setDate(t.getDate() + 1);
+        out.push({sep: dk === tk ? 'Today' : sameDay(m.start, t) ? 'Tomorrow' : dayShort(m.start), day:true}); day = dk; }
+      if (dk === tk && !nowDone && m.start.getTime() > n){ out.push({now:true}); nowDone = true; }
+      out.push(m);
+    }
+    return out;
+  },
+  count(){ const n = Date.now(); return DATA.meetings.filter(m => sameDay(m.start, new Date()) && m.start.getTime() + m.mins * 60000 > n).length; },
+  row(s, r, m, hl){
+    const n = Date.now(), st = m.start.getTime(), en = st + m.mins * 60000, past = en < n, live = st <= n && en > n, today = sameDay(m.start, new Date());
+    const L = [[fmtT(m.start) + ' ', {fg: past ? 'faint' : 'dim'}], [live ? '● ' : '  ', {fg:'ok'}], [m.title, {fg: past ? 'faint' : hl ? 'bright' : 'fg', b:hl}]];
+    const R = [];
+    if (r.w >= 54 && m.loc) R.push([m.loc + '  ', {fg:'faint'}]);
+    if (live) R.push(['now', {fg:'ok', b:1}]);
+    else if (past) R.push(['done', {fg:'faint'}]);
+    else if (today){ const mins = Math.round((st - n) / 60000); R.push([`in ${rel(mins)}`, {fg: mins <= 15 ? 'warn' : 'dim'}]); }
+    else R.push([rel(m.mins), {fg:'faint'}]);
+    rowLR(s, r, L, R);
+  },
+  actions(m){ return [A('⏎', 'open in Calendar', () => toast(`Opened “${m.title}” in Calendar`), true)]; },
+  summary(){ const n = Date.now(), live = DATA.meetings.find(m => m.start <= n && m.start.getTime() + m.mins * 60000 > n), nx = DATA.meetings.find(m => m.start > n);
+    const out = []; if (live) out.push(['● now  ', {fg:'ok'}]);
+    if (nx) out.push([nx.title + ' ', {fg:'fg'}], [`in ${rel(Math.round((nx.start - n) / 60000))}`, {fg:'warn'}]);
+    return out; },
+  detail(s, r, m){
+    const put = detailWriter(s, r), en = new Date(m.start.getTime() + m.mins * 60000);
+    for (const l of wrap(m.title, r.w)) put([[l, {fg:'bright', b:1}]]);
+    put([[`${dayShort(m.start)}   ${fmtT(m.start)} to ${fmtT(en)}   ${rel(m.mins)}`, {fg:'dim'}]]);
+    if (m.loc) put([[m.loc, {fg:'dim'}]]);
+    put([['With ' + m.who, {fg:'dim'}]]);
+    put([]);
+    if (m.notes){ put([['Notes', {fg:'fg', b:1}]]); for (const l of wrap(m.notes, r.w)) put([[l, {fg:'dim'}]]); put([]); }
+    put([['Accept or decline in Calendar (⏎)', {fg:'faint'}]]);
+  },
+};
+W.reminders = {
+  title:'Reminders', short:'Reminders', list:true,
+  items(){ const a = DATA.rem.filter(x => !x.done).sort((p, q) => (p.due || 9e15) - (q.due || 9e15)); return a.length ? a : [{sep:'All done'}]; },
+  count(){ return DATA.rem.filter(x => !x.done).length; },
+  row(s, r, m, hl){
+    const [dt, dc] = dueTxt(m.due);
+    const L = [['○ ', {fg: dc === 'bad' ? 'bad' : 'dim'}], [m.title, {fg: hl ? 'bright' : 'fg', b:hl}]];
+    const R = []; if (r.w >= 46) R.push([pad(m.list, 6), {fg:'faint'}]); R.push([dt.padStart(8), {fg:dc}]);
+    rowLR(s, r, L, R);
+  },
+  actions(m){ return [A('␣', 'complete', () => { m.done = true; toast(`Completed “${m.title}”`, () => { m.done = false; }); }), A('⏎', 'open in Reminders', () => toast(`Opened “${m.title}” in Reminders`), true)]; },
+  summary(){ const a = DATA.rem.filter(x => !x.done), o = a.filter(x => x.due && x.due < new Date()).length, t = a.filter(x => x.due && sameDay(x.due, new Date()) && x.due >= new Date()).length;
+    return [[`${o} overdue`, {fg: o ? 'bad' : 'faint'}], [`   ${t} due today`, {fg:'warn'}]]; },
+  detail(s, r, m){
+    const put = detailWriter(s, r), [dt, dc] = dueTxt(m.due);
+    for (const l of wrap(m.title, r.w)) put([[l, {fg:'bright', b:1}]]);
+    put([[m.list, {fg:'dim'}], ...(m.due ? [['   due ' + dayShort(m.due) + ' ' + fmtT(m.due), {fg:dc}]] : [])]);
+    put([]);
+    if (m.notes) for (const l of wrap(m.notes, r.w)) put([[l, {fg:'dim'}]]);
+  },
+};
+W.tasks = {
+  title:'Tasks', short:'Tasks', list:true,
+  items(){ const a = [...DATA.tasks.filter(t => !t.done), ...DATA.tasks.filter(t => t.done)]; return a.length ? a : [{sep:'No tasks. Press a to add one.'}]; },
+  count(){ return DATA.tasks.filter(t => !t.done).length; },
+  row(s, r, t, hl){
+    const [dt, dc] = t.done ? ['', 'faint'] : dueTxt(t.due);
+    rowLR(s, r, [[t.done ? '✓ ' : '○ ', {fg: t.done ? 'ok' : 'dim'}], [t.title, {fg: t.done ? 'faint' : hl ? 'bright' : 'fg', b: hl && !t.done, u: t.done ? 'x' : 0}]], [[dt.padStart(8), {fg:dc}]]);
+  },
+  actions(t){
+    return [
+      A('␣', t.done ? 'reopen' : 'done', () => { t.done = !t.done; }),
+      A('⏎', 'edit', () => ask('Edit task', 'save', v => { t.title = v; }, t.title), true),
+      A('d', 'delete', () => { const i = DATA.tasks.indexOf(t); DATA.tasks.splice(i, 1); toast(`Deleted “${t.title}”`, () => DATA.tasks.splice(i, 0, t)); }),
+    ];
+  },
+  extra:[A('a', 'add', () => ask('New task (end with “due tue” to set a date)', 'add', v => { const [title, due] = parseDue(v); DATA.tasks.unshift({title, due, done:false}); ls('tasks').sel = 0; }))],
+  summary(){ const a = DATA.tasks.filter(t => !t.done), nx = a.find(t => t.due); return [[`${a.length} open`, {fg:'fg'}], ...(nx ? [['   next: ' + nx.title, {fg:'dim'}]] : [])]; },
+};
+function drawMd(s, x, y, t, w){
+  let st = {fg:'fg'};
+  if (t.startsWith('## ')) st = {fg:'fg', b:1}; else if (t.startsWith('# ')) st = {fg:'bright', b:1};
+  let code = false, i = 0;
+  for (const ch of t){
+    if (i >= w) break;
+    let cs = st;
+    if (ch === '`'){ code = !code; cs = {fg:'faint'}; }
+    else if (code) cs = {fg:'accent'};
+    else if (i < 3 && ((ch === '#' && t.startsWith('#')) || (ch === '-' && t.startsWith('- ')))) cs = {fg:'faint'};
+    s.put(x + i, y, ch, cs); i++;
+  }
+}
+W.notes = {
+  title:'Notes', short:'Notes',
+  extra:[A('i', 'edit', () => { S.mode = 'note'; UI.cur = {r:0, c:0}; S.focus = 'notes'; }), A('E', '$EDITOR', () => toast('Opened scratch.md in $EDITOR. dash resumes when you quit it.'))],
+  render(s, r){
+    const L = DATA.note, ed = S.mode === 'note'; let top = 0;
+    if (ed && UI.cur.r >= r.h) top = UI.cur.r - r.h + 1;
+    for (let i = 0; i < r.h && top + i < L.length; i++) drawMd(s, r.x, r.y + i, L[top + i], r.w);
+    if (ed){ const c = UI.cur, x = r.x + c.c; if (x < r.x + r.w) s.put(x, r.y + c.r - top, L[c.r][c.c] || ' ', {fg:'bg', bg:'ok'}); }
+    if (!L.join('').trim()) s.text(r.x, r.y, 'Empty. Press i to write.', {fg:'faint'});
+  },
+  summary(){ const l = DATA.note.find(x => x.trim() && !x.startsWith('#')) || ''; return [[l.replace(/^- /, ''), {fg:'dim'}]]; },
+};
+W.calendar = {
+  title:'Calendar', short:'Calendar',
+  extra:[A('p', 'previous', () => { UI.calOff--; }), A('n', 'next', () => { UI.calOff++; })],
+  render(s, r){
+    const n = new Date(), m = new Date(n.getFullYear(), n.getMonth() + UI.calOff, 1), days = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
+    const gw = 20, x0 = r.x + Math.max(0, Math.floor((r.w - gw) / 2)), rows = Math.ceil((m.getDay() + days) / 7), y0 = r.y + Math.max(0, Math.floor((r.h - rows - 2) / 2));
+    const title = `${MON[m.getMonth()]} ${m.getFullYear()}`;
+    s.text(x0 + Math.floor((gw - len(title)) / 2), y0, title, {fg:'fg', b:1});
+    ['Su','Mo','Tu','We','Th','Fr','Sa'].forEach((d, i) => s.text(x0 + i * 3, y0 + 1, d, {fg: i >= 5 ? 'faint' : 'dim'}));
+    for (let d = 1; d <= days; d++){
+      const k = m.getDay() + d - 1, col = k % 7, row = Math.floor(k / 7), today = UI.calOff === 0 && d === n.getDate();
+      const t = String(d).padStart(2);
+      if (today) s.text(x0 + col * 3, y0 + 2 + row, t, {fg:'bg', bg:'accent', b:1});
+      else s.text(x0 + col * 3, y0 + 2 + row, t, {fg: col >= 5 ? 'faint' : 'fg'});
+    }
+  },
+};
+const DIG = {'0':['111','101','101','101','111'],'1':['010','110','010','010','111'],'2':['111','001','111','100','111'],'3':['111','001','111','001','111'],'4':['101','101','111','001','001'],'5':['111','100','111','001','111'],'6':['111','100','111','101','111'],'7':['111','001','001','001','001'],'8':['111','101','111','101','111'],'9':['111','101','111','001','111'],':':['0','1','0','1','0']};
+function bigW(str, sc){ let w = 0; for (const ch of str){ const g = DIG[ch][0].length; w += sc === 1 ? g + 1 : g * 2 + 2; } return w - (sc === 1 ? 1 : 2); }
+function bigText(s, x, y, str, sc, st){
+  for (const ch of str){
+    const g = DIG[ch], gw = g[0].length;
+    if (sc === 1){ for (let row = 0; row < 3; row++) for (let c = 0; c < gw; c++){ const t = g[row * 2] && g[row * 2][c] === '1', b = g[row * 2 + 1] && g[row * 2 + 1][c] === '1'; if (t || b) s.put(x + c, y + row, t && b ? '█' : t ? '▀' : '▄', st); } x += gw + 1; }
+    else { for (let row = 0; row < 5; row++) for (let c = 0; c < gw; c++) if (g[row][c] === '1'){ s.put(x + c * 2, y + row, '█', st); s.put(x + c * 2 + 1, y + row, '█', st); } x += gw * 2 + 2; }
+  }
+}
+W.clock = {
+  title:'Clock', short:'Clock',
+  render(s, r){
+    const n = new Date(), hm = fmtT(n), date = `${['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][n.getDay()]} ${n.getDate()} ${MON[n.getMonth()]}`;
+    const sc = r.w >= 36 && r.h >= 7 ? 2 : r.w >= 18 && r.h >= 4 ? 1 : 0;
+    if (!sc){ s.segs(r.x, r.y, [[hm, {fg:'bright', b:1}], [':' + p2(n.getSeconds()), {fg:'faint'}], ['  ' + dayShort(n), {fg:'dim'}]], r.w); return; }
+    const bh = sc === 2 ? 5 : 3, bw = bigW(hm, sc), extra = r.h - bh >= 2 ? 2 : r.h - bh >= 1 ? 1 : 0;
+    const y0 = r.y + Math.max(0, Math.floor((r.h - bh - extra) / 2)), x0 = r.x + Math.max(0, Math.floor((r.w - bw) / 2));
+    bigText(s, x0, y0, hm, sc, {fg:'bright'});
+    s.text(x0 + bw + 1, y0 + bh - 1, p2(n.getSeconds()), {fg:'faint'});
+    if (extra >= 1) s.text(r.x + Math.max(0, Math.floor((r.w - len(date)) / 2)), y0 + bh + (extra === 2 ? 1 : 0), date, {fg:'dim'}, r.w);
+  },
+};
+function spark(vals){ const b = '▁▂▃▄▅▆▇█'; return vals.map(v => b[clamp(Math.floor(v / 100 * 8), 0, 7)]).join(''); }
+function bar(f, w){ const e = Math.round(f * w * 8), full = Math.floor(e / 8), part = e % 8; return '█'.repeat(full) + (part ? '▏▎▍▌▋▊▉'[part - 1] : ''); }
+const cpuCol = v => v > 85 ? 'bad' : v > 65 ? 'warn' : 'accent';
+W.cpu = {
+  title:'CPU and memory', short:'System',
+  render(s, r){
+    const v = Math.round(cpuV), memG = (memF * 16).toFixed(1);
+    if (r.h < 4){ s.segs(r.x, r.y, [['cpu ', {fg:'dim'}], [spark(cpuH.slice(-8)), {fg:cpuCol(v)}], [` ${v}%   `, {fg:'fg'}], ['mem ', {fg:'dim'}], [`${Math.round(memF * 100)}%`, {fg:'fg'}]], r.w); return; }
+    rowLR(s, {x:r.x, y:r.y, w:r.w}, [['cpu ', {fg:'dim'}], [`${v}%`, {fg:cpuCol(v), b:1}]], r.w >= 30 ? [['load 2.14 1.96 1.71', {fg:'faint'}]] : []);
+    const ch = r.h - 3, H = ch * 4, hist = cpuH.slice(-r.w * 2);
+    while (hist.length < r.w * 2) hist.unshift(0);
+    const LB = [0x01,0x02,0x04,0x40], RB = [0x08,0x10,0x20,0x80];
+    for (let i = 0; i < r.w; i++){
+      const d1 = Math.round(hist[i * 2] / 100 * H), d2 = Math.round(hist[i * 2 + 1] / 100 * H);
+      for (let j = 0; j < ch; j++){ let bits = 0; for (let k = 0; k < 4; k++){ const lvl = (ch - 1 - j) * 4 + (3 - k); if (lvl < d1) bits |= LB[k]; if (lvl < d2) bits |= RB[k]; }
+        if (bits) s.put(r.x + i, r.y + 1 + j, String.fromCharCode(0x2800 + bits), {fg: (ch - 1 - j) / ch > 0.66 ? 'warn' : 'accent'}); }
+    }
+    const lab = `mem ${memG}/16 G `, bw = Math.max(4, r.w - len(lab) - 5);
+    s.segs(r.x, r.y + r.h - 1, [[lab, {fg:'dim'}], [pad(bar(memF, bw), bw), {fg:'info'}], [' ' + Math.round(memF * 100) + '%', {fg:'fg'}]], r.w);
+    s.hline(r.x + len(lab) + len(bar(memF, bw)), r.y + r.h - 1, bw - len(bar(memF, bw)), '─', {fg:'line'});
+  },
+};
+W.weather = {
+  title:'Weather', short:'Weather',
+  render(s, r){
+    rowLR(s, {x:r.x, y:r.y, w:r.w}, [['☼ ', {fg:'warn'}], [`${WX.temp}°`, {fg:'bright', b:1}], [` ${WX.cond}`, {fg:'dim'}]], [[WX.city, {fg:'dim'}]]);
+    if (r.h < 2) return;
+    s.text(r.x, r.y + 1, `high ${WX.hi}°  low ${WX.lo}°  wind ${WX.wind}  humidity ${WX.hum}%`, {fg:'faint'}, r.w);
+    if (r.h < 5) return;
+    const h0 = new Date().getHours(), cols = Math.min(WX.hours.length, Math.floor(r.w / 5));
+    for (let i = 0; i < cols; i++){
+      const hr = (h0 + i + 1) % 24, x = r.x + i * 5, night = hr >= 19 || hr < 6;
+      s.text(x, r.y + 3, p2(hr), {fg:'faint'});
+      s.text(x, r.y + 4, night ? '☾' : '☼', {fg: night ? 'info' : 'warn'});
+      s.text(x + 1, r.y + 4, `${WX.hours[i]}°`, {fg:'fg'});
+    }
+    if (r.h >= 7) s.text(r.x, r.y + r.h - 1, `Open-Meteo, updated ${fmtT(rm(-10))}`, {fg:'faint'}, r.w);
+  },
+};
+const ALL = ['prs','jira','meetings','reminders','tasks','notes','calendar','clock','cpu','weather'];
+
+// ---------- layouts: a list of weighted tracks, each a list of weighted Widgets; A runs tracks as rows, B as columns ----------
+const it = (id, w) => ({id, w});
+const layouts = {
+  A: {orient:'rows', tracks:[
+    {w:9, items:[it('clock', 20), it('weather', 28), it('cpu', 30), it('calendar', 24)]},
+    {w:19, items:[it('prs', 62), it('meetings', 38)]},
+    {w:16, items:[it('jira', 34), it('reminders', 26), it('tasks', 22), it('notes', 24)]},
+  ]},
+  B: {orient:'cols', pinned:['clock','weather','cpu'], tracks:[
+    {w:62, items:[it('prs', 11), it('jira', 8)]},
+    {w:44, items:[it('meetings', 14), it('calendar', 7)]},
+    {w:50, items:[it('reminders', 7), it('tasks', 7), it('notes', 8)]},
+  ]},
+  C: {rail:['prs','jira','meetings','reminders','tasks','notes'], railW:32, split:0.54, pinned:['clock','weather','cpu','calendar']},
+};
+function split(n, ws){ if (!ws.length) return []; n = Math.max(0, n); const sum = ws.reduce((a, b) => a + b, 0) || 1, out = ws.map(w => Math.floor(n * w / sum)); let rem = n - out.reduce((a, b) => a + b, 0); for (let i = 0; rem > 0; i = (i + 1) % out.length){ out[i]++; rem--; } return out; }
+function computeLayout(L, area, gT, gI){
+  const rows = L.orient === 'rows', rects = new Map(), splits = [], isz = [];
+  const tsz = split((rows ? area.h : area.w) - gT * (L.tracks.length - 1), L.tracks.map(t => t.w));
+  let pos = rows ? area.y : area.x;
+  L.tracks.forEach((t, ti) => {
+    const sz = split((rows ? area.w : area.h) - gI * (t.items.length - 1), t.items.map(i => i.w)); isz.push(sz);
+    let q = rows ? area.x : area.y;
+    t.items.forEach((itm, ii) => {
+      rects.set(itm.id, rows ? {x:q, y:pos, w:sz[ii], h:tsz[ti]} : {x:pos, y:q, w:tsz[ti], h:sz[ii]});
+      q += sz[ii];
+      if (ii < t.items.length - 1){ const z = gI ? q : q - 1, zw = gI || 2;
+        splits.push(rows ? {kind:'item', t:ti, i:ii, x:z, y:pos, w:zw, h:tsz[ti], axis:'x'} : {kind:'item', t:ti, i:ii, x:pos, y:z, w:tsz[ti], h:zw, axis:'y'}); q += gI; }
+    });
+    pos += tsz[ti];
+    if (ti < L.tracks.length - 1){ const z = gT ? pos : pos - 1, zw = gT || 2;
+      splits.push(rows ? {kind:'track', t:ti, x:area.x, y:z, w:area.w, h:zw, axis:'y'} : {kind:'track', t:ti, x:z, y:area.y, w:zw, h:area.h, axis:'x'}); pos += gT; }
+  });
+  return {rects, splits, tsz, isz};
+}
+const MIN = {rows:{track:5, item:16}, cols:{track:24, item:4}};
+const avg = l => l.length ? l.reduce((a, x) => a + x.w, 0) / l.length : 1;
+function findPos(L, id){ for (let t = 0; t < L.tracks.length; t++){ const i = L.tracks[t].items.findIndex(x => x.id === id); if (i >= 0) return {t, i}; } return null; }
+function removeW(L, id){ const p = findPos(L, id), tr = L.tracks[p.t], x = tr.items.splice(p.i, 1)[0]; if (!tr.items.length) L.tracks.splice(p.t, 1); return x; }
+function dropW(L, id, tid, side){
+  if (id === tid) return; const x = removeW(L, id), p = findPos(L, tid), tr = L.tracks[p.t];
+  if (side === 'before' || side === 'after'){ x.w = avg(tr.items); tr.items.splice(p.i + (side === 'after' ? 1 : 0), 0, x); }
+  else { const w = avg(L.tracks); x.w = 1; L.tracks.splice(p.t + (side === 'trackAfter' ? 1 : 0), 0, {w, items:[x]}); }
+}
+function applySizes(list, sizes, i, j, d, min){ const sz = sizes.slice(), a = sz[i], b = sz[j]; if (a == null || b == null) return; const na = clamp(a + d, min, a + b - min); if (a + b < 2 * min) return; sz[i] = na; sz[j] = a + b - na; list.forEach((x, k) => x.w = sz[k]); }
+function arrangeMove(L, id, along, neg){
+  const p = findPos(L, id), tr = L.tracks[p.t], rows = L.orient === 'rows';
+  if (along){ const j = p.i + (neg ? -1 : 1); if (j < 0 || j >= tr.items.length) return; [tr.items[p.i], tr.items[j]] = [tr.items[j], tr.items[p.i]]; return; }
+  let nt = p.t + (neg ? -1 : 1);
+  if (nt < 0 || nt >= L.tracks.length){ if (tr.items.length < 2) return; const w = avg(L.tracks), x = tr.items.splice(p.i, 1)[0]; x.w = 1; L.tracks.splice(neg ? 0 : L.tracks.length, 0, {w, items:[x]}); return; }
+  const me = S.rects.get(id), c = rows ? me.x + me.w / 2 : me.y + me.h / 2, x = tr.items.splice(p.i, 1)[0];
+  if (!tr.items.length){ L.tracks.splice(p.t, 1); if (nt > p.t) nt--; }
+  const dst = L.tracks[nt]; let idx = dst.items.findIndex(y => { const r = S.rects.get(y.id); return (rows ? r.x + r.w / 2 : r.y + r.h / 2) > c; }); if (idx < 0) idx = dst.items.length;
+  x.w = avg(dst.items); dst.items.splice(idx, 0, x);
+}
+function arrangeResize(L, id, horiz, grow){
+  const rows = L.orient === 'rows', itemAxis = rows ? horiz : !horiz, p = findPos(L, id), d = (grow ? 1 : -1) * (horiz ? 2 : 1), m = MIN[L.orient];
+  if (itemAxis){ const list = L.tracks[p.t].items; if (list.length < 2) return; const j = p.i + 1 < list.length ? p.i + 1 : p.i - 1; applySizes(list, S.lay.isz[p.t], p.i, j, d, m.item); }
+  else { const list = L.tracks; if (list.length < 2) return; const j = p.t + 1 < list.length ? p.t + 1 : p.t - 1; applySizes(list, S.lay.tsz, p.t, j, d, m.track); }
+}
+
+// ---------- app state ----------
+const VARIANTS = [
+  {k:'A', name:'Panels', desc:'boxed tiles in weighted rows'},
+  {k:'B', name:'Ledger', desc:'borderless columns under a status band'},
+  {k:'C', name:'Cockpit', desc:'summary rail, one Widget on stage with detail'},
+];
+const S = {variant:'A', mode:'normal', focus:'prs', hover:null, drag:null, toast:null, undo:null, shift:false, ctrl:false, hasFocus:false, ov:null, snap:null, rects:new Map(), frects:new Map(), lay:null, sizeMode:'fit', stage:null};
+let HITS = [];
+const hit = o => HITS.push(o);
+function toast(msg, undo){ S.toast = {msg, until:Date.now() + 5000, undo:!!undo}; S.undo = undo || null; dirty(); }
+function ask(title, verb, done, value){ S.mode = 'prompt'; S.ov = {kind:'prompt', title, verb, done, value:value || ''}; }
+function menu(title, items, at){ const r = S.frects.get(S.focus) || {x:10, y:5, w:10, h:1}; S.mode = 'menu'; S.ov = {kind:'menu', title, items, sel:0, x: at ? at.x : r.x + 4, y: at ? at.y : r.y + 2}; }
+function focusables(){ if (S.variant === 'C') return layouts.C.rail.slice(); return layouts[S.variant].tracks.flatMap(t => t.items.map(i => i.id)); }
+function ensureFocus(){ const f = focusables(); if (!f.includes(S.focus)) S.focus = f[0]; }
+function cycleFocus(d){ const f = focusables(), i = f.indexOf(S.focus); S.focus = f[(i + d + f.length) % f.length]; }
+function selectable(x){ return x && x.sep == null && !x.now; }
+function normSel(id, items, pref){ const st = ls(id), n = items.length; if (!n) return; st.sel = clamp(st.sel, 0, n - 1); if (selectable(items[st.sel])) return; const order = pref < 0 ? [-1, 1] : [1, -1]; for (const d of order){ for (let i = st.sel + d; i >= 0 && i < n; i += d) if (selectable(items[i])){ st.sel = i; return; } } }
+function selItem(id){ const w = W[id]; if (!w.list) return null; const items = w.items(); normSel(id, items, 1); const x = items[ls(id).sel]; return selectable(x) ? x : null; }
+function moveSel(id, d){ const items = W[id].items(), st = ls(id); for (let i = st.sel + d; i >= 0 && i < items.length; i += d) if (selectable(items[i])){ st.sel = i; return; } }
+function keysFor(id){ const w = W[id], x = selItem(id); return [...(x && w.actions ? w.actions(x) : []), ...(w.extra || [])]; }
+const matchKey = (ak, k) => ak === k || (ak === '⏎' && k === 'Enter') || (ak === '␣' && k === 'Space');
+function spatial(dir){
+  const me = S.frects.get(S.focus); if (!me) return;
+  const gap = (a1, a2, b1, b2) => Math.max(0, Math.max(a1, b1) - Math.min(a2, b2));
+  let best = null, bd = 1e9;
+  for (const [id, r] of S.frects){
+    if (id === S.focus) continue; let p, q;
+    if (dir === 'left'){ if (r.x + r.w > me.x + 1) continue; p = me.x - (r.x + r.w); q = gap(me.y, me.y + me.h, r.y, r.y + r.h); }
+    else if (dir === 'right'){ if (r.x < me.x + me.w - 1) continue; p = r.x - (me.x + me.w); q = gap(me.y, me.y + me.h, r.y, r.y + r.h); }
+    else if (dir === 'up'){ if (r.y + r.h > me.y + 1) continue; p = me.y - (r.y + r.h); q = gap(me.x, me.x + me.w, r.x, r.x + r.w); }
+    else { if (r.y < me.y + me.h - 1) continue; p = r.y - (me.y + me.h); q = gap(me.x, me.x + me.w, r.x, r.x + r.w); }
+    const sc = p + q * 3 + Math.abs((r.x + r.w / 2) - (me.x + me.w / 2)) * (dir === 'up' || dir === 'down' ? 0.02 : 0) + Math.abs((r.y + r.h / 2) - (me.y + me.h / 2)) * (dir === 'left' || dir === 'right' ? 0.05 : 0);
+    if (sc < bd){ bd = sc; best = id; }
+  }
+  if (best) S.focus = best;
+}
+
+// ---------- list rendering ----------
+function listRender(s, r, id, f){
+  const w = W[id], items = w.items(), st = ls(id), n = items.length, rw = n > r.h ? r.w - 1 : r.w;
+  normSel(id, items, 1);
+  if (st.sel !== st.last){ if (st.sel < st.top) st.top = st.sel; if (st.sel >= st.top + r.h) st.top = st.sel - r.h + 1; st.last = st.sel; }
+  st.top = clamp(st.top, 0, Math.max(0, n - r.h));
+  if (st.top > 0 && items[st.top - 1] && items[st.top - 1].sep != null && st.sel - st.top < r.h - 1) st.top--;
+  for (let i = 0; i < r.h; i++){
+    const idx = st.top + i; if (idx >= n) break; const x = items[idx], y = r.y + i;
+    if (x.sep != null){ const e = s.text(r.x, y, x.sep, {fg: x.day ? 'dim' : 'faint', b: !!x.day}, rw); if (x.day) s.hline(e + 1, y, r.x + rw - e - 1, '─', {fg:'line'}); continue; }
+    if (x.now){ const e = s.text(r.x, y, fmtT(new Date()) + ' ', {fg:'bad'}); s.hline(e, y, r.x + rw - e, '─', {fg:'bad'}); continue; }
+    const sel = idx === st.sel, hl = sel && f;
+    if (hl) s.bgRect(r.x, y, rw, 1, 'sel');
+    w.row(s, {x:r.x, y, w:rw}, x, hl, sel);
+    hit({x:r.x, y, w:r.w, h:1, type:'item', wid:id, idx});
+  }
+  if (n > r.h){ const th = Math.max(1, Math.round(r.h * r.h / n)), ty = Math.round((r.h - th) * st.top / Math.max(1, n - r.h)); for (let k = 0; k < th; k++) s.put(r.x + r.w - 1, r.y + ty + k, '▐', {fg:'faint'}); }
+}
+function renderWidget(s, id, r, f){ if (r.w < 2 || r.h < 1) return; s.clip(r); try { if (W[id].list) listRender(s, r, id, f); else W[id].render(s, r, {f, id}); } finally { s.unclip(); } }
+function keyHints(s, x, y, maxw, id, late, inBorder){
+  let p = x; const end = x + maxw;
+  for (const a of keysFor(id)){
+    const need = len(a.k) + 1 + len(a.label) + 2; if (p + need > end) break;
+    if (inBorder) p = s.text(p, y, ' ', {});
+    const x0 = p; p = s.text(p, y, a.k, {fg:'accent', b:1}); p = s.text(p, y, ' ' + a.label, {fg:'dim'});
+    late.push({x:x0, y, w:p - x0, h:1, type:'key', run:a.run});
+    p = s.text(p, y, inBorder ? ' ' : '  ', {});
+    if (inBorder) p++;
+  }
+  return p;
+}
+const isHover = (type, id) => S.hover && S.hover.type === type && S.hover.wid === id;
+
+// ---------- variant A: Panels ----------
+function renderA(s){
+  const lay = computeLayout(layouts.A, {x:0, y:0, w:COLS, h:ROWS - 1}, 0, 0), late = []; S.lay = lay;
+  for (const [id, r] of lay.rects){ S.rects.set(id, r); S.frects.set(id, r); panelA(s, id, r, late); }
+  for (const sp of lay.splits) hit({...sp, type:'split'});
+  const hs = S.drag && S.drag.kind === 'resize' ? S.drag.sp : (S.hover && S.hover.type === 'split' ? S.hover : null);
+  if (hs) s.tint(hs.x, hs.y, hs.w, hs.h, 'accent');
+  late.forEach(hit);
+}
+function panelA(s, id, r, late){
+  if (r.w < 4 || r.h < 3) return;
+  const w = W[id], f = S.focus === id, arr = f && S.mode === 'arrange', moving = S.drag && S.drag.kind === 'move' && S.drag.active;
+  hit({x:r.x, y:r.y, w:r.w, h:r.h, type:'widget', wid:id});
+  s.box(r.x, r.y, r.w, r.h, {fg: arr ? 'warn' : f ? 'accent' : 'line'}, arr ? 'heavy' : 'round');
+  if (isHover('title', id) || arr || (moving && S.drag.wid === id)) s.put(r.x + 2, r.y, '⠿', {fg: arr ? 'warn' : 'accent'});
+  const cnt = w.count ? w.count() : null;
+  const ex = s.segs(r.x + 3, r.y, [[' ' + w.title + ' ', {fg: f ? 'bright' : 'fg', b:f}], ...(cnt != null ? [[cnt + ' ', {fg: f ? 'accent' : 'dim'}]] : [])], r.w - 5);
+  late.push({x:r.x + 2, y:r.y, w:ex - r.x - 2, h:1, type:'title', wid:id});
+  renderWidget(s, id, {x:r.x + 2, y:r.y + 1, w:r.w - 4, h:r.h - 2}, f);
+  if (arr) s.segs(r.x + 2, r.y + r.h - 1, [[' arrange ', {fg:'bg', bg:'warn', b:1}], [' hjkl move  HJKL resize  ⏎ keep  esc revert ', {fg:'warn'}]], r.w - 4);
+  else if (f && S.mode === 'normal') keyHints(s, r.x + 2, r.y + r.h - 1, r.w - 4, id, late, true);
+  if (!f) s.dimRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
+}
+
+// ---------- shared status band (B and C) ----------
+function band(s, x, y, w){
+  const n = new Date(), v = Math.round(cpuV), sep = ['   │   ', {fg:'line'}];
+  const L = [[fmtT(n), {fg:'bright', b:1}], [':' + p2(n.getSeconds()), {fg:'faint'}], ['  ' + dayShort(n) + '  week ' + week(n), {fg:'dim'}], sep,
+    ['☼ ', {fg:'warn'}], [`${WX.temp}°`, {fg:'bright', b:1}], [` ${WX.cond}, ${WX.city}`, {fg:'dim'}], sep,
+    ['cpu ', {fg:'dim'}], [spark(cpuH.slice(-10)), {fg:cpuCol(v)}], [` ${p2(v)}%`, {fg:'fg'}], ['   mem ', {fg:'dim'}], [pad(bar(memF, 8), 8), {fg:'info'}], [` ${Math.round(memF * 100)}%`, {fg:'fg'}]];
+  const R = W.meetings.summary();
+  const rw = segsLen(R);
+  if (segsLen(L) + rw + 4 <= w) s.segs(x + w - rw, y, R);
+  s.segs(x, y, L, w);
+}
+
+// ---------- variant B: Ledger ----------
+function renderB(s){
+  band(s, 1, 0, COLS - 2);
+  s.hline(0, 1, COLS, '─', {fg:'line'});
+  const lay = computeLayout(layouts.B, {x:1, y:3, w:COLS - 2, h:ROWS - 4}, 3, 1), late = []; S.lay = lay;
+  for (const [id, r] of lay.rects){ S.rects.set(id, r); S.frects.set(id, r); sectionB(s, id, r, late); }
+  for (const sp of lay.splits) hit({...sp, type:'split'});
+  const hs = S.drag && S.drag.kind === 'resize' ? S.drag.sp : (S.hover && S.hover.type === 'split' ? S.hover : null);
+  if (hs){ if (hs.axis === 'x') s.vline(hs.x + Math.floor(hs.w / 2), hs.y, hs.h, '│', {fg:'accent'}); else s.hline(hs.x, hs.y + Math.floor(hs.h / 2), hs.w, '─', {fg:'accent'}); }
+  late.forEach(hit);
+}
+function sectionB(s, id, r, late){
+  if (r.w < 6 || r.h < 2) return;
+  const w = W[id], f = S.focus === id, arr = f && S.mode === 'arrange', ac = arr ? 'warn' : 'accent', moving = S.drag && S.drag.kind === 'move' && S.drag.active;
+  hit({x:r.x, y:r.y, w:r.w, h:r.h, type:'widget', wid:id});
+  s.put(r.x, r.y, isHover('title', id) || arr || (moving && S.drag.wid === id) ? '⠿' : f ? '▌' : ' ', {fg:ac});
+  const cnt = w.count ? w.count() : null;
+  const ex = s.segs(r.x + 2, r.y, [[w.title, {fg: f ? 'bright' : 'fg', b:1}], ...(cnt != null ? [['  ' + cnt, {fg: f ? ac : 'dim'}]] : []), ...(arr ? [['  arrange: hjkl move, HJKL resize, ⏎ keep, esc revert', {fg:'warn'}]] : [])], r.w - 3);
+  late.push({x:r.x, y:r.y, w:ex - r.x, h:1, type:'title', wid:id});
+  s.hline(ex + 1, r.y, r.x + r.w - ex - 1, '─', {fg: arr ? 'warn' : 'line'});
+  if (f) s.vline(r.x, r.y + 1, r.h - 1, '▎', {fg:ac});
+  renderWidget(s, id, {x:r.x + 2, y:r.y + 1, w:r.w - 2, h:r.h - 1}, f);
+  if (!f) s.dimRect(r.x + 1, r.y + 1, r.w - 1, r.h - 1);
+}
+
+// ---------- variant C: Cockpit ----------
+function renderC(s){
+  const L = layouts.C, rw = L.railW, H = ROWS - 1, late = [];
+  let y = 1; S.railRects = [];
+  L.rail.forEach((id, i) => {
+    const w = W[id], f = S.focus === id, r = {x:0, y, w:rw, h:3};
+    if (y + 2 > H - 1) return;
+    hit({...r, type:'rail', wid:id});
+    if (f){ s.bgRect(1, y, rw - 2, 2, 'sel'); s.vline(0, y, 2, '▌', {fg: S.mode === 'arrange' ? 'warn' : 'accent'}); }
+    const moving = S.drag && S.drag.kind === 'rail' && S.drag.active && S.drag.wid === id;
+    s.text(2, y, isHover('rail', id) || moving ? '⠿' : String(i + 1), {fg: isHover('rail', id) || moving ? 'accent' : 'faint'});
+    const cnt = w.count ? String(w.count()) : '';
+    s.text(4, y, w.title, {fg: f ? 'bright' : 'fg', b:1}, rw - 8);
+    s.text(rw - 2 - len(cnt), y, cnt, {fg: f ? 'accent' : 'dim'});
+    s.segs(4, y + 1, w.summary ? w.summary() : [], rw - 6);
+    S.frects.set(id, r); S.railRects.push({id, y, h:3});
+    y += 3;
+  });
+  if (H - y >= 10){ s.hline(1, H - 10, rw - 2, '─', {fg:'line'}); renderWidget(s, 'calendar', {x:2, y:H - 9, w:rw - 4, h:9}, false); }
+  s.vline(rw, 0, H, '│', {fg: (S.hover && S.hover.kind === 'rail') || (S.drag && S.drag.sp && S.drag.sp.kind === 'rail') ? 'accent' : 'line'});
+  hit({kind:'rail', x:rw, y:0, w:1, h:H, axis:'x', type:'split'});
+  const sx = rw + 2, sw = COLS - rw - 3;
+  band(s, sx, 0, sw);
+  s.hline(rw + 1, 1, COLS - rw - 1, '─', {fg:'line'});
+  const st = {x:sx, y:3, w:sw, h:H - 3}, w = W[S.focus], f = true;
+  S.stage = st;
+  const cnt = w.count ? w.count() : null;
+  s.segs(st.x, 2, [[w.title, {fg:'bright', b:1}], ...(cnt != null ? [['  ' + cnt, {fg:'accent'}]] : [])], st.w);
+  hit({...st, type:'widget', wid:S.focus});
+  if (w.list && w.detail){
+    const lw = Math.round(st.w * L.split), dx = st.x + lw;
+    renderWidget(s, S.focus, {x:st.x, y:st.y + 1, w:lw - 2, h:st.h - 1}, f);
+    s.vline(dx, st.y, st.h, '│', {fg: (S.hover && S.hover.kind === 'stage') || (S.drag && S.drag.sp && S.drag.sp.kind === 'stage') ? 'accent' : 'line'});
+    hit({kind:'stage', x:dx, y:st.y, w:1, h:st.h, axis:'x', type:'split'});
+    const x = selItem(S.focus), dr = {x:dx + 2, y:st.y + 1, w:st.x + st.w - dx - 2, h:st.h - 1};
+    if (x){ s.clip(dr); try { w.detail(s, dr, x); } finally { s.unclip(); } }
+  } else renderWidget(s, S.focus, {x:st.x, y:st.y + 1, w:st.w, h:st.h - 1}, f);
+  late.forEach(hit);
+}
+
+// ---------- drag feedback, footer and overlays ----------
+function drawDrag(s){
+  const d = S.drag; if (!d || !d.active) return;
+  if (d.kind === 'move'){
+    const o = S.rects.get(d.wid); if (!o) return;
+    if (d.target){ const r = d.target.r, sd = d.target.side, st = {fg:'accent'};
+      if (sd === 'left' || sd === 'right') s.vline(sd === 'left' ? r.x : r.x + r.w - 1, r.y, r.h, '┃', st); else s.hline(r.x, sd === 'top' ? r.y : r.y + r.h - 1, r.w, '━', st); }
+    const gw = Math.min(o.w, 34), gh = Math.min(o.h, 6), gx = clamp(d.cur.x - Math.min(d.off.x, gw - 2), 0, COLS - gw), gy = clamp(d.cur.y - Math.min(d.off.y, gh - 1), 0, ROWS - 1 - gh);
+    s.box(gx, gy, gw, gh, {fg:'accent'}, 'dash');
+    s.text(gx + 2, gy, ` ${W[d.wid].title} `, {fg:'accent', b:1}, gw - 4);
+  }
+  if (d.kind === 'rail' && d.insertY != null) s.hline(1, d.insertY, layouts.C.railW - 2, '━', {fg:'accent'});
+}
+const MODES = {normal:['NORMAL','accent'], arrange:['ARRANGE','warn'], note:['INSERT','ok'], prompt:['INPUT','ok'], palette:['ACTIONS','info'], menu:['MENU','info'], picker:['WIDGETS','info'], help:['KEYS','info']};
+function footer(s){
+  const y = ROWS - 1, late = [], M = MODES[S.mode], K = t => [t, {fg:'accent', b:1}], T = t => [t, {fg:'dim'}];
+  let x = s.text(0, y, ` ${M[0]} `, {fg:'bg', bg:M[1], b:1}) + 1;
+  let R;
+  if (!S.hasFocus) R = [['click the window to drive it', {fg:'warn'}]];
+  else if (S.ctrl) R = [K('^K'), T(' all actions  '), K('^R'), T(' refresh all')];
+  else if (S.shift) R = [K('H J K L'), T(' focus in any direction  '), K('G'), T(' last item  '), K('?'), T(' keys')];
+  else if (S.mode === 'arrange') R = [K('Tab'), T(' pick another  '), K('⏎'), T(' keep  '), K('esc'), T(' revert')];
+  else R = [K('?'), T(' keys  '), K('^K'), T(' actions  '), K('m'), T(' arrange  '), K('w'), T(' widgets  '), K('[ ]'), T(' variant')];
+  const rw = segsLen(R); s.segs(COLS - rw - 1, y, R);
+  const mw = COLS - rw - 3 - x, d = S.drag;
+  if (d && d.active && d.kind === 'move') s.segs(x, y, [[`Move ${W[d.wid].title}`, {fg:'accent'}], [d.target ? ` to the ${d.target.side} of ${W[d.target.id].title}` : '  drop it on another Widget', {fg:'dim'}], ['   esc cancels', {fg:'faint'}]], mw);
+  else if (d && d.active && d.kind === 'resize'){ const lay = S.lay, sp = d.sp; let t = 'Resizing';
+    if (sp.kind === 'track') t = `Resizing: ${lay.tsz[sp.t]} and ${lay.tsz[sp.t + 1]} ${sp.axis === 'y' ? 'rows' : 'columns'}`;
+    else if (sp.kind === 'item') t = `Resizing: ${lay.isz[sp.t][sp.i]} and ${lay.isz[sp.t][sp.i + 1]} ${sp.axis === 'x' ? 'columns' : 'rows'}`;
+    else if (sp.kind === 'rail') t = `Rail width ${layouts.C.railW} columns`;
+    s.text(x, y, t, {fg:'accent'}, mw); }
+  else if (S.toast && Date.now() < S.toast.until) s.segs(x, y, [[S.toast.msg, {fg:'fg'}], ...(S.toast.undo ? [['   u', {fg:'accent', b:1}], [' undo', {fg:'dim'}]] : [])], mw);
+  else if (S.mode === 'note') s.segs(x, y, [['Editing the note', {fg:'ok'}], ['   esc', {fg:'accent', b:1}], [' done', {fg:'dim'}]], mw);
+  else if (S.variant !== 'A' && S.mode === 'normal') keyHints(s, x, y, mw, S.focus, late, false);
+  late.forEach(hit);
+}
+function ovBox(s, x, y, w, h, title, foot){
+  x = clamp(x, 0, Math.max(0, COLS - w)); y = clamp(y, 0, Math.max(0, ROWS - 1 - h));
+  s.dimRect(x + 1, y + h, w, 1); s.dimRect(x + w, y + 1, 1, h);
+  s.fill(x, y, w, h, ' ', {bg:'bg'});
+  s.box(x, y, w, h, {fg:'accent'}, 'round');
+  if (title) s.text(x + 2, y, ` ${title} `, {fg:'bright', b:1}, w - 4);
+  if (foot) s.segs(x + 2, y + h - 1, foot, w - 4);
+  hit({x, y, w, h, type:'ov'});
+  return {x, y, w, h};
+}
+const fk = (...pairs) => pairs.flatMap(([k, t]) => [[' ' + k, {fg:'accent', b:1}], [' ' + t + ' ', {fg:'dim'}]]);
+function paletteEntries(){
+  const out = [];
+  for (const id of focusables()){ const x = selItem(id), name = x ? (x.title || x.summary || '') : '';
+    for (const a of keysFor(id)) out.push({k:a.k, label:a.label, ctx:W[id].short + (name ? ': ' + name : ''), run:a.run, wid:id}); }
+  out.push({k:'m', label:'arrange the Layout', ctx:'dash', run:() => enterArrange()}, {k:'w', label:'show or hide Widgets', ctx:'dash', run:() => { S.mode = 'picker'; S.ov = {kind:'picker', sel:0}; }},
+    {k:'^R', label:'refresh all sources', ctx:'dash', run:() => toast('Refreshed 6 sources')}, {k:']', label:'next prototype variant', ctx:'prototype', run:() => cycleVariant(1)});
+  const q = S.ov.q.toLowerCase(); if (!q) return out;
+  return out.filter(e => { const h = (e.label + ' ' + e.ctx).toLowerCase(); let i = 0; for (const c of q){ i = h.indexOf(c, i); if (i < 0) return false; i++; } return true; });
+}
+function pickerEntries(){
+  const v = S.variant, L = layouts[v];
+  return ALL.map(id => {
+    const pinned = L.pinned && L.pinned.includes(id);
+    const on = v === 'C' ? L.rail.includes(id) : !!findPos(L, id);
+    return {id, on, pinned, note: pinned ? (v === 'C' && id === 'calendar' ? 'under the rail' : 'in the top band') : ''};
+  });
+}
+function toggleWidget(id){
+  const v = S.variant, L = layouts[v];
+  if (v === 'C'){ const i = L.rail.indexOf(id); if (i >= 0){ if (L.rail.length > 1) L.rail.splice(i, 1); } else L.rail.push(id); return; }
+  if (findPos(L, id)){ if (focusables().length > 1) removeW(L, id); return; }
+  if (L.orient === 'rows'){ const t = L.tracks[L.tracks.length - 1]; t.items.push({id, w:avg(t.items)}); }
+  else { const t = L.tracks.reduce((a, b) => b.items.length < a.items.length ? b : a); t.items.push({id, w:avg(t.items)}); }
+}
+const HELP = [
+  ['Move around', [['j k  ↓ ↑', 'next or previous item'], ['h l  ← →', 'Widget to the left or right'], ['H J K L', 'Widget in any direction'], ['Tab  S-Tab', 'next or previous Widget'], ['1 to 9', 'jump to a Widget'], ['g  G', 'first or last item']]],
+  ['Act', [['⏎', 'primary action'], ['letters', 'actions shown for the Widget'], ['^K  :', 'every action, searchable'], ['u', 'undo the last action'], ['right-click', 'actions for an item'], ['double-click', 'primary action']]],
+  ['Arrange', [['m', 'arrange the focused Widget'], ['hjkl  arrows', 'move it'], ['HJKL  S-arrows', 'resize it'], ['⏎  esc', 'keep or revert'], ['drag a title', 'move a Widget'], ['drag a border', 'resize']]],
+  ['Other', [['w', 'show or hide Widgets'], ['wheel', 'scroll without moving focus'], ['hold Shift or Ctrl', 'footer shows those keys'], ['[  ]', 'switch prototype variant'], ['?  esc', 'close this']]],
+];
+function drawOverlay(s){
+  const o = S.ov;
+  if (S.mode === 'help'){
+    const w = Math.min(96, COLS - 4), colW = Math.floor((w - 4) / 2), h = 2 + 2 * (Math.max(...HELP.map(g => g[1].length)) + 2), b = ovBox(s, Math.floor((COLS - w) / 2), Math.floor((ROWS - h) / 2), w, h, 'Keys and mouse', fk(['esc', 'close']));
+    HELP.forEach(([g, rows], gi) => { const x = b.x + 2 + (gi % 2) * colW, y = b.y + 1 + Math.floor(gi / 2) * (rows.length + 2 + 1);
+      s.text(x, y, g, {fg:'fg', b:1}); rows.forEach(([k, t], i) => { s.text(x, y + 1 + i, pad(k, 17), {fg:'accent'}); s.text(x + 17, y + 1 + i, t, {fg:'dim'}, colW - 19); }); });
+    return;
+  }
+  if (!o) return;
+  if (o.kind === 'prompt'){
+    const w = Math.min(76, COLS - 6), b = ovBox(s, Math.floor((COLS - w) / 2), Math.floor(ROWS / 2) - 3, w, 5, o.title, fk(['⏎', o.verb], ['esc', 'cancel']));
+    const avail = w - 7, v = o.value, shown = len(v) > avail ? '…' + [...v].slice(-(avail - 1)).join('') : v;
+    const e = s.segs(b.x + 2, b.y + 2, [['› ', {fg:'accent'}], [shown, {fg:'bright'}]]);
+    s.put(e, b.y + 2, ' ', {bg:'accent'});
+  } else if (o.kind === 'menu'){
+    const w = Math.max(len(o.title) + 6, ...o.items.map(i => len(i.label) + 6)), h = o.items.length + 2, b = ovBox(s, o.x, o.y, w, h, o.title, null);
+    o.items.forEach((m, i) => { const y = b.y + 1 + i; if (i === o.sel) s.bgRect(b.x + 1, y, w - 2, 1, 'sel'); s.text(b.x + 2, y, m.label, {fg: m.fg || (i === o.sel ? 'bright' : 'fg'), b: i === o.sel}); if (m.k) s.text(b.x + w - 2 - len(m.k), y, m.k, {fg:'accent'}); hit({x:b.x + 1, y, w:w - 2, h:1, type:'ovitem', idx:i}); });
+  } else if (o.kind === 'palette'){
+    const es = paletteEntries(), w = Math.min(90, COLS - 6), h = Math.min(Math.max(es.length, 1) + 4, ROWS - 6), b = ovBox(s, Math.floor((COLS - w) / 2), 3, w, h, 'Actions', fk(['⏎', 'run'], ['↑↓', 'choose'], ['esc', 'close']));
+    o.sel = clamp(o.sel, 0, Math.max(0, es.length - 1));
+    const e = s.segs(b.x + 2, b.y + 1, [['› ', {fg:'accent'}], [o.q, {fg:'bright'}]]); s.put(e, b.y + 1, ' ', {bg:'accent'});
+    s.put(b.x, b.y + 2, '├', {fg:'accent'}); s.hline(b.x + 1, b.y + 2, w - 2, '─', {fg:'line'}); s.put(b.x + w - 1, b.y + 2, '┤', {fg:'accent'});
+    const vis = h - 4, top = clamp(o.sel - vis + 1, 0, Math.max(0, es.length - vis));
+    if (!es.length) s.text(b.x + 2, b.y + 3, 'No action matches. Backspace to widen the search.', {fg:'faint'});
+    for (let i = 0; i < vis && top + i < es.length; i++){ const en = es[top + i], y = b.y + 3 + i, sel = top + i === o.sel;
+      if (sel) s.bgRect(b.x + 1, y, w - 2, 1, 'sel');
+      rowLR(s, {x:b.x + 2, y, w:w - 4}, [[pad(en.label, 18), {fg: sel ? 'bright' : 'fg', b:sel}], [en.ctx, {fg:'dim'}]], [[en.k, {fg:'accent', b:1}]]);
+      hit({x:b.x + 1, y, w:w - 2, h:1, type:'ovitem', idx:top + i}); }
+  } else if (o.kind === 'picker'){
+    const es = pickerEntries(), w = 46, h = es.length + 3, b = ovBox(s, Math.floor((COLS - w) / 2), Math.floor((ROWS - h) / 2), w, h, 'Widgets', fk(['␣', 'show or hide'], ['esc', 'close']));
+    o.sel = clamp(o.sel, 0, es.length - 1);
+    es.forEach((e, i) => { const y = b.y + 1 + i, sel = i === o.sel; if (sel) s.bgRect(b.x + 1, y, w - 2, 1, 'sel');
+      s.segs(b.x + 2, y, [[e.pinned ? '[·] ' : e.on ? '[x] ' : '[ ] ', {fg: e.on ? 'accent' : 'faint'}], [W[e.id].title, {fg: e.pinned ? 'faint' : sel ? 'bright' : 'fg', b:sel}]]);
+      if (e.note) s.text(b.x + w - 2 - len(e.note), y, e.note, {fg:'faint'});
+      hit({x:b.x + 1, y, w:w - 2, h:1, type:'ovitem', idx:i}); });
+  }
+}
+
+// ---------- frame ----------
+function render(){
+  HITS = []; SCR.clear(); S.rects = new Map(); S.frects = new Map();
+  ensureFocus();
+  if (S.variant === 'A') renderA(SCR); else if (S.variant === 'B') renderB(SCR); else renderC(SCR);
+  drawDrag(SCR); footer(SCR); drawOverlay(SCR);
+  updateState();
+}
+const stateEl = document.getElementById('state'), layEl = document.getElementById('layout'), vlabel = document.getElementById('vlabel');
+let lastState = '', lastLay = '';
+function layoutText(){
+  const L = layouts[S.variant];
+  if (S.variant === 'C') return `rail = [${L.rail.map(x => `"${x}"`).join(', ')}]\nrail_width = ${L.railW}\nstage_split = ${L.split.toFixed(2)}`;
+  const r = (x, n) => Math.round(x * 100 / n) / 100, ts = L.tracks.reduce((a, t) => a + t.w, 0);
+  return `orient = "${L.orient}"\n` + L.tracks.map(t => { const is = t.items.reduce((a, i) => a + i.w, 0); return `[[track]] weight = ${r(t.w, ts)}\n  ` + t.items.map(i => `${i.id} = ${r(i.w, is)}`).join('   '); }).join('\n');
+}
+function updateState(){
+  const v = VARIANTS.find(x => x.k === S.variant);
+  const h = `<span>variant <b>${v.k}, ${v.name}</b></span><span>mode <b>${MODES[S.mode][0].toLowerCase()}</b></span><span>focus <b>${W[S.focus].title}</b></span><span>size <b>${COLS}×${ROWS}</b> cells</span>`;
+  if (h !== lastState){ stateEl.innerHTML = h; lastState = h; }
+  const lt = layoutText(); if (lt !== lastLay){ layEl.textContent = lt; lastLay = lt; }
+  const vl = `<b>${v.k}</b> ${v.name} <small>${v.desc}</small>`; if (vlabel.innerHTML !== vl) vlabel.innerHTML = vl;
+}
+function frame(){ if (D && SCR){ D = false; try { render(); } catch (e){ console.error(e); } paint(); } requestAnimationFrame(frame); }
+function cycleVariant(d){ const i = VARIANTS.findIndex(v => v.k === S.variant); S.variant = VARIANTS[(i + d + VARIANTS.length) % VARIANTS.length].k; S.mode = 'normal'; S.ov = null; S.drag = null; try { history.replaceState(null, '', '#' + S.variant); } catch (e){} dirty(); }
+function enterArrange(){ S.snap = JSON.stringify(layouts[S.variant]); S.mode = 'arrange'; S.ov = null; }
+
+// ---------- keyboard ----------
+const DIRK = {h:'left', l:'right', k:'up', j:'down', ArrowLeft:'left', ArrowRight:'right', ArrowUp:'up', ArrowDown:'down'};
+const SDIRK = {H:'left', L:'right', K:'up', J:'down', 'S-ArrowLeft':'left', 'S-ArrowRight':'right', 'S-ArrowUp':'up', 'S-ArrowDown':'down'};
+function keyName(e){ const k = e.key; if (k === ' ') return 'Space'; if (e.ctrlKey && k.length === 1) return 'C-' + k.toLowerCase(); if (k === 'Tab') return e.shiftKey ? 'S-Tab' : 'Tab'; if (k.startsWith('Arrow') && e.shiftKey) return 'S-' + k; return k; }
+function normalKey(k){
+  const id = S.focus, w = W[id];
+  if (k === '[' || k === ']'){ cycleVariant(k === '[' ? -1 : 1); return true; }
+  if (k === 'Tab' || k === 'S-Tab'){ cycleFocus(k === 'Tab' ? 1 : -1); return true; }
+  if (/^[1-9]$/.test(k)){ const t = focusables()[+k - 1]; if (t) S.focus = t; return true; }
+  if (k === 'C-k' || k === ':'){ S.mode = 'palette'; S.ov = {kind:'palette', q:'', sel:0}; return true; }
+  if (k === '?'){ S.mode = 'help'; return true; }
+  if (k === 'm'){ enterArrange(); return true; }
+  if (k === 'w'){ S.mode = 'picker'; S.ov = {kind:'picker', sel:0}; return true; }
+  if (k === 'C-r'){ toast('Refreshed 6 sources'); return true; }
+  if (k === 'u'){ if (S.undo){ const u = S.undo; S.undo = null; u(); toast('Undone'); } return true; }
+  if (k === 'Escape'){ S.toast = null; return true; }
+  if (k === 'j' || k === 'ArrowDown'){ if (w.list) moveSel(id, 1); else spatial('down'); return true; }
+  if (k === 'k' || k === 'ArrowUp'){ if (w.list) moveSel(id, -1); else spatial('up'); return true; }
+  if (k === 'h' || k === 'ArrowLeft' || k === 'l' || k === 'ArrowRight'){ spatial(DIRK[k]); return true; }
+  if (SDIRK[k]){ spatial(SDIRK[k]); return true; }
+  if (w.list && (k === 'g' || k === 'G')){ ls(id).sel = k === 'g' ? 0 : 1e9; normSel(id, w.items(), k === 'g' ? 1 : -1); return true; }
+  const a = keysFor(id).find(a => matchKey(a.k, k)); if (a){ a.run(); return true; }
+  return false;
+}
+function arrangeKey(k){
+  if (k === 'Escape'){ layouts[S.variant] = JSON.parse(S.snap); S.mode = 'normal'; toast('Layout change reverted'); return true; }
+  if (k === 'Enter' || k === 'm'){ S.mode = 'normal'; toast('Layout saved'); return true; }
+  if (k === 'Tab' || k === 'S-Tab'){ cycleFocus(k === 'Tab' ? 1 : -1); return true; }
+  if (S.variant === 'C'){
+    const L = layouts.C, i = L.rail.indexOf(S.focus), d = DIRK[k], sd = SDIRK[k];
+    if (d === 'up' || d === 'down'){ const j = i + (d === 'up' ? -1 : 1); if (j >= 0 && j < L.rail.length) [L.rail[i], L.rail[j]] = [L.rail[j], L.rail[i]]; }
+    else if (d === 'left' || d === 'right') L.railW = clamp(L.railW + (d === 'right' ? 2 : -2), 24, 64);
+    else if (sd === 'left' || sd === 'right') L.split = clamp(L.split + (sd === 'right' ? 0.03 : -0.03), 0.3, 0.8);
+    return true;
+  }
+  const L = layouts[S.variant], rows = L.orient === 'rows';
+  if (DIRK[k]){ const d = DIRK[k], along = rows ? (d === 'left' || d === 'right') : (d === 'up' || d === 'down'); arrangeMove(L, S.focus, along, d === 'left' || d === 'up'); return true; }
+  if (SDIRK[k]){ const d = SDIRK[k]; arrangeResize(L, S.focus, d === 'left' || d === 'right', d === 'right' || d === 'down'); return true; }
+  return true;
+}
+function noteKey(k, e){
+  const L = DATA.note, c = UI.cur;
+  if (k === 'Escape'){ S.mode = 'normal'; toast('Note saved'); return true; }
+  if (k === 'Enter'){ const t = L[c.r]; L.splice(c.r, 1, t.slice(0, c.c), t.slice(c.c)); c.r++; c.c = 0; return true; }
+  if (k === 'Backspace'){ if (c.c > 0){ const t = L[c.r]; L[c.r] = t.slice(0, c.c - 1) + t.slice(c.c); c.c--; } else if (c.r > 0){ const p = L[c.r - 1]; c.c = p.length; L[c.r - 1] = p + L[c.r]; L.splice(c.r, 1); c.r--; } return true; }
+  if (k === 'ArrowLeft'){ if (c.c > 0) c.c--; else if (c.r > 0){ c.r--; c.c = L[c.r].length; } return true; }
+  if (k === 'ArrowRight'){ if (c.c < L[c.r].length) c.c++; else if (c.r < L.length - 1){ c.r++; c.c = 0; } return true; }
+  if (k === 'ArrowUp' || k === 'ArrowDown'){ c.r = clamp(c.r + (k === 'ArrowUp' ? -1 : 1), 0, L.length - 1); c.c = Math.min(c.c, L[c.r].length); return true; }
+  if (k === 'Tab'){ L[c.r] = L[c.r].slice(0, c.c) + '  ' + L[c.r].slice(c.c); c.c += 2; return true; }
+  if (k === 'Space') k = ' ';
+  if (k.length === 1 && !e.ctrlKey){ L[c.r] = L[c.r].slice(0, c.c) + k + L[c.r].slice(c.c); c.c++; }
+  return true;
+}
+function closeOv(){ S.mode = 'normal'; S.ov = null; }
+function ovKey(k, e){
+  const o = S.ov;
+  if (S.mode === 'help'){ if (k === 'Escape' || k === '?' || k === 'q' || k === 'Enter') closeOv(); return true; }
+  if (k === 'Escape'){ closeOv(); return true; }
+  if (o.kind === 'prompt'){
+    if (k === 'Enter'){ const v = o.value.trim(); closeOv(); if (v) o.done(v); return true; }
+    if (k === 'Backspace'){ o.value = [...o.value].slice(0, -1).join(''); return true; }
+    if (k === 'Space') k = ' ';
+    if (k.length === 1 && !e.ctrlKey) o.value += k;
+    return true;
+  }
+  const n = o.kind === 'menu' ? o.items.length : o.kind === 'picker' ? pickerEntries().length : paletteEntries().length;
+  if (k === 'ArrowDown' || k === 'C-n' || (o.kind !== 'palette' && k === 'j')){ o.sel = clamp(o.sel + 1, 0, n - 1); return true; }
+  if (k === 'ArrowUp' || k === 'C-p' || (o.kind !== 'palette' && k === 'k')){ o.sel = clamp(o.sel - 1, 0, n - 1); return true; }
+  if (o.kind === 'picker'){ if (k === 'Space' || k === 'Enter'){ const e2 = pickerEntries()[o.sel]; if (!e2.pinned) toggleWidget(e2.id); } else if (k === 'w') closeOv(); return true; }
+  if (k === 'Enter'){ runOv(o.sel); return true; }
+  if (o.kind === 'palette'){ if (k === 'Backspace') o.q = o.q.slice(0, -1); else if (k.length === 1 && !e.ctrlKey){ o.q += k; o.sel = 0; } return true; }
+  if (o.kind === 'menu'){ const m = o.items.find(i => i.k === k); if (m){ closeOv(); m.run(); } }
+  return true;
+}
+function runOv(i){
+  const o = S.ov;
+  if (o.kind === 'menu'){ const m = o.items[i]; closeOv(); if (m) m.run(); }
+  else if (o.kind === 'palette'){ const en = paletteEntries()[i]; closeOv(); if (en){ if (en.wid) S.focus = en.wid; en.run(); } }
+  else if (o.kind === 'picker'){ o.sel = i; const e = pickerEntries()[i]; if (!e.pinned) toggleWidget(e.id); }
+}
+cv.addEventListener('keydown', e => {
+  if (e.key === 'Shift'){ S.shift = true; dirty(); return; }
+  if (e.key === 'Control'){ S.ctrl = true; dirty(); return; }
+  if (e.metaKey || e.key === 'Alt' || e.key === 'Meta') return;
+  const k = keyName(e);
+  if (S.drag && k === 'Escape'){ if (S.drag.kind === 'resize' && S.drag.undo) layouts[S.variant] = JSON.parse(S.drag.undo); S.drag = null; e.preventDefault(); dirty(); return; }
+  let used;
+  if (S.mode === 'note') used = noteKey(k, e);
+  else if (S.mode === 'arrange') used = arrangeKey(k);
+  else if (S.mode === 'normal') used = normalKey(k);
+  else used = ovKey(k, e);
+  if (used || k === 'Tab' || k === 'S-Tab' || k === 'Space' || k.startsWith('Arrow') || k.startsWith('S-Arrow')) e.preventDefault();
+  dirty();
+});
+cv.addEventListener('keyup', e => { if (e.key === 'Shift') S.shift = false; if (e.key === 'Control') S.ctrl = false; dirty(); });
+cv.addEventListener('focus', () => { S.hasFocus = true; dirty(); });
+cv.addEventListener('blur', () => { S.hasFocus = false; S.shift = S.ctrl = false; dirty(); });
+document.addEventListener('keydown', e => { if (document.activeElement === cv) return; const t = e.target; if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return; if (e.key === '[' || e.key === ']'){ cycleVariant(e.key === '[' ? -1 : 1); } });
+
+// ---------- mouse: cell precision only ----------
+function cellOf(e){ const b = cv.getBoundingClientRect(); return {x:Math.floor((e.clientX - b.left) / CW), y:Math.floor((e.clientY - b.top) / CH)}; }
+function hitAt(c){ for (let i = HITS.length - 1; i >= 0; i--){ const h = HITS[i]; if (c.x >= h.x && c.x < h.x + h.w && c.y >= h.y && c.y < h.y + h.h) return h; } return null; }
+function dropTarget(c, wid){
+  for (const [id, r] of S.rects){ if (id === wid) continue;
+    if (c.x >= r.x && c.x < r.x + r.w && c.y >= r.y && c.y < r.y + r.h){
+      const fx = (c.x - r.x + 0.5) / r.w, fy = (c.y - r.y + 0.5) / r.h, d = {left:fx, right:1 - fx, top:fy * 1.6, bottom:(1 - fy) * 1.6};
+      return {id, r, side:Object.entries(d).sort((a, b) => a[1] - b[1])[0][0]}; } }
+  return null;
+}
+cv.addEventListener('mousedown', e => {
+  cv.focus(); e.preventDefault();
+  const c = cellOf(e), h = hitAt(c);
+  if (S.mode !== 'normal' && S.mode !== 'arrange' && S.mode !== 'note'){
+    if (h && h.type === 'ovitem') runOv(h.idx); else if (!h || h.type !== 'ov') closeOv();
+    dirty(); return;
+  }
+  if (S.mode === 'note' && !(h && h.wid === 'notes')){ S.mode = 'normal'; toast('Note saved'); }
+  if (!h){ dirty(); return; }
+  if (e.button === 2){
+    if (h.type === 'item' || h.type === 'widget' || h.type === 'rail'){ S.focus = h.wid; if (h.type === 'item') ls(h.wid).sel = h.idx;
+      const acts = keysFor(S.focus); if (acts.length) menu(W[S.focus].short + ' actions', acts.map(a => ({label:a.label, k:a.k, run:a.run})), {x:c.x, y:c.y}); }
+    dirty(); return;
+  }
+  if (h.type === 'split'){
+    const L = layouts[S.variant];
+    S.drag = {kind:'resize', sp:h, start:c, undo:JSON.stringify(L), active:true,
+      sizes: h.kind === 'track' ? S.lay.tsz.slice() : h.kind === 'item' ? S.lay.isz[h.t].slice() : null, railW:layouts.C.railW, split:layouts.C.split};
+  } else if (h.type === 'title'){
+    S.focus = h.wid; const o = S.rects.get(h.wid); S.drag = {kind:'move', wid:h.wid, start:c, cur:c, active:false, off:{x:c.x - o.x, y:c.y - o.y}, target:null};
+  } else if (h.type === 'rail'){
+    S.focus = h.wid; S.drag = {kind:'rail', wid:h.wid, start:c, cur:c, active:false, insertY:null};
+  } else if (h.type === 'item'){
+    S.focus = h.wid; ls(h.wid).sel = h.idx;
+    if (e.detail === 2){ const a = keysFor(h.wid).find(x => x.primary); if (a) a.run(); }
+  } else if (h.type === 'key') h.run();
+  else if (h.type === 'widget') S.focus = h.wid;
+  dirty();
+});
+function onMove(e){
+  const c = cellOf(e), d = S.drag;
+  if (d){
+    if (d.kind === 'move' || d.kind === 'rail'){
+      d.cur = c; if (!d.active && (Math.abs(c.x - d.start.x) + Math.abs(c.y - d.start.y)) >= 1) d.active = true;
+      if (d.active && d.kind === 'move') d.target = dropTarget(c, d.wid);
+      if (d.active && d.kind === 'rail'){ const rr = S.railRects || []; let iy = null, idx = rr.length; for (let i = 0; i < rr.length; i++){ if (c.y < rr[i].y + 1.5){ idx = i; break; } } iy = idx < rr.length ? rr[idx].y - 1 : (rr.length ? rr[rr.length - 1].y + 2 : 1); d.insertY = Math.max(0, iy); d.insertIdx = idx; }
+    } else if (d.kind === 'resize'){
+      const sp = d.sp, delta = sp.axis === 'x' ? c.x - d.start.x : c.y - d.start.y, L = layouts[S.variant];
+      if (sp.kind === 'track'){ const m = MIN[L.orient].track; applySizes(L.tracks, d.sizes, sp.t, sp.t + 1, delta, m); }
+      else if (sp.kind === 'item'){ const m = MIN[L.orient].item; applySizes(L.tracks[sp.t].items, d.sizes, sp.i, sp.i + 1, delta, m); }
+      else if (sp.kind === 'rail') layouts.C.railW = clamp(d.railW + delta, 24, 64);
+      else if (sp.kind === 'stage' && S.stage) layouts.C.split = clamp(d.split + delta / S.stage.w, 0.3, 0.8);
+    }
+    dirty(); return;
+  }
+  if (e.target !== cv) return;
+  const h = hitAt(c), key = h ? `${h.type}:${h.wid || ''}:${h.kind || ''}:${h.x},${h.y}` : '';
+  cv.style.cursor = !h ? 'default' : h.type === 'split' ? (h.axis === 'x' ? 'col-resize' : 'row-resize') : (h.type === 'title' || h.type === 'rail') ? 'grab' : (h.type === 'item' || h.type === 'key' || h.type === 'ovitem') ? 'pointer' : 'default';
+  if (key !== S.hoverKey){ S.hoverKey = key; S.hover = h; dirty(); }
+}
+window.addEventListener('mousemove', onMove);
+window.addEventListener('mouseup', () => {
+  const d = S.drag; if (!d) return;
+  if (d.kind === 'move' && d.active && d.target){
+    const L = layouts[S.variant], m = L.orient === 'rows' ? {left:'before', right:'after', top:'trackBefore', bottom:'trackAfter'} : {top:'before', bottom:'after', left:'trackBefore', right:'trackAfter'};
+    const undo = JSON.stringify(L); dropW(L, d.wid, d.target.id, m[d.target.side]);
+    toast(`Moved ${W[d.wid].title} to the ${d.target.side} of ${W[d.target.id].title}`, () => { layouts[S.variant] = JSON.parse(undo); });
+  }
+  if (d.kind === 'rail' && d.active && d.insertIdx != null){ const R = layouts.C.rail, i = R.indexOf(d.wid); let j = d.insertIdx; R.splice(i, 1); if (j > i) j--; R.splice(j, 0, d.wid); }
+  S.drag = null; dirty();
+});
+cv.addEventListener('contextmenu', e => e.preventDefault());
+cv.addEventListener('wheel', e => {
+  const h = hitAt(cellOf(e)); if (!h || !h.wid || !W[h.wid].list) return;
+  e.preventDefault(); const st = ls(h.wid); st.top = Math.max(0, st.top + (e.deltaY > 0 ? 2 : -2)); dirty();
+}, {passive:false});
+
+// ---------- sizing ----------
+const winTitle = document.getElementById('wintitle');
+function measure(){ cx.font = `400 ${FS}px ${FONT}`; CW = Math.round(cx.measureText('M').width) || 8; CH = Math.round(FS * 1.32); }
+function setSize(c, r){
+  COLS = c; ROWS = r; DPR = window.devicePixelRatio || 1;
+  cv.width = Math.round(COLS * CW * DPR); cv.height = Math.round(ROWS * CH * DPR);
+  cv.style.width = COLS * CW + 'px'; cv.style.height = ROWS * CH + 'px';
+  SCR = new Screen(COLS, ROWS); winTitle.textContent = `dash  ${COLS}×${ROWS}`; dirty();
+}
+function fit(){
+  const sc = document.querySelector('.scroller'), c = clamp(Math.floor((sc.clientWidth - 8) / CW), 100, 240);
+  const r = clamp(Math.floor((window.innerHeight - 250) / CH), 34, 70); setSize(c, r);
+}
+function applySizeMode(){ if (S.sizeMode === 'fit') fit(); else { const [c, r] = S.sizeMode.split('x').map(Number); setSize(c, r); } }
+document.querySelectorAll('[data-size]').forEach(b => b.addEventListener('click', () => {
+  S.sizeMode = b.dataset.size; document.querySelectorAll('[data-size]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); applySizeMode(); cv.focus();
+}));
+window.addEventListener('resize', () => { if (S.sizeMode === 'fit') fit(); });
+document.getElementById('prev').addEventListener('click', () => cycleVariant(-1));
+document.getElementById('next').addEventListener('click', () => cycleVariant(1));
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readPal);
+new MutationObserver(readPal).observe(document.documentElement, {attributes:true, attributeFilter:['data-theme']});
+
+function init(){
+  readPal(); measure();
+  const h = (location.hash || '').replace('#', '').toUpperCase(); if (VARIANTS.some(v => v.k === h)) S.variant = h;
+  applySizeMode(); setInterval(tick, 1000); requestAnimationFrame(frame);
+}
+Promise.all([document.fonts.load(`400 ${FS}px "JetBrains Mono"`), document.fonts.load(`700 ${FS}px "JetBrains Mono"`)]).catch(() => {}).finally(init);
+})();
+</script>
