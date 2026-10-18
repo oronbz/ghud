@@ -77,6 +77,9 @@ func styled(th theme.Theme, spans []widget.Span) string {
 		if s.Bold {
 			st = st.Bold(true)
 		}
+		if s.Bg != theme.Bg {
+			st = st.Background(th.Color(s.Bg))
+		}
 		b.WriteString(st.Render(s.Text))
 	}
 	return b.String()

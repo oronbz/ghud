@@ -68,6 +68,15 @@ func (h *Host) Fg(x, y int) (tok theme.Token, ok bool) {
 	return h.token(c.Style.Fg)
 }
 
+// Bg names the theme token of the cell's background colour, like Fg.
+func (h *Host) Bg(x, y int) (tok theme.Token, ok bool) {
+	c := h.Cell(x, y)
+	if c == nil {
+		return 0, false
+	}
+	return h.token(c.Style.Bg)
+}
+
 func (h *Host) Bold(x, y int) bool {
 	c := h.Cell(x, y)
 	return c != nil && c.Style.Attrs&uv.AttrBold != 0

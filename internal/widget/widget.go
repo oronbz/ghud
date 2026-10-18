@@ -50,7 +50,9 @@ type Line struct {
 type Span struct {
 	Text  string
 	Token theme.Token
-	Bold  bool
+	// Bg fills the span's cells; the zero value, theme.Bg, leaves the background alone.
+	Bg   theme.Token
+	Bold bool
 }
 
 func Text(tok theme.Token, s string) Line { return Line{Spans: []Span{{Text: s, Token: tok}}} }

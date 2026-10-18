@@ -4,16 +4,20 @@
 package host
 
 import (
+	"image"
 	"time"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
+	"github.com/oronbz/ghud/internal/layout"
 	"github.com/oronbz/ghud/internal/paths"
 	"github.com/oronbz/ghud/internal/ports"
 	"github.com/oronbz/ghud/internal/render"
 	"github.com/oronbz/ghud/internal/theme"
 	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/ghud/internal/widgets/calendar"
 	"github.com/oronbz/ghud/internal/widgets/clock"
 )
 
@@ -27,11 +31,11 @@ type Model struct {
 	opts    Options
 	w, h    int
 	now     time.Time
-	widgets []placed
+	widgets map[string]placed
+	layout  layout.Layout
 }
 
 type placed struct {
-	id     string
 	typ    widget.Type
 	widget widget.Widget
 }
@@ -40,12 +44,18 @@ type tickMsg struct{ at time.Time }
 
 var quitKey = key.NewBinding(key.WithKeys("q"), key.WithHelp("q", "quit"))
 
+// builtins are the Widget types compiled into ghud, in config order.
+var builtins = []widget.Type{clock.Type, calendar.Type}
+
 func New(o Options) Model {
-	return Model{
-		opts:    o,
-		now:     o.Ports.Clock.Now(),
-		widgets: []placed{{id: clock.Type.Name, typ: clock.Type, widget: clock.Type.New()}},
+	m := Model{opts: o, now: o.Ports.Clock.Now(), widgets: map[string]placed{}}
+	var ids []string
+	for _, t := range builtins {
+		m.widgets[t.Name] = placed{typ: t, widget: t.New()}
+		ids = append(ids, t.Name)
 	}
+	m.layout = layout.Default().Join(ids)
+	return m
 }
 
 func (m Model) Init() tea.Cmd { return m.nextTick() }
@@ -85,18 +95,25 @@ func (m Model) View() tea.View {
 	v := tea.NewView("")
 	v.AltScreen = true
 	v.BackgroundColor = m.opts.Theme.Color(theme.Bg)
-	if m.w == 0 || m.h == 0 || len(m.widgets) == 0 {
+	if m.w == 0 || m.h == 0 {
 		return v
 	}
-	w := m.widgets[0]
-	v.SetContent(render.Draw(m.opts.Theme, render.Tile{
-		Title: w.typ.Title,
-		W:     m.w,
-		H:     m.h,
-		Payload: w.widget.Payload(widget.Frame{
-			Now:  m.now,
-			Size: widget.Size{W: m.w - 2, H: m.h - 2},
-		}),
-	}))
+	f := layout.Compute(m.layout, m.w, m.h)
+	layers := make([]*lipgloss.Layer, 0, len(f.Tiles))
+	for _, t := range f.Tiles {
+		w := m.widgets[t.ID]
+		layers = append(layers, lipgloss.NewLayer(render.Draw(m.opts.Theme, render.Tile{
+			Title: w.typ.Title,
+			W:     t.W,
+			H:     t.H,
+			Payload: w.widget.Payload(widget.Frame{
+				Now:  m.now,
+				Size: widget.Size{W: t.W - 2, H: t.H - 2},
+			}),
+		})).X(t.X).Y(t.Y))
+	}
+	canvas := lipgloss.NewCanvas(m.w, m.h)
+	lipgloss.NewCompositor(layers...).Draw(canvas, image.Rect(0, 0, m.w, m.h))
+	v.SetContent(canvas.Render())
 	return v
 }
