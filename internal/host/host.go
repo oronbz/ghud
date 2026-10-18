@@ -16,6 +16,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/oronbz/ghud/internal/cache"
 	"github.com/oronbz/ghud/internal/closekey"
 	"github.com/oronbz/ghud/internal/config"
 	"github.com/oronbz/ghud/internal/layout"
@@ -76,7 +77,9 @@ type Model struct {
 	// rate-limited credential may be used again.
 	sched  map[string]sched
 	paused map[string]time.Time
-	rng    *rand.Rand
+	// cache keeps fetching Widgets' data across runs and instances.
+	cache cache.Store
+	rng   *rand.Rand
 	// timers counts the refresh timers armed so far; copies share it.
 	timers *int
 	// spinning and beating are the spinner's and the wall-clock check's
@@ -133,7 +136,7 @@ var Builtins = []widget.Type{clock.Type, calendar.Type, tasks.Type, cpu.Type, no
 func New(o Options) Model {
 	m := Model{opts: o, now: o.Ports.Clock.Now(), widgets: map[string]placed{},
 		fetched: map[string]widget.Payload{}, lists: map[string]listState{},
-		sched: map[string]sched{}, paused: map[string]time.Time{}, rng: newRand(o.Ports.Clock.Now()), timers: new(int),
+		sched: map[string]sched{}, paused: map[string]time.Time{}, cache: cacheStore(o), rng: newRand(o.Ports.Clock.Now()), timers: new(int),
 		closing: closekey.NewMatcher(o.CloseKeys)}
 	types := o.Types
 	if types == nil {
@@ -214,7 +217,7 @@ func (m Model) place(wc config.Widget, ref config.Ref) placed {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.nextTick(), m.queryColors(), m.nextChange(), func() tea.Msg { return startMsg{} })
+	return tea.Batch(m.nextTick(), m.queryColors(), m.nextChange(), func() tea.Msg { return startMsg{} }, m.cleanCache())
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -235,7 +238,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case refreshedMsg:
 		return m.refreshed(msg)
 	case startMsg:
-		m, fetch := m.startAll()
+		m, fetch := m.startAll(false)
 		m, beat := m.beat()
 		return m, tea.Batch(fetch, beat)
 	case dueMsg:

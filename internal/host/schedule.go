@@ -10,6 +10,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/oronbz/ghud/internal/cache"
 	"github.com/oronbz/ghud/internal/widget"
 )
 
@@ -47,12 +48,24 @@ type sched struct {
 	// err is why the last refresh failed, nil after a success.
 	err   error
 	setup *widget.SetupError
+	// key is the Source's cache entry, "" when it isn't cached; checked is
+	// when its last refresh started, here or in another instance.
+	key     string
+	checked time.Time
+	// cached is data read from the cache at start that no refresh has replaced yet.
+	cached bool
 }
 
 type refreshedMsg struct {
 	id      string
 	payload widget.Payload
 	err     error
+	// at is when the refresh started.
+	at time.Time
+	// skipped is a refresh another instance's fetch lock held off.
+	skipped bool
+	// entry is the cache entry another instance fetched meanwhile, taken instead of fetching.
+	entry *cache.Entry
 }
 
 // dueMsg is Widget id's refresh timer firing at at; want is when it was meant to.
@@ -87,24 +100,36 @@ func (m Model) source(id string) (widget.Source, bool) {
 
 // start refreshes Source id now, whatever its schedule; a refresh already
 // in flight is followed by another.
-func (m Model) start(id string) (Model, tea.Cmd) {
+func (m Model) start(id string) (Model, tea.Cmd) { return m.begin(id, true) }
+
+// whenDue refreshes Source id unless its cached data, which another
+// instance may have fetched, isn't due yet; then it plans the refresh.
+func (m Model) whenDue(id string) (Model, tea.Cmd) { return m.begin(id, false) }
+
+func (m Model) begin(id string, force bool) (Model, tea.Cmd) {
 	src, ok := m.source(id)
 	if !ok {
 		return m, nil
 	}
 	s := m.sched[id]
 	if s.busy {
-		s.again = true
+		s.again = s.again || force
 		m.sched[id] = s
 		return m, nil
+	}
+	now := m.opts.Ports.Clock.Now()
+	if !force && m.fresh(id, now) {
+		return m, m.plan(id, m.next(id, s.checked))
 	}
 	s.busy, s.due = true, time.Time{}
 	s.timer = m.nextTimer()
 	m.sched[id] = s
-	now := m.opts.Ports.Clock.Now()
 	fetch := func() tea.Msg {
 		p, err := src.Refresh(context.Background(), now)
-		return refreshedMsg{id: id, payload: p, err: err}
+		return refreshedMsg{id: id, payload: p, err: err, at: now}
+	}
+	if s.key != "" {
+		fetch = m.fetchCached(id, src, now, force)
 	}
 	if m.spinning {
 		return m, fetch
@@ -113,8 +138,9 @@ func (m Model) start(id string) (Model, tea.Cmd) {
 	return m, tea.Batch(fetch, m.opts.Ports.Clock.After(spinEvery, func(t time.Time) tea.Msg { return spinMsg{t} }))
 }
 
-// startAll refreshes every visible Source now, except those waiting out a rate limit.
-func (m Model) startAll() (Model, tea.Cmd) {
+// startAll refreshes every visible Source, except those waiting out a rate
+// limit; unless forced, cached data that isn't due yet is kept.
+func (m Model) startAll(force bool) (Model, tea.Cmd) {
 	now := m.opts.Ports.Clock.Now()
 	var cmds []tea.Cmd
 	for _, id := range m.ids() {
@@ -122,7 +148,7 @@ func (m Model) startAll() (Model, tea.Cmd) {
 			continue
 		}
 		var cmd tea.Cmd
-		m, cmd = m.start(id)
+		m, cmd = m.begin(id, force)
 		cmds = append(cmds, cmd)
 	}
 	return m, tea.Batch(cmds...)
@@ -163,13 +189,18 @@ func (m Model) due(msg dueMsg) (Model, tea.Cmd) {
 	if m.layout.IsHidden(msg.id) {
 		return m, nil
 	}
-	return m.start(msg.id)
+	return m.whenDue(msg.id)
 }
 
 // shown refreshes Source id if it fell due while hidden.
 func (m Model) shown(id string) (Model, tea.Cmd) {
 	s, ok := m.sched[id]
-	if !ok || s.busy || !s.fetched.IsZero() && (s.due.IsZero() || s.due.After(m.opts.Ports.Clock.Now())) {
+	switch {
+	case !ok || s.busy:
+		return m, nil
+	case s.key != "":
+		return m.whenDue(id)
+	case !s.fetched.IsZero() && (s.due.IsZero() || s.due.After(m.opts.Ports.Clock.Now())):
 		return m, nil
 	}
 	return m.start(id)
@@ -224,7 +255,7 @@ func (m Model) woke() (Model, tea.Cmd) {
 	for i, id := range overdue {
 		if i == 0 {
 			var cmd tea.Cmd
-			m, cmd = m.start(id)
+			m, cmd = m.whenDue(id)
 			cmds = append(cmds, cmd)
 			continue
 		}
@@ -243,27 +274,21 @@ func (m Model) refreshed(msg refreshedMsg) (Model, tea.Cmd) {
 	m.now = now
 	s := m.sched[msg.id]
 	s.busy = false
-	var setup *widget.SetupError
 	var limited *widget.RateLimitError
 	switch {
-	case msg.err == nil:
-		s.fetched, s.err, s.fails, s.setup = now, nil, 0, nil
-		m.fetched[msg.id] = msg.payload
-		st := m.lists[msg.id]
-		if i := slices.IndexFunc(msg.payload.Items, func(it widget.Item) bool { return it.ID == st.sel }); i >= 0 {
-			st.idx = i
-		}
-		m.lists[msg.id] = st
-	case errors.As(msg.err, &setup):
-		s.err, s.fails, s.setup = nil, 0, setup
-	case errors.As(msg.err, &limited):
-		s.err, s.setup = msg.err, nil
-		if c, ok := m.widgets[msg.id].widget.(widget.Credentialed); ok && limited.Until.After(m.paused[c.Credential()]) {
-			m.paused[c.Credential()] = limited.Until
-		}
+	case msg.skipped:
+	case msg.entry != nil:
+		m.sched[msg.id] = s
+		m.adopt(msg.id, *msg.entry)
+		s = m.sched[msg.id]
+		limited = s.limited()
 	default:
-		s.err, s.setup = msg.err, nil
-		s.fails++
+		var fetched time.Time
+		if msg.err == nil {
+			fetched = now
+		}
+		s, limited = m.settle(msg.id, s, msg.payload, fetched, msg.err)
+		s.checked = msg.at
 	}
 	m.sched[msg.id] = s
 	m.clampList(msg.id)
@@ -273,8 +298,17 @@ func (m Model) refreshed(msg refreshedMsg) (Model, tea.Cmd) {
 		return m.start(msg.id)
 	}
 	var cmds []tea.Cmd
-	if at := m.next(msg.id, now); !at.IsZero() {
-		cmds = append(cmds, m.plan(msg.id, at))
+	switch {
+	case msg.skipped:
+		// Another instance is fetching; its entry arrives as a file change, and
+		// should it never come, the lock is abandoned by the time this fires.
+		cmds = append(cmds, m.plan(msg.id, now.Add(fetchTimeout)))
+	case msg.entry != nil:
+		cmds = append(cmds, m.plan(msg.id, m.next(msg.id, msg.entry.CheckedAt)))
+	default:
+		if at := m.next(msg.id, now); !at.IsZero() {
+			cmds = append(cmds, m.plan(msg.id, at))
+		}
 	}
 	if limited != nil {
 		// The pause covers every Widget on the same credential.
@@ -285,6 +319,44 @@ func (m Model) refreshed(msg refreshedMsg) (Model, tea.Cmd) {
 		}
 	}
 	return m, tea.Batch(cmds...)
+}
+
+// settle records in s a refresh's outcome: data fetched at fetched, zero
+// when there is none new, and err. A rate limit pauses s's credential, and
+// is returned so the other Widgets on it can be replanned.
+func (m Model) settle(id string, s sched, p widget.Payload, fetched time.Time, err error) (sched, *widget.RateLimitError) {
+	var setup *widget.SetupError
+	var limited *widget.RateLimitError
+	switch {
+	case err == nil:
+		s.err, s.fails, s.setup = nil, 0, nil
+	case errors.As(err, &setup):
+		s.err, s.fails, s.setup = nil, 0, setup
+	case errors.As(err, &limited):
+		s.err, s.setup = err, nil
+		if c, ok := m.widgets[id].widget.(widget.Credentialed); ok && limited.Until.After(m.paused[c.Credential()]) {
+			m.paused[c.Credential()] = limited.Until
+		}
+	default:
+		s.err, s.setup = err, nil
+		s.fails++
+	}
+	if !fetched.IsZero() {
+		s.fetched, s.cached = fetched, false
+		m.fetched[id] = p
+		st := m.lists[id]
+		if i := slices.IndexFunc(p.Items, func(it widget.Item) bool { return it.ID == st.sel }); i >= 0 {
+			st.idx = i
+		}
+		m.lists[id] = st
+	}
+	return s, limited
+}
+
+func (s sched) limited() *widget.RateLimitError {
+	var limited *widget.RateLimitError
+	errors.As(s.err, &limited)
+	return limited
 }
 
 // next is when Source id refreshes after a refresh at now: an interval on,
@@ -354,7 +426,14 @@ func (m Model) schedule(id string, refresh time.Duration) (problem string) {
 		return ""
 	}
 	iv, problem := interval(p, refresh)
-	m.sched[id] = sched{interval: iv}
+	s := sched{interval: iv, key: cacheKey(id, p)}
+	m.sched[id] = s
+	if e, ok := m.cache.Load(s.key); ok && s.key != "" {
+		m.adopt(id, e)
+		s = m.sched[id]
+		s.cached = !s.fetched.IsZero()
+		m.sched[id] = s
+	}
 	return problem
 }
 

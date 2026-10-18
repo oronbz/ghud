@@ -48,19 +48,23 @@ func (m Model) health(id string) health {
 }
 
 // chrome is the Status drawn in Widget id's top border: a spinner while it
-// refreshes, and reason and age while it's stale.
+// refreshes, reason and age while it's stale, and the age of data read
+// from the cache until a refresh replaces it.
 func (m Model) chrome(id string) render.Status {
 	var st render.Status
 	s := m.sched[id]
 	if s.busy {
 		st.Spinner = m.spinner()
 	}
-	if m.health(id) == stale {
+	switch {
+	case m.health(id) == stale:
 		reason := "stale"
 		if s.err != nil {
 			reason = reasonOf(s.err)
 		}
 		st.Stale = reason + " · " + age(m.now.Sub(s.fetched))
+	case s.cached:
+		st.Age = age(m.now.Sub(s.fetched))
 	}
 	return st
 }
