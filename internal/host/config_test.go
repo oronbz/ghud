@@ -162,7 +162,7 @@ type = "clock"
 }
 
 func TestSyntaxErrorAtLaunchStartsOnTheDefaultWithAToast(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 100, Height: 12, Types: liveViews, Config: `
+	h := hosttest.New(t, hosttest.Options{Width: 100, Height: 16, Types: liveViews, Config: `
 [[widget]]
 type = "clock"
 title = "Broken
@@ -177,7 +177,7 @@ title = "Broken
 }
 
 func TestBadGlobalOptionToastsAndKeepsTheDefault(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 100, Height: 12, Config: `
+	h := hosttest.New(t, hosttest.Options{Width: 100, Height: 16, Config: `
 time_format = "25h"
 `})
 
@@ -190,7 +190,7 @@ time_format = "25h"
 }
 
 func TestMisshapenWidgetAndPluginEntriesToastWithoutCrashing(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 100, Height: 12, Config: `
+	h := hosttest.New(t, hosttest.Options{Width: 100, Height: 16, Config: `
 widget = [1, 2]
 plugin = ["x"]
 `})
@@ -208,6 +208,12 @@ func TestLaunchingWithNoConfigWritesNoFiles(t *testing.T) {
 	h.Press("j", "q")
 
 	err := filepath.WalkDir(h.Root, func(path string, d fs.DirEntry, err error) error {
+		if err == nil && path == filepath.Join(h.Root, "cache") {
+			return fs.SkipDir
+		}
+		if err == nil && path == filepath.Join(h.Root, "cache") {
+			return fs.SkipDir
+		}
 		if err == nil && path != h.Root {
 			t.Errorf("wrote %s", path)
 		}

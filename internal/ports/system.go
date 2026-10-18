@@ -32,6 +32,7 @@ func System(getenv func(string) string) Ports {
 		Watcher:   newFSWatcher(),
 		HTTP:      &http.Client{Timeout: 30 * time.Second},
 		Endpoints: DefaultEndpoints(),
+		Getenv:    getenv,
 	}
 }
 
