@@ -249,6 +249,7 @@ func (m Model) View() tea.View {
 				Arrange: m.arranging && t.ID == m.focus,
 				Payload: m.payloadIn(t.ID, t.Rect),
 				List:    m.lists[t.ID].render(),
+				Status:  m.chrome(t.ID),
 			}
 			if tile.Focused && !m.arranging {
 				tile.Hints = m.hints(t.ID)
@@ -282,11 +283,8 @@ func (m Model) View() tea.View {
 // payloadIn is what Widget id shows in a tile at r, border included.
 func (m Model) payloadIn(id string, r layout.Rect) widget.Payload {
 	w := m.widgets[id]
-	if w.setup != "" {
-		return widget.Payload{Center: true, Lines: []widget.Line{
-			widget.Text(theme.Warn, "needs setup"),
-			widget.Text(theme.Dim, w.setup),
-		}}
+	if p, ok := m.statusPayload(id); ok {
+		return p
 	}
 	switch v := w.widget.(type) {
 	case widget.Source:

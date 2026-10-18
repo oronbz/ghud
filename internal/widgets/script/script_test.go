@@ -41,7 +41,71 @@ func (f fixture) setCmd(t *testing.T, cmd string) {
 	}
 }
 
-const outdated = `printf '[{"name":"git","installed":"2.46","current":"2.47"},{"name":"go","installed":"1.27.0","current":"1.27.1"}]'`
+func TestFailingCommandShowsItsStderrAsAnErrorWithNoDataAndAsTheStaleReasonWithData(t *testing.T) {
+	f := withScript(t, `interval = "10m"`, `echo "brew: command not found" >&2; exit 127`)
+	if _, _, ok := f.Find("exit 127: brew: command not found"); !ok {
+		t.Errorf("failing command with no data doesn't show the error:\n%s", f.Screen())
+	}
+
+	f.setCmd(t, outdated)
+	f.Advance(17 * time.Second)
+	if _, _, ok := f.Find("git"); !ok {
+		t.Fatalf("retry 15s (±10%%) after the failure didn't show the Items:\n%s", f.Screen())
+	}
+
+	f.setCmd(t, `echo "Error: no network" >&2; exit 1`)
+	f.Advance(12 * time.Minute)
+	top := f.Line(0)
+	if !strings.Contains(top, "Error: no network · 1") {
+		t.Errorf("top border %q, want stderr as the stale reason with the age", top)
+	}
+	if _, _, ok := f.Find("git"); !ok {
+		t.Errorf("stale Widget hides its Items:\n%s", f.Screen())
+	}
+}
+
+func TestPlainTextOutputShowsAsLinesAndBadJSONIsAnError(t *testing.T) {
+	f := withScript(t, "", `printf 'disk 81%%\nswap 2%%\n'`)
+	if _, _, ok := f.Find("disk 81%"); !ok {
+		t.Errorf("screen lacks the first line:\n%s", f.Screen())
+	}
+	if _, _, ok := f.Find("swap 2%"); !ok {
+		t.Errorf("screen lacks the second line:\n%s", f.Screen())
+	}
+
+	g := withScript(t, "", `printf '[{"name": "git",'`)
+	if _, _, ok := g.Find("bad JSON"); !ok {
+		t.Errorf("bad JSON isn't reported:\n%s", g.Screen())
+	}
+}
+
+func TestStyledLinesUseThemeTokens(t *testing.T) {
+	f := withScript(t, "", `printf '{"lines": ["plain", {"spans": [{"text": "warm", "token": "warn"}]}]}'`)
+	x, y, ok := f.Find("warm")
+	if !ok {
+		t.Fatalf("screen lacks the styled line:\n%s", f.Screen())
+	}
+	if tok, _ := f.Fg(x, y); tok.String() != "warn" {
+		t.Errorf("styled span drawn in %v, want warn", tok)
+	}
+	if _, _, ok := f.Find("plain"); !ok {
+		t.Errorf("screen lacks the plain line:\n%s", f.Screen())
+	}
+
+	g := withScript(t, "", `printf '{"lines": [{"spans": [{"text": "x", "token": "#ff0000"}]}]}'`)
+	if _, _, ok := g.Find("is not a theme"); !ok {
+		t.Errorf("a raw colour isn't rejected:\n%s", g.Screen())
+	}
+}
+
+func TestScriptWithoutACommandNeedsSetup(t *testing.T) {
+	g := hosttest.New(t, hosttest.Options{Width: 60, Height: 10, Config: "[[widget]]\ntype = \"script\"\n"})
+	if _, _, ok := g.Find("needs setup"); !ok {
+		t.Errorf("script without a command isn't in needs setup:\n%s", g.Screen())
+	}
+}
+
+const outdated =`printf '[{"name":"git","installed":"2.46","current":"2.47"},{"name":"go","installed":"1.27.0","current":"1.27.1"}]'`
 
 func TestScriptRunsItsCommandOnItsIntervalAndShowsTheItemsItPrints(t *testing.T) {
 	f := withScript(t, `interval = "10m"`, outdated)

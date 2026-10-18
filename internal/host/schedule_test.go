@@ -63,9 +63,10 @@ func feedType(name, title string, log *feedLog) widget.Type {
 	}
 }
 
-func withFeed(t *testing.T, o hosttest.Options) (*hosttest.Host, *feedLog) {
+// withFeed is a host with one Feed Widget whose first refreshes fail with errs.
+func withFeed(t *testing.T, o hosttest.Options, errs ...error) (*hosttest.Host, *feedLog) {
 	t.Helper()
-	log := &feedLog{}
+	log := &feedLog{errs: errs}
 	o.Types = append(o.Types, feedType("feed", "Feed", log))
 	if o.Width == 0 {
 		o.Width, o.Height = 90, 10
@@ -125,4 +126,93 @@ func TestHiddenWidgetIsNotRefreshedUntilShown(t *testing.T) {
 	}
 }
 
-var _ = theme.Warn
+// outage is a failed refresh with a short reason for the stale marker and a fix hint.
+type outage struct{ reason, msg, hint string }
+
+func (o outage) Error() string  { return o.msg }
+func (o outage) Reason() string { return o.reason }
+func (o outage) Hint() string   { return o.hint }
+
+var offline = outage{"offline", "dial tcp 140.82.112.6:443: connect: network is unreachable", "Check your connection"}
+
+func TestFailureWithNoDataShowsTheErrorAndHintInTheBody(t *testing.T) {
+	h, _ := withFeed(t, hosttest.Options{}, offline)
+
+	screen := h.Screen()
+	for _, want := range []string{"network is unreachable", "Check your connection"} {
+		if !strings.Contains(screen, want) {
+			t.Errorf("screen lacks %q:\n%s", want, screen)
+		}
+	}
+	x, y, _ := h.Find("connect")
+	if tok, _ := h.Fg(x, y); tok != theme.Bad {
+		t.Errorf("error drawn in %v, want bad", tok)
+	}
+}
+
+func TestFailuresBackOffFrom15sDoublingTo15MinutesAndASuccessResetsIt(t *testing.T) {
+	errs := make([]error, 9)
+	for i := range errs {
+		errs[i] = offline
+	}
+	h, log := withFeed(t, hosttest.Options{}, errs...)
+
+	var gaps []time.Duration
+	for log.count() < 11 {
+		before := log.count()
+		start := h.Clock.Now()
+		for log.count() == before {
+			h.Advance(time.Second)
+		}
+		gaps = append(gaps, h.Clock.Now().Sub(start))
+	}
+	want := []time.Duration{15, 30, 60, 120, 240, 480, 900, 900, 900, 120}
+	for i := range want {
+		want[i] *= time.Second
+	}
+	if len(gaps) != len(want) {
+		t.Fatalf("gaps %v, want %v", gaps, want)
+	}
+	for i := range want {
+		if gaps[i] != want[i] {
+			t.Errorf("gaps between refreshes %v, want %v (the last one after a success)", gaps, want)
+			break
+		}
+	}
+}
+
+func TestFailureWithDataShowsItStaleWithReasonAndAgeAndTheFullErrorWhenFocused(t *testing.T) {
+	h, log := withFeed(t, hosttest.Options{})
+	log.fail(offline, offline, offline)
+	h.Advance(2 * time.Minute)
+
+	top := h.Line(0)
+	if !strings.Contains(top, "offline · 2m") {
+		t.Fatalf("top border %q, want the stale marker", top)
+	}
+	x, _, _ := h.Find("offline · 2m")
+	if tok, _ := h.Fg(x, 0); tok != theme.Warn {
+		t.Errorf("stale marker drawn in %v, want warn", tok)
+	}
+	if _, _, ok := h.Find("headline"); !ok {
+		t.Errorf("stale Widget hides its data:\n%s", h.Screen())
+	}
+	if strings.Contains(h.Screen(), "unreachable") {
+		t.Errorf("unfocused stale Widget shows the full error:\n%s", h.Screen())
+	}
+
+	h.Press("tab")
+	if footer := h.Line(9); !strings.Contains(footer, "network is unreachable") {
+		t.Errorf("footer %q, want the full error while the stale Widget is focused", footer)
+	}
+
+	// Retries at 2m15s and 2m45s fail too; the one at 3m45s succeeds.
+	h.Advance(100 * time.Second)
+	if top := h.Line(0); !strings.Contains(top, "offline · 3m") {
+		t.Errorf("top border %q, want the age to grow", top)
+	}
+	h.Advance(10 * time.Second)
+	if top := h.Line(0); strings.Contains(top, "offline") {
+		t.Errorf("top border %q still stale after a successful retry", top)
+	}
+}
