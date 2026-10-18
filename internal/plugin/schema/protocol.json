@@ -1,0 +1,294 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ghud.dev/schema/protocol.json",
+  "title": "ghud plugin protocol, version 1",
+  "description": "JSON-RPC 2.0 between ghud (the host) and a Plugin's process, one message per line (newline-delimited JSON) on the process's stdin and stdout; stderr is ignored. The host starts one process per Plugin and addresses every Widget-specific message by its Widget id. Sequence: the host sends `initialize` and waits for its result; it then sends `widget/open` for each placed Widget, `widget/frame` when a Widget's size, focus or visibility changes, `widget/refresh` on its schedule, `action/choices` and `action/invoke` when the user runs an Action, and `widget/close` when a Widget goes away. The Plugin may send `widget/update` at any time. Closing stdin means quit. A result is checked against the matching $defs entry: initializeResult, refreshResult, choicesResult or invokeResult; this top-level schema checks the envelope and every request's and notification's params.",
+  "type": "object",
+  "required": ["jsonrpc"],
+  "properties": {
+    "jsonrpc": { "const": "2.0" },
+    "id": { "type": ["integer", "string"] },
+    "method": { "type": "string" },
+    "params": { "type": "object" },
+    "result": {},
+    "error": { "$ref": "#/$defs/error" }
+  },
+  "oneOf": [
+    { "required": ["method"], "not": { "anyOf": [{ "required": ["result"] }, { "required": ["error"] }] } },
+    { "required": ["id", "result"], "not": { "anyOf": [{ "required": ["method"] }, { "required": ["error"] }] } },
+    { "required": ["id", "error"], "not": { "anyOf": [{ "required": ["method"] }, { "required": ["result"] }] } }
+  ],
+  "allOf": [
+    { "if": { "required": ["method"], "properties": { "method": { "const": "initialize" } } }, "then": { "required": ["id", "params"], "properties": { "params": { "$ref": "#/$defs/initializeParams" } } } },
+    { "if": { "required": ["method"], "properties": { "method": { "const": "widget/open" } } }, "then": { "required": ["params"], "not": { "required": ["id"] }, "properties": { "params": { "$ref": "#/$defs/openParams" } } } },
+    { "if": { "required": ["method"], "properties": { "method": { "const": "widget/frame" } } }, "then": { "required": ["params"], "not": { "required": ["id"] }, "properties": { "params": { "$ref": "#/$defs/frameParams" } } } },
+    { "if": { "required": ["method"], "properties": { "method": { "const": "widget/close" } } }, "then": { "required": ["params"], "not": { "required": ["id"] }, "properties": { "params": { "$ref": "#/$defs/widgetParams" } } } },
+    { "if": { "required": ["method"], "properties": { "method": { "const": "widget/refresh" } } }, "then": { "required": ["id", "params"], "properties": { "params": { "$ref": "#/$defs/widgetParams" } } } },
+    { "if": { "required": ["method"], "properties": { "method": { "const": "action/choices" } } }, "then": { "required": ["id", "params"], "properties": { "params": { "$ref": "#/$defs/choicesParams" } } } },
+    { "if": { "required": ["method"], "properties": { "method": { "const": "action/invoke" } } }, "then": { "required": ["id", "params"], "properties": { "params": { "$ref": "#/$defs/invokeParams" } } } },
+    { "if": { "required": ["method"], "properties": { "method": { "const": "widget/update" } } }, "then": { "required": ["params"], "not": { "required": ["id"] }, "properties": { "params": { "$ref": "#/$defs/updateParams" } } } }
+  ],
+  "$defs": {
+    "error": {
+      "description": "A failed request. For widget/refresh prefer a result with a status; for action/invoke, message is shown to the user as `<label> failed: <message>`.",
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "integer" },
+        "message": { "type": "string" },
+        "data": {}
+      }
+    },
+    "widgetId": { "description": "The Widget's id from config.toml, unique on the dashboard.", "type": "string", "minLength": 1 },
+    "size": {
+      "description": "The Widget's inner size in cells, border excluded.",
+      "type": "object",
+      "required": ["width", "height"],
+      "additionalProperties": false,
+      "properties": {
+        "width": { "type": "integer", "minimum": 0 },
+        "height": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "initializeParams": {
+      "description": "host → Plugin, request: the handshake. The Plugin answers with the protocol version it speaks; any other version than the host's puts the Plugin's Widgets in needs setup.",
+      "type": "object",
+      "required": ["protocol"],
+      "properties": {
+        "protocol": { "description": "The version the host speaks.", "type": "integer", "minimum": 1 },
+        "ghud": { "description": "ghud's version.", "type": "string" }
+      }
+    },
+    "initializeResult": {
+      "type": "object",
+      "required": ["protocol"],
+      "properties": {
+        "protocol": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "frameParams": {
+      "description": "host → Plugin, notification: how the Widget is shown. Sent when any of it changes.",
+      "type": "object",
+      "required": ["widget", "size", "focused", "visible"],
+      "properties": {
+        "widget": { "$ref": "#/$defs/widgetId" },
+        "size": { "$ref": "#/$defs/size" },
+        "focused": { "type": "boolean" },
+        "visible": { "description": "False while the user has hidden the Widget; hidden Widgets aren't refreshed.", "type": "boolean" }
+      }
+    },
+    "openParams": {
+      "description": "host → Plugin, notification: a Widget of one of the Plugin's types was placed, with its settings (defaults filled in, durations as strings such as \"5m\") and how it's shown. Sent again, after a new initialize, when the process restarts.",
+      "allOf": [{ "$ref": "#/$defs/frameParams" }],
+      "required": ["type", "settings"],
+      "properties": {
+        "type": { "type": "string" },
+        "settings": { "type": "object" }
+      }
+    },
+    "widgetParams": {
+      "description": "host → Plugin: widget/refresh (request; answer with an update) and widget/close (notification).",
+      "type": "object",
+      "required": ["widget"],
+      "properties": {
+        "widget": { "$ref": "#/$defs/widgetId" }
+      }
+    },
+    "refreshResult": { "$ref": "#/$defs/update" },
+    "updateParams": {
+      "description": "Plugin → host, notification: an update pushed at any time, such as a live view's new second or data that changed upstream.",
+      "allOf": [{ "$ref": "#/$defs/update" }],
+      "required": ["widget"],
+      "properties": {
+        "widget": { "$ref": "#/$defs/widgetId" }
+      }
+    },
+    "update": {
+      "description": "New data and/or Status. A payload replaces what the Widget shows; a status other than ok keeps the data shown (marked stale) or, with none, shows the error.",
+      "type": "object",
+      "properties": {
+        "payload": { "$ref": "#/$defs/payload" },
+        "status": { "$ref": "#/$defs/status" }
+      }
+    },
+    "status": {
+      "type": "object",
+      "required": ["state"],
+      "properties": {
+        "state": {
+          "description": "ok; error (a failed fetch: message, a few words of reason for the stale marker, and a hint); setup (needs setup: message is the hint, action fixes it and becomes the primary Action); rate_limited (paused until `until`).",
+          "enum": ["ok", "error", "setup", "rate_limited"]
+        },
+        "message": { "type": "string" },
+        "reason": { "type": "string" },
+        "hint": { "type": "string" },
+        "action": { "$ref": "#/$defs/action" },
+        "until": { "description": "RFC 3339 time a rate limit lifts.", "type": "string" }
+      }
+    },
+    "token": {
+      "description": "A theme token. Raw colours are rejected, so the user's theme recolours every Widget.",
+      "enum": ["bg", "sel", "line", "faint", "dim", "fg", "bright", "accent", "warn", "ok", "bad", "info", "alt"]
+    },
+    "payload": {
+      "description": "What a Widget shows: a live view's styled lines, or a list's items under columns. Either may carry Widget Actions.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "lines": { "type": "array", "items": { "$ref": "#/$defs/line" } },
+        "center": { "description": "Centre the lines in the tile.", "type": "boolean" },
+        "wrap": { "description": "Word-wrap the lines and let the user scroll them.", "type": "boolean" },
+        "columns": { "description": "Makes the payload a list: every item has one field per column.", "type": "array", "items": { "$ref": "#/$defs/column" } },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/item" } },
+        "count": { "description": "Drawn after the title.", "type": "integer" },
+        "empty": { "description": "Shown when the list has no items.", "type": "string" },
+        "rule": { "$ref": "#/$defs/rule" },
+        "actions": { "description": "Widget Actions.", "type": "array", "items": { "$ref": "#/$defs/action" } }
+      }
+    },
+    "line": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "spans": { "type": "array", "items": { "$ref": "#/$defs/span" } },
+        "digits": { "description": "Draw the line's text as big digits (0-9, ':', space, A, P, M).", "enum": ["", "half-block", "block"] },
+        "chart": { "$ref": "#/$defs/chart" }
+      }
+    },
+    "span": {
+      "type": "object",
+      "required": ["token"],
+      "additionalProperties": false,
+      "properties": {
+        "text": { "type": "string" },
+        "token": { "$ref": "#/$defs/token" },
+        "bg": { "$ref": "#/$defs/token" },
+        "bold": { "type": "boolean" },
+        "bar": {
+          "description": "Draw the span as an eighth-block bar instead of its text.",
+          "type": "object",
+          "required": ["value"],
+          "additionalProperties": false,
+          "properties": {
+            "value": { "type": "number", "minimum": 0, "maximum": 1 },
+            "width": { "description": "Cells; 0 takes what the line's other spans leave.", "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "chart": {
+      "description": "A braille area chart, newest sample at the right edge.",
+      "type": "object",
+      "required": ["values", "token"],
+      "additionalProperties": false,
+      "properties": {
+        "values": { "type": "array", "items": { "type": "number", "minimum": 0, "maximum": 1 } },
+        "rows": { "type": "integer", "minimum": 0 },
+        "token": { "$ref": "#/$defs/token" }
+      }
+    },
+    "column": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "priority": { "description": "The highest-numbered columns are dropped first as the Widget narrows.", "type": "integer" },
+        "flex": { "description": "Shares the width the other columns leave.", "type": "boolean" },
+        "right": { "type": "boolean" }
+      }
+    },
+    "field": { "type": "array", "items": { "$ref": "#/$defs/span" } },
+    "item": {
+      "type": "object",
+      "required": ["id", "fields"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "description": "Stable across refreshes, so the selection follows the item.", "type": "string" },
+        "group": { "description": "Consecutive items with the same group share a header.", "type": "string" },
+        "fields": { "type": "array", "items": { "$ref": "#/$defs/field" } },
+        "actions": { "type": "array", "items": { "$ref": "#/$defs/action" } }
+      }
+    },
+    "rule": {
+      "description": "A line across the list before item `before`, such as a timeline's now-line.",
+      "type": "object",
+      "required": ["before", "token"],
+      "additionalProperties": false,
+      "properties": {
+        "before": { "type": "integer", "minimum": 0 },
+        "text": { "type": "string" },
+        "token": { "$ref": "#/$defs/token" }
+      }
+    },
+    "action": {
+      "type": "object",
+      "required": ["id", "label"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "description": "Free-form; comes back in action/invoke.", "type": "string" },
+        "key": { "description": "The key that runs it while the Widget is focused, as Bubble Tea prints keys: \"a\", \"enter\", \"space\", \"ctrl+e\". Host keys win; the Action stays in the ^K palette.", "type": "string" },
+        "label": { "type": "string" },
+        "primary": { "description": "Runs on enter.", "type": "boolean" },
+        "confirm": { "description": "Ask first: the Action can't be taken back.", "type": "boolean" },
+        "verb": {
+          "description": "open and copy are performed by the host with target (a URL to open, text to copy) and never sent to the Plugin.",
+          "enum": ["open", "copy", "complete", "delete", "edit"]
+        },
+        "target": { "type": "string" },
+        "input": {
+          "description": "What the host asks for first: text (a one-line prompt), inline (the multi-line editor over the Widget, prefilled with value), secret (a masked prompt whose value reaches only the Plugin: never drawn, toasted or logged), or choice (a menu of action/choices). The answer arrives as action/invoke's text. With text or secret input, target is a page the host opens as the prompt appears.",
+          "enum": ["none", "text", "inline", "secret", "choice"]
+        },
+        "prompt": { "type": "string" },
+        "value": { "description": "The text an input starts with; comes back as action/invoke's base.", "type": "string" }
+      }
+    },
+    "choicesParams": {
+      "description": "host → Plugin, request: the choices of a choice Action, fetched when the user runs it (the menu shows a spinner meanwhile).",
+      "type": "object",
+      "required": ["widget", "action"],
+      "properties": {
+        "widget": { "$ref": "#/$defs/widgetId" },
+        "action": { "type": "string" },
+        "item": { "description": "The selected item's id; absent for a Widget Action.", "type": "string" }
+      }
+    },
+    "choicesResult": {
+      "type": "object",
+      "required": ["choices"],
+      "properties": {
+        "choices": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "label"],
+            "properties": {
+              "id": { "description": "Comes back as action/invoke's text.", "type": "string" },
+              "label": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "invokeParams": {
+      "description": "host → Plugin, request: run an Action.",
+      "type": "object",
+      "required": ["widget", "action"],
+      "properties": {
+        "widget": { "$ref": "#/$defs/widgetId" },
+        "action": { "type": "string" },
+        "item": { "description": "The selected item's id; absent for a Widget Action.", "type": "string" },
+        "text": { "description": "The text typed, the secret entered, or the id of the choice picked.", "type": "string" },
+        "base": { "description": "The Action's value: the text an input started from.", "type": "string" }
+      }
+    },
+    "invokeResult": {
+      "description": "A success. The host refreshes the Widget afterwards.",
+      "type": "object",
+      "properties": {
+        "toast": { "description": "Shown in the footer.", "type": "string" },
+        "edit": { "description": "A file the host opens in $EDITOR; the Widget refreshes when the editor exits.", "type": "string" },
+        "then": { "description": "With edit, the Action the host runs once the editor exits cleanly, with text = the edit file.", "$ref": "#/$defs/action" }
+      }
+    }
+  }
+}

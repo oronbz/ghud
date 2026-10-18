@@ -21,6 +21,7 @@ type Ports struct {
 	EventKit  EventKit
 	Machine   Machine
 	Watcher   Watcher
+	Inbox     Inbox
 	HTTP      *http.Client
 	Endpoints Endpoints
 	// Getenv reads the process environment, such as GH_TOKEN.
@@ -65,6 +66,13 @@ type Watcher interface {
 	// Next returns a Cmd that waits for the next change and delivers
 	// msg(files changed), each spelt as it was given to Watch.
 	Next(msg func(files []string) tea.Msg) tea.Cmd
+}
+
+// Inbox turns messages that arrive on their own, from goroutines outside the
+// program such as a Plugin's reader, into Cmds.
+type Inbox interface {
+	// Next returns a Cmd that waits for the next message on ch.
+	Next(ch <-chan tea.Msg) tea.Cmd
 }
 
 // Machine reads how hard this machine is working.

@@ -49,6 +49,8 @@ var MacOnly = []string{"meetings", "reminders"}
 // Config is what a Widget is built from: its validated settings, defaults
 // filled in, and the global options that affect it.
 type Config struct {
+	// ID is the Widget's id, which a Plugin's messages are addressed by.
+	ID       string
 	Settings Settings
 	// TimeFormat is "12h" or "24h".
 	TimeFormat string
@@ -102,6 +104,49 @@ type Watcher interface {
 	Files() []string
 }
 
+// Pusher is a Source that also sends updates unasked, such as a Plugin
+// pushing new data or reporting that its process stopped.
+type Pusher interface {
+	// Listen starts the Widget's deliveries: it calls push, from any
+	// goroutine, with each update until the Widget is closed. The host calls
+	// it off the UI thread, once.
+	Listen(push func(Push))
+}
+
+// Push is one update a Pusher sends.
+type Push struct {
+	// Payload, when set, replaces the data shown.
+	Payload *Payload
+	// Err is a Status, read the way Refresh's error is.
+	Err error
+	// Lost drops the data shown, such as Items whose Actions can't run any
+	// more because the process behind them stopped.
+	Lost bool
+	// Retry, when set, is when the host refreshes the Widget again, whatever its schedule.
+	Retry time.Time
+}
+
+// Observer is a Widget that wants to know how it's shown, such as a Plugin
+// fitting its data to the tile.
+type Observer interface {
+	// Observe is called on the UI thread whenever Shown changes, so it must not block.
+	Observe(Shown)
+}
+
+type Shown struct {
+	// Size is the tile's inner size; zero while the Widget isn't visible.
+	Size    Size
+	Focused bool
+	// Visible is false while the Widget is hidden.
+	Visible bool
+}
+
+// Closer is a Widget that holds something to let go of, such as its place
+// in a Plugin's process, once the host drops it.
+type Closer interface {
+	Close()
+}
+
 // Actor runs the Actions a Widget declares in its Payload. Invoke runs off
 // the UI thread; the Item's new state arrives with the next Refresh.
 type Actor interface {
@@ -125,13 +170,13 @@ type Invocation struct {
 // Result is what a successful Action reports back.
 type Result struct {
 	// Toast is shown in the footer.
-	Toast string
+	Toast string `json:"toast,omitempty"`
 	// Edit is a file for the host to open in $EDITOR, with the TUI
 	// suspended; the Widget refreshes once the editor exits.
-	Edit string
+	Edit string `json:"edit,omitempty"`
 	// Then, with Edit, is the Action the host runs once the editor exits
 	// cleanly, with Text set to the Edit file and Base to Then's Value.
-	Then *Action
+	Then *Action `json:"then,omitempty"`
 }
 
 type Size struct{ W, H int }
@@ -147,25 +192,25 @@ type Frame struct {
 // Payload is what a Widget shows: a live view's styled Lines, or a list
 // Widget's Items under Columns. Either kind may carry Widget Actions.
 type Payload struct {
-	Lines []Line
+	Lines []Line `json:"lines,omitempty"`
 	// Center centres the block vertically and each line horizontally.
-	Center bool
+	Center bool `json:"center,omitempty"`
 	// Wrap word-wraps Lines to the Widget's width instead of truncating
 	// them, and lets the user scroll them with j/k.
-	Wrap bool
+	Wrap bool `json:"wrap,omitempty"`
 
 	// Columns make the Payload a list: every Item has one Field per Column.
-	Columns []Column
-	Items   []Item
+	Columns []Column `json:"columns,omitempty"`
+	Items   []Item   `json:"items,omitempty"`
 	// Count is drawn after a list Widget's title, such as the number of open tasks.
-	Count int
+	Count int `json:"count,omitempty"`
 	// Empty is shown when the list has no Items.
-	Empty string
+	Empty string `json:"empty,omitempty"`
 	// Rule, when set, draws a line across the list, such as a timeline's now-line.
-	Rule *Rule
+	Rule *Rule `json:"rule,omitempty"`
 
 	// Actions apply to the whole Widget rather than to an Item.
-	Actions []Action
+	Actions []Action `json:"actions,omitempty"`
 }
 
 // IsList reports whether the Payload is a list of Items rather than lines.
@@ -175,23 +220,23 @@ func (p Payload) IsList() bool { return len(p.Columns) > 0 }
 type Column struct {
 	// Priority decides which columns survive a narrow Widget: the
 	// highest-numbered column is dropped first.
-	Priority int
+	Priority int `json:"priority,omitempty"`
 	// Flex columns share the width the others leave and truncate to fit;
 	// the others are as wide as their widest Field.
-	Flex bool
+	Flex bool `json:"flex,omitempty"`
 	// Right aligns the column's Fields to its right edge.
-	Right bool
+	Right bool `json:"right,omitempty"`
 }
 
 // Item is one row of a list Widget.
 type Item struct {
 	// ID is stable across refreshes, so the selection follows the Item.
-	ID string
+	ID string `json:"id"`
 	// Group, when set, puts the Item under a header; consecutive Items with
 	// the same Group share one.
-	Group   string
-	Fields  []Field
-	Actions []Action
+	Group   string   `json:"group,omitempty"`
+	Fields  []Field  `json:"fields"`
+	Actions []Action `json:"actions,omitempty"`
 }
 
 // Rule is a line across a list that can't be selected: its Text, then a
@@ -199,9 +244,9 @@ type Item struct {
 type Rule struct {
 	// Before is the Item it's drawn above, ahead of that Item's group
 	// header; len(Items) draws it after the last Item.
-	Before int
-	Text   string
-	Token  theme.Token
+	Before int         `json:"before"`
+	Text   string      `json:"text,omitempty"`
+	Token  theme.Token `json:"token"`
 }
 
 // Field is one cell of an Item, in its Column.
@@ -213,24 +258,25 @@ func F(tok theme.Token, text string) Field { return Field{{Text: text, Token: to
 // Action is something the user can do to an Item or to the whole Widget.
 type Action struct {
 	// ID is free-form; the Widget gets it back in Invocation.Action.
-	ID string
+	ID string `json:"id"`
 	// Key runs the Action while its Widget is focused, written the way Bubble
 	// Tea prints keys ("a", "enter", "space"). Host keys win over it.
-	Key   string
-	Label string
+	Key   string `json:"key,omitempty"`
+	Label string `json:"label"`
 	// Primary runs on enter, whatever its Key.
-	Primary bool
+	Primary bool `json:"primary,omitempty"`
 	// Confirm asks before running, for Actions that can't be taken back.
-	Confirm bool
-	Verb    Verb
+	Confirm bool `json:"confirm,omitempty"`
+	Verb    Verb `json:"verb,omitempty"`
 	// Target is the URL an Open Action opens or the text a Copy Action
 	// copies; the host performs both itself. On an Action that asks for text
 	// or a secret it's a page the host opens as the prompt appears, such as
 	// where to create a token.
-	Target string
-	Input  Input
+	Target string `json:"target,omitempty"`
+	Input  Input  `json:"input,omitempty"`
 	// Prompt titles a text input's prompt; Value is the text it starts with.
-	Prompt, Value string
+	Prompt string `json:"prompt,omitempty"`
+	Value  string `json:"value,omitempty"`
 }
 
 // Verb says what kind of thing an Action does.
@@ -258,6 +304,28 @@ const (
 	// reaches only Invocation.Text: it's never drawn, toasted, logged or cached.
 	SecretInput
 )
+
+var inputNames = []string{"", "text", "inline", "secret"}
+
+func (i Input) MarshalText() ([]byte, error) {
+	if i < 0 || int(i) >= len(inputNames) {
+		return nil, fmt.Errorf("unknown input %d", i)
+	}
+	return []byte(inputNames[i]), nil
+}
+
+func (i *Input) UnmarshalText(b []byte) error {
+	if string(b) == "none" {
+		*i = NoInput
+		return nil
+	}
+	n := slices.Index(inputNames, string(b))
+	if n < 0 {
+		return fmt.Errorf("input %q must be \"none\", \"text\", \"inline\" or \"secret\"", b)
+	}
+	*i = Input(n)
+	return nil
+}
 
 type Line struct {
 	Spans []Span `json:"spans,omitempty"`
