@@ -52,6 +52,7 @@ type Model struct {
 	keyMap      bool
 	toast       toast
 	// fetched holds each Source's last Payload; lists, each list's selection.
+	// Like every map here they're shared by Model copies, and only Update writes them.
 	fetched map[string]widget.Payload
 	lists   map[string]listState
 	// overlay is the open confirm or text prompt, which takes every key.

@@ -141,7 +141,7 @@ type bound struct {
 	subject string
 }
 
-// actions are the focused-or-not Widget's Actions: the selected Item's, then the Widget's.
+// actions are Widget id's Actions as they apply now: the selected Item's, then the Widget's.
 func (m Model) actions(id string) []bound {
 	r, ok := m.rects()[id]
 	if !ok || m.widgets[id].setup != "" {
