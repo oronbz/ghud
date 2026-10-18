@@ -54,7 +54,12 @@ func New(o Options) Model {
 		m.widgets[t.Name] = placed{typ: t, widget: t.New()}
 		ids = append(ids, t.Name)
 	}
-	m.layout = layout.Default().Join(ids)
+	// An unreadable layout.json falls back to the default rather than blocking launch.
+	saved, err := layout.Load(o.Paths.Config)
+	if err != nil {
+		saved = layout.Default()
+	}
+	m.layout = saved.Join(ids)
 	return m
 }
 
