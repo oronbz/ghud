@@ -67,6 +67,8 @@ type Model struct {
 	lists   map[string]listState
 	// overlay is the open confirm or text prompt, which takes every key.
 	overlay *overlay
+	// palette is the open ^K Action palette.
+	palette *palette
 	// held is the modifier (Shift or Ctrl) held on its own, which swaps the
 	// footer to that modifier's keys; only kitty-protocol terminals report it.
 	held   tea.KeyMod
@@ -229,6 +231,9 @@ func (m Model) View() tea.View {
 	}
 	if m.keyMap {
 		layers = append(layers, m.keyMapLayer())
+	}
+	if m.palette != nil {
+		layers = append(layers, m.paletteLayer())
 	}
 	if m.overlay != nil {
 		layers = append(layers, m.overlayLayer())

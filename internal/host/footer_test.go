@@ -90,12 +90,12 @@ func TestModifiedKeysActNormallyAndLeaveTheFooterUnmodified(t *testing.T) {
 	}
 	h.Release("K", "leftshift")
 
-	h.Press("leftctrl", "ctrl+k")
+	h.Press("leftctrl", "ctrl+j")
 	if got := focused(t, h, phoneticTitles); got != "Alpha" {
-		t.Errorf("ctrl+k moved focus to %q", got)
+		t.Errorf("ctrl+j moved focus to %q", got)
 	}
-	h.Release("ctrl+k")
+	h.Release("ctrl+j")
 	if !strings.Contains(footer(), "esc unfocus") {
-		t.Errorf("footer after ctrl+k %q, want the focused hints", footer())
+		t.Errorf("footer after ctrl+j %q, want the focused hints", footer())
 	}
 }
