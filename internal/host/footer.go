@@ -44,6 +44,9 @@ func (m Model) footer() string {
 	}
 	if m.menu != nil {
 		hints = "jk choose · ⏎ run · esc close"
+		if m.menu.loading {
+			hints = "loading… · esc close"
+		}
 	}
 	if o := m.overlay; o != nil {
 		mode, modeColor = " INPUT ", theme.Ok

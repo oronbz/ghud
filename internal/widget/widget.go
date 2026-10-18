@@ -153,6 +153,23 @@ type Actor interface {
 	Invoke(ctx context.Context, inv Invocation) (Result, error)
 }
 
+// Chooser lists a ChoiceInput Action's choices when it runs, such as an
+// issue's transitions. Choices runs off the UI thread while the host's menu
+// shows a spinner.
+type Chooser interface {
+	Choices(ctx context.Context, inv Invocation) ([]Choice, error)
+}
+
+// Choice is one entry of a ChoiceInput Action's menu.
+type Choice struct {
+	// ID comes back to the Widget in Invocation.Choice.
+	ID    string
+	Label string
+	// Target, when set, is a page the host opens instead of running the
+	// Action, for a choice ghud can't complete itself.
+	Target string
+}
+
 // Invocation is one run of an Action.
 type Invocation struct {
 	// Action is the Action's ID.
@@ -161,6 +178,8 @@ type Invocation struct {
 	Item string
 	// Text is what the user typed into a text input.
 	Text string
+	// Choice is the ID of the Choice picked for a choice input.
+	Choice string
 	// Base is the Action's Value, the text an input started from, so a
 	// Widget can tell whether its data changed underneath the edit.
 	Base string
@@ -303,6 +322,10 @@ const (
 	// SecretInput asks for one line in a masked host prompt. The value
 	// reaches only Invocation.Text: it's never drawn, toasted, logged or cached.
 	SecretInput
+	// ChoiceInput opens a menu at once, titled Prompt, and fills it with the
+	// Widget's Choices (it must be a Chooser) as they load; the picked one
+	// reaches Invocation.Choice.
+	ChoiceInput
 )
 
 var inputNames = []string{"", "text", "inline", "secret"}

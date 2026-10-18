@@ -159,9 +159,12 @@ type Endpoints struct {
 	GitHubGraphQL string
 	GitHubREST    string
 	AtlassianAPI  string
-	OpenMeteo     string
-	Geocoding     string
-	IPAPI         string
+	// Jira, when set, stands in for every Jira site's URL, so tests reach a
+	// fake Jira whatever `site` says. It's empty for real use.
+	Jira      string
+	OpenMeteo string
+	Geocoding string
+	IPAPI     string
 }
 
 func DefaultEndpoints() Endpoints {

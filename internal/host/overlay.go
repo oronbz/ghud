@@ -38,7 +38,7 @@ func (m Model) overlayKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	if o.kind == confirming {
 		if k == "enter" || k == "y" {
 			m.overlay = nil
-			if o.action.Input == widget.TextInput || o.action.Input == widget.SecretInput {
+			if o.action.Input != widget.NoInput && o.action.Input != widget.InlineInput {
 				o.action.Confirm = false
 				return m.run(o.widget, o.action)
 			}
