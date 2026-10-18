@@ -1,11 +1,13 @@
 # Glossary
 
-**Plugin**: An installable package that provides one or more Widgets.
+**Plugin**: An installable package that provides one or more Widget types.
 
-**Widget**: One tile on the dashboard showing one source's data. Some Widgets list Items (pull requests, reminders); others are live views with no Items (clock, CPU gauge, weather).
+**Widget type**: A kind of tile a Plugin provides, such as Weather or Review requests. It becomes visible only when placed as a Widget.
 
-**Item**: A single row in a list Widget, such as a pull request, a ticket, a reminder or a meeting. Only Items carry Actions.
+**Widget**: One placed, configured tile on the dashboard, an instance of a Widget type. The same Widget type can be placed more than once with different settings (weather for two cities, two Jira queries). Some Widgets list Items (pull requests, reminders); others are live views with no Items (clock, CPU gauge, weather).
 
-**Action**: Something the user can do to an Item, such as open, accept, decline or complete.
+**Item**: A single row in a list Widget, such as a pull request, a ticket, a reminder or a meeting.
+
+**Action**: Something the user can do, either to an Item (open, approve, complete) or to a whole Widget (add a task, change the calendar month, edit the note). Some Actions ask for confirmation before they run because they can't be taken back.
 
 **Layout**: The saved arrangement and sizes of Widgets on the dashboard.
