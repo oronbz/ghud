@@ -19,28 +19,30 @@ import (
 	"github.com/oronbz/ghud/internal/weather/weathertest"
 )
 
-// sandbox is a temp home with env on top of HOME.
-func sandbox(t *testing.T, env map[string]string, stdin string, args ...string) (cli.System, string, *bytes.Buffer, *bytes.Buffer) {
+// sandbox is a temp home with env on top of HOME. The cache is kept outside
+// the home: the default Layout's fetching Widgets write it by design, and may
+// still be writing it when the test ends.
+func sandbox(t *testing.T, env map[string]string, stdin string, args ...string) (cli.System, string, *screen, *bytes.Buffer) {
 	home := t.TempDir()
-	full := map[string]string{"HOME": home}
+	full := map[string]string{"HOME": home, "XDG_CACHE_HOME": scratch(t)}
 	for k, v := range env {
 		full[k] = strings.ReplaceAll(v, "$HOME", home)
 	}
 	getenv := func(k string) string { return full[k] }
 	pp, _ := hermetic(t, getenv)
-	var stdout, stderr bytes.Buffer
+	stdout, stderr := newScreen(), &bytes.Buffer{}
 	return cli.System{
 		Args:   args,
 		Getenv: getenv,
 		Ports:  pp,
-		Stdin:  strings.NewReader(stdin),
-		Stdout: &stdout,
-		Stderr: &stderr,
+		Stdin:  keys{strings.NewReader(stdin), stdout},
+		Stdout: stdout,
+		Stderr: stderr,
 		ProgramOptions: []tea.ProgramOption{
 			tea.WithWindowSize(40, 9),
 			tea.WithoutSignals(),
 		},
-	}, home, &stdout, &stderr
+	}, home, stdout, stderr
 }
 
 func writeFile(t *testing.T, path, content string) {

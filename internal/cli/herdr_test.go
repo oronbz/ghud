@@ -2,6 +2,7 @@ package cli_test
 
 import (
 	"context"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -25,6 +26,18 @@ func inHerdr(t *testing.T, stdin string, env map[string]string, args ...string) 
 	var cmds *hosttest.Commands
 	s.Ports, cmds = hermetic(t, s.Getenv)
 	return s, cmds
+}
+
+// herdrCalls are the herdr command lines ghud ran, leaving out the ones the
+// default Layout's Widgets run, such as `gh auth token`.
+func herdrCalls(cmds *hosttest.Commands) [][]string {
+	var calls [][]string
+	for _, c := range cmds.Ran() {
+		if filepath.Base(c[0]) == "herdr" {
+			calls = append(calls, c)
+		}
+	}
+	return calls
 }
 
 func TestCloseKeysQuitGhud(t *testing.T) {
@@ -63,8 +76,8 @@ func TestInAHerdrPaneRightClickIsOptedInAndRestored(t *testing.T) {
 		{"herdr", "pane", "input", "--current", "--right-click", "pane"},
 		{"herdr", "pane", "input", "--current", "--right-click", "herdr"},
 	}
-	if !slices.EqualFunc(cmds.Calls, want, slices.Equal) {
-		t.Errorf("herdr calls %q, want %q", cmds.Calls, want)
+	if got := herdrCalls(cmds); !slices.EqualFunc(got, want, slices.Equal) {
+		t.Errorf("herdr calls %q, want %q", got, want)
 	}
 }
 
@@ -72,13 +85,14 @@ func TestHerdrsOwnBinaryIsPreferred(t *testing.T) {
 	s, cmds := inHerdr(t, "q", map[string]string{"HERDR_PANE_ID": "w1-3", "HERDR_BIN_PATH": "/opt/herdr/bin/herdr"})
 
 	run(t, s)
-	for _, c := range cmds.Calls {
+	calls := herdrCalls(cmds)
+	for _, c := range calls {
 		if c[0] != "/opt/herdr/bin/herdr" {
 			t.Errorf("ran %q, not HERDR_BIN_PATH", c)
 		}
 	}
-	if len(cmds.Calls) != 2 {
-		t.Errorf("herdr calls %q, want the opt-in and the restore", cmds.Calls)
+	if len(calls) != 2 {
+		t.Errorf("herdr calls %q, want the opt-in and the restore", calls)
 	}
 }
 
@@ -87,8 +101,8 @@ func TestOutsideAHerdrPaneHerdrIsNeverRun(t *testing.T) {
 	s, cmds := inHerdr(t, "q", map[string]string{"HERDR_ACTIVE_PANE_ID": "w1-3", "HERDR_BIN_PATH": "/opt/herdr/bin/herdr"})
 
 	run(t, s)
-	if len(cmds.Calls) != 0 {
-		t.Errorf("herdr calls %q, want none", cmds.Calls)
+	if calls := herdrCalls(cmds); len(calls) != 0 {
+		t.Errorf("herdr calls %q, want none", calls)
 	}
 }
 
@@ -102,7 +116,7 @@ func TestRightClickIsRestoredWhenGhudIsKilled(t *testing.T) {
 	if code := run(t, s); code == 0 {
 		t.Error("a killed ghud exited 0")
 	}
-	if n := len(cmds.Calls); n != 2 || cmds.Calls[n-1][5] != "herdr" {
-		t.Errorf("herdr calls %q, want the restore last", cmds.Calls)
+	if calls := herdrCalls(cmds); len(calls) != 2 || calls[1][5] != "herdr" {
+		t.Errorf("herdr calls %q, want the restore last", calls)
 	}
 }

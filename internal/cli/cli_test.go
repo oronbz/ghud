@@ -2,11 +2,13 @@ package cli_test
 
 import (
 	"bytes"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -42,28 +44,70 @@ func hermetic(t *testing.T, getenv func(string) string) (*ports.Ports, *hosttest
 	return &pp, cmds
 }
 
-func system(t *testing.T, stdin string, args ...string) (cli.System, *bytes.Buffer, *bytes.Buffer) {
-	home, err := os.MkdirTemp("", "ghud-cli")
+// scratch is a temp dir that a fetch still in flight at exit may write its
+// cache entry into after the test ends, so removing it is best effort.
+func scratch(t *testing.T) string {
+	dir, err := os.MkdirTemp("", "ghud-cli")
 	if err != nil {
 		t.Fatal(err)
 	}
-	// A fetch still in flight at exit may write its cache entry after the test ends.
-	t.Cleanup(func() { _ = os.RemoveAll(home) })
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	return dir
+}
+
+// screen is ghud's output, noting when a frame with text is first drawn.
+type screen struct {
+	bytes.Buffer
+	mu    sync.Mutex
+	once  sync.Once
+	drawn chan struct{}
+}
+
+func newScreen() *screen { return &screen{drawn: make(chan struct{})} }
+
+func (s *screen) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n, err := s.Buffer.Write(p)
+	if strings.TrimSpace(ansi.Strip(s.Buffer.String())) != "" {
+		s.once.Do(func() { close(s.drawn) })
+	}
+	return n, err
+}
+
+// keys is stdin typed once ghud has drawn a frame. Bubble Tea sends the
+// window size from a goroutine, so a q read sooner can quit before the first
+// frame is drawn.
+type keys struct {
+	r      *strings.Reader
+	screen *screen
+}
+
+func (k keys) Read(p []byte) (int, error) {
+	if k.r.Len() == 0 {
+		return 0, io.EOF
+	}
+	<-k.screen.drawn
+	return k.r.Read(p)
+}
+
+func system(t *testing.T, stdin string, args ...string) (cli.System, *screen, *bytes.Buffer) {
+	home := scratch(t)
 	getenv := func(k string) string { return map[string]string{"HOME": home}[k] }
 	pp, _ := hermetic(t, getenv)
-	var stdout, stderr bytes.Buffer
+	stdout, stderr := newScreen(), &bytes.Buffer{}
 	return cli.System{
 		Args:   args,
 		Getenv: getenv,
 		Ports:  pp,
-		Stdin:  strings.NewReader(stdin),
-		Stdout: &stdout,
-		Stderr: &stderr,
+		Stdin:  keys{strings.NewReader(stdin), stdout},
+		Stdout: stdout,
+		Stderr: stderr,
 		ProgramOptions: []tea.ProgramOption{
 			tea.WithWindowSize(60, 16),
 			tea.WithoutSignals(),
 		},
-	}, &stdout, &stderr
+	}, stdout, stderr
 }
 
 func run(t *testing.T, s cli.System) int {
