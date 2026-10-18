@@ -72,7 +72,7 @@ func (m Model) editKey(msg tea.Msg) (Model, tea.Cmd) {
 	if k, ok := msg.(tea.KeyPressMsg); ok && k.String() == "esc" {
 		m.editing = nil
 		if text := e.ta.Value(); text != e.start {
-			return m, m.invoke(e.widget, e.action, text)
+			return m.invoke(e.widget, e.action, text)
 		}
 		return m, nil
 	}

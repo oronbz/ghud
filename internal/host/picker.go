@@ -32,13 +32,19 @@ func (m Model) pickerKey(msg tea.KeyPressMsg) Model {
 		m.cursor = max(m.cursor-1, 0)
 	case key.Matches(msg, pickerKeys.Toggle) && len(ids) > 0:
 		id := ids[m.cursor]
-		m.layout = m.layout.SetHidden(id, !m.layout.IsHidden(id))
-		if m.layout.IsHidden(m.focus) {
-			m.focus = ""
-		}
-		m = m.saveLayout()
+		m = m.setHidden(id, !m.layout.IsHidden(id))
 	}
 	return m
+}
+
+// setHidden shows or hides Widget id and writes the Layout at once. Hiding
+// the focused Widget unfocuses ghud.
+func (m Model) setHidden(id string, hidden bool) Model {
+	m.layout = m.layout.SetHidden(id, hidden)
+	if m.layout.IsHidden(m.focus) {
+		m.focus = ""
+	}
+	return m.saveLayout()
 }
 
 // pickerIDs lists every Widget, hidden or not, in Layout order.

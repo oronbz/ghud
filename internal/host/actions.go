@@ -60,6 +60,8 @@ type actedMsg struct {
 	action widget.Action
 	result widget.Result
 	err    error
+	// byHost marks an Action the host performed, which leaves the Widget as it was.
+	byHost bool
 }
 
 // refresh fetches a Source's Payload off the UI thread; other Widgets need none.
@@ -155,13 +157,27 @@ type bound struct {
 	item string
 	// subject names the Item in confirm questions.
 	subject string
+	// by is the host-provided Action this is, or none for the Widget's own.
+	by hostAction
 }
 
-// actions are Widget id's Actions as they apply now: the selected Item's, then the Widget's.
+type hostAction int
+
+const (
+	none hostAction = iota
+	hide
+)
+
+// actions are Widget id's Actions as they apply now: the selected Item's,
+// then the Widget's, then the host-provided ones.
 func (m Model) actions(id string) []bound {
 	r, ok := m.rects()[id]
-	if !ok || m.widgets[id].setup != "" {
+	if !ok {
 		return nil
+	}
+	host := []bound{{Action: widget.Action{ID: "hide", Label: "hide"}, by: hide}}
+	if m.widgets[id].setup != "" {
+		return host
 	}
 	p := m.payloadIn(id, r)
 	var out []bound
@@ -174,7 +190,7 @@ func (m Model) actions(id string) []bound {
 	for _, a := range p.Actions {
 		out = append(out, bound{Action: a})
 	}
-	return out
+	return append(out, host...)
 }
 
 // subject is the text of an Item's first flex Field, the name it goes by.
@@ -196,16 +212,24 @@ func subject(p widget.Payload, it widget.Item) string {
 func (m Model) hints(id string) []render.Hint {
 	var hs []render.Hint
 	for _, a := range m.actions(id) {
-		k := a.Key
-		if k == "" && a.Primary {
-			k = "enter"
+		if k := shownKey(a); k != "" {
+			hs = append(hs, render.Hint{Key: k, Label: a.Label})
 		}
-		if k == "" || hostKey(k) && !(k == "enter" && a.Primary) {
-			continue
-		}
-		hs = append(hs, render.Hint{Key: k, Label: a.Label})
 	}
 	return hs
+}
+
+// shownKey is the key that runs a while its Widget is focused, or "" when it
+// has none or a host key shadows it.
+func shownKey(a bound) string {
+	k := a.Key
+	if k == "" && a.Primary {
+		k = "enter"
+	}
+	if k == "" || hostKey(k) && !(k == "enter" && a.Primary) {
+		return ""
+	}
+	return k
 }
 
 // actionFor is the focused Widget's Action bound to key, Item Actions first.
@@ -228,18 +252,31 @@ func (m Model) run(id string, a bound) (Model, tea.Cmd) {
 	case a.Input == widget.InlineInput:
 		return m.startEditing(id, a)
 	default:
-		return m, m.invoke(id, a, "")
+		return m.invoke(id, a, "")
 	}
 	return m, nil
 }
 
-func (m Model) invoke(id string, a bound, text string) tea.Cmd {
+// invoke performs host-provided Actions itself and hands the rest to the Widget.
+func (m Model) invoke(id string, a bound, text string) (Model, tea.Cmd) {
+	switch {
+	case a.by == hide:
+		return m.setHidden(id, true), nil
+	case a.Verb == widget.Open:
+		opener, target := m.opts.Ports.Opener, a.Target
+		return m, func() tea.Msg {
+			return actedMsg{id: id, action: a.Action, err: opener.Open(target), byHost: true}
+		}
+	case a.Verb == widget.Copy:
+		m, toast := m.say("Copied to the clipboard", theme.Fg)
+		return m, tea.Batch(m.opts.Ports.Clipboard.Copy(a.Target), toast)
+	}
 	actor, ok := m.widgets[id].widget.(widget.Actor)
 	if !ok {
-		return nil
+		return m, nil
 	}
 	inv := widget.Invocation{Action: a.ID, Item: a.item, Text: text, Now: m.opts.Ports.Clock.Now()}
-	return func() tea.Msg {
+	return m, func() tea.Msg {
 		res, err := actor.Invoke(context.Background(), inv)
 		return actedMsg{id: id, action: a.Action, result: res, err: err}
 	}
@@ -250,6 +287,9 @@ func (m Model) invoke(id string, a bound, text string) tea.Cmd {
 func (m Model) acted(msg actedMsg) (Model, tea.Cmd) {
 	if msg.err != nil {
 		return m.say(capitalise(msg.action.Label)+" failed: "+msg.err.Error(), theme.Bad)
+	}
+	if msg.byHost {
+		return m, nil
 	}
 	if f := msg.result.Edit; f != "" {
 		return m, m.opts.Ports.Editor.Edit(f, func(err error) tea.Msg { return editedMsg{id: msg.id, err: err} })

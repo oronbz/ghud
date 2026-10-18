@@ -100,13 +100,17 @@ func TestIEditsTheNoteInInsertModeAndEscSavesIt(t *testing.T) {
 	}
 }
 
-func TestCtrlKStaysAHostKeyInInsertMode(t *testing.T) {
-	h := withNotes(t, "", hosttest.Options{Width: 40, Height: 9})
+func TestCtrlKOpensThePaletteFromInsertModeAndColonTypes(t *testing.T) {
+	h := withNotes(t, "", hosttest.Options{Width: 60, Height: 16})
 	h.Press("1", "i")
-	h.Type("abc")
+	h.Type("a:bc")
 	// In the editor alone, ctrl+k would delete to the end of the line.
-	h.Press("left", "left", "ctrl+k", "esc")
-	if got := readNote(t, notesFile(h.Root, "notes.md")); got != "abc\n" {
+	h.Press("left", "left", "ctrl+k")
+	if !strings.Contains(h.Screen(), "─ Actions ") {
+		t.Fatalf("ctrl+k didn't open the palette:\n%s", h.Screen())
+	}
+	h.Press("esc", "esc")
+	if got := readNote(t, notesFile(h.Root, "notes.md")); got != "a:bc\n" {
 		t.Fatalf("notes.md = %q", got)
 	}
 }

@@ -35,6 +35,9 @@ func (m Model) footer() string {
 		mode, modeColor = " INSERT ", theme.Ok
 		hints = "esc save"
 	}
+	if m.palette != nil {
+		hints = "type to filter · ↑↓ choose · ⏎ run · esc close"
+	}
 	if o := m.overlay; o != nil {
 		mode, modeColor = " INPUT ", theme.Ok
 		if o.kind == confirming {
