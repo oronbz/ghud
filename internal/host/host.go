@@ -73,6 +73,12 @@ type Model struct {
 	// footer to that modifier's keys; only kitty-protocol terminals report it.
 	held   tea.KeyMod
 	colors colors
+	// mouse is config.toml's mouse option: capture clicks, drags and the wheel.
+	mouse bool
+	// hover is the title or seam under the pointer while no button is held.
+	hover *layout.Zone
+	drag  *drag
+	click click
 }
 
 type placed struct {
@@ -105,6 +111,7 @@ func New(o Options) Model {
 		problems = append(problems, err.Error())
 	}
 	m.toast = toast{text: toastOf(append(problems, cfg.Problems...)), tok: theme.Warn}
+	m.mouse = cfg.Mouse
 	m.colors = colors{pinned: !o.Theme.IsZero(), name: cfg.Theme, over: cfg.Colors, asking: o.Theme.IsZero()}
 	m = m.resolveTheme()
 	var ids []string
@@ -162,6 +169,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tickMsg:
 		m.now = msg.at
 		return m, m.nextTick()
+	case tea.MouseMsg:
+		return m.mouseMsg(msg)
 	case tea.KeyPressMsg:
 		return m.key(msg)
 	case tea.KeyReleaseMsg:
@@ -202,28 +211,21 @@ func (m Model) View() tea.View {
 		ReportAllKeysAsEscapeCodes: true,
 		ReportAssociatedText:       true,
 	}
+	if m.mouse {
+		v.MouseMode = tea.MouseModeAllMotion
+	}
 	if m.w == 0 || m.h == 0 {
 		return v
 	}
 	var layers []*lipgloss.Layer
-	if f := m.frame(); f.TooSmall {
-		layers = append(layers, lipgloss.NewLayer(m.tooSmall(f.Need)))
+	s := m.scene()
+	if s.TooSmall {
+		layers = append(layers, lipgloss.NewLayer(m.tooSmall(s.Need)))
 	} else {
-		for _, t := range f.Tiles {
-			tile := render.Tile{
-				Title:   t.Title,
-				W:       t.W,
-				H:       t.H,
-				Focused: t.ID == m.focus,
-				Arrange: m.arranging && t.ID == m.focus,
-				Payload: m.payloadIn(t.ID, t.Rect),
-				List:    m.lists[t.ID].render(),
-			}
-			if tile.Focused && !m.arranging {
-				tile.Hints = m.hints(t.ID)
-			}
-			layers = append(layers, lipgloss.NewLayer(render.Draw(m.opts.Theme, tile)).X(t.X).Y(t.Y))
+		for i, t := range s.Tiles {
+			layers = append(layers, lipgloss.NewLayer(render.Draw(m.opts.Theme, s.tiles[i])).X(t.X).Y(t.Y))
 		}
+		layers = append(layers, m.dragLayers(s)...)
 		layers = append(layers, lipgloss.NewLayer(m.footer()).Y(m.h-footerHeight))
 	}
 	if m.picking {
@@ -240,6 +242,7 @@ func (m Model) View() tea.View {
 	}
 	canvas := lipgloss.NewCanvas(m.w, m.h)
 	lipgloss.NewCompositor(layers...).Draw(canvas, image.Rect(0, 0, m.w, m.h))
+	m.tint(canvas, s.Tint)
 	v.SetContent(canvas.Render())
 	return v
 }
@@ -292,10 +295,54 @@ func (m Model) tooSmall(need layout.Size) string {
 }
 
 // Zones are the hit zones of the frame View draws.
-func (m Model) Zones() []layout.Zone { return m.frame().Zones }
+func (m Model) Zones() []layout.Zone { return m.scene().Zones }
+
+// scene is the one layout pass View draws and the mouse hits: the frame's
+// geometry, each tile's content, and the zones of the Item rows and key
+// hints placed in it.
+type scene struct {
+	layout.Frame
+	// tiles are drawn at Frame.Tiles' places.
+	tiles []render.Tile
+}
+
+func (m Model) scene() scene {
+	s := scene{Frame: m.frame()}
+	if s.TooSmall {
+		return s
+	}
+	for _, t := range s.Tiles {
+		tile := render.Tile{
+			Title:   t.Title,
+			W:       t.W,
+			H:       t.H,
+			Focused: t.ID == m.focus,
+			Arrange: m.arranging && t.ID == m.focus,
+			Handle:  t.Handle,
+			Payload: m.payloadIn(t.ID, t.Rect),
+			List:    m.lists[t.ID].render(),
+		}
+		if tile.Focused && !m.arranging {
+			tile.Hints = m.hints(t.ID)
+			for i, at := range render.HintSlots(tile.Hints, t.W) {
+				s.Zones = append(s.Zones, layout.Zone{Kind: layout.Hint, ID: t.ID, Index: i, Rect: layout.Rect{X: t.X + at.X, Y: t.Y + t.H - 1, W: at.W, H: 1}})
+			}
+		}
+		if tile.Payload.IsList() {
+			rows := render.Rows(tile.Payload)
+			for i := range t.H - 2 {
+				if j := tile.List.Top + i; j < len(rows) && rows[j] != render.Header {
+					s.Zones = append(s.Zones, layout.Zone{Kind: layout.Item, ID: t.ID, Index: rows[j], Rect: layout.Rect{X: t.X + 1, Y: t.Y + 1 + i, W: t.W - 2, H: 1}})
+				}
+			}
+		}
+		s.tiles = append(s.tiles, tile)
+	}
+	return s
+}
 
 func (m Model) frame() layout.Frame {
-	f := layout.Compute(m.layout, m.titles(), m.w, m.h-footerHeight)
+	f := layout.Compute(m.layout, m.titles(), m.w, m.h-footerHeight, m.pointer())
 	f.Need.H += footerHeight
 	return f
 }

@@ -9,6 +9,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/oronbz/ghud/internal/layout"
 	"github.com/oronbz/ghud/internal/theme"
 	"github.com/oronbz/ghud/internal/widget"
 )
@@ -19,6 +20,8 @@ type Tile struct {
 	Focused bool
 	// Arrange draws the heavy warn border of the Widget being arranged.
 	Arrange bool
+	// Handle draws the ⠿ grab handle before the title.
+	Handle bool
 	Payload widget.Payload
 	// List is how a list Payload is selected and scrolled.
 	List List
@@ -50,6 +53,9 @@ func Draw(th theme.Theme, t Tile) string {
 	inner := t.W - 2
 
 	label := " " + title.Render(t.Title) + " "
+	if t.Handle {
+		label = " " + th.Fg(theme.Accent).Render(layout.HandleGlyph) + title.Render(t.Title) + " "
+	}
 	if t.Payload.IsList() {
 		label += count.Render(fmt.Sprint(t.Payload.Count)) + " "
 	}
@@ -61,26 +67,42 @@ func Draw(th theme.Theme, t Tile) string {
 	for _, l := range body(th, t.Payload, t.List, inner, t.H-2) {
 		out = append(out, border.Render(b.Left)+l+border.Render(b.Right))
 	}
-	out = append(out, bottom(th, border, b, t.Hints, inner))
+	out = append(out, bottom(th, border, b, t.Hints, t.W))
 	return strings.Join(out, "\n")
 }
 
-// bottom is the bottom border, carrying " key label " hints while they fit.
-func bottom(th theme.Theme, border lipgloss.Style, edge lipgloss.Border, hints []Hint, inner int) string {
+// bottom is the bottom border of a tile w wide, carrying " key label "
+// hints while they fit.
+func bottom(th theme.Theme, border lipgloss.Style, edge lipgloss.Border, hints []Hint, w int) string {
 	var b strings.Builder
-	used := 1
+	x := 2
 	b.WriteString(border.Render(edge.BottomLeft + edge.Bottom))
+	for i, at := range HintSlots(hints, w) {
+		b.WriteString(" " + th.Fg(theme.Accent).Bold(true).Render(KeyLabel(hints[i].Key)) + th.Fg(theme.Dim).Render(" "+hints[i].Label) + " ")
+		b.WriteString(border.Render(edge.Bottom))
+		x = at.X + at.W + 1
+	}
+	b.WriteString(border.Render(strings.Repeat(edge.Bottom, max(0, w-1-x)) + edge.BottomRight))
+	return b.String()
+}
+
+// Slot is where a hint sits in the bottom border, in cells from the tile's left edge.
+type Slot struct{ X, W int }
+
+// HintSlots places the hints that fit in the bottom border of a tile w wide,
+// in order; the rest are left out.
+func HintSlots(hints []Hint, w int) []Slot {
+	var out []Slot
+	x := 2
 	for _, h := range hints {
-		text := " " + th.Fg(theme.Accent).Bold(true).Render(KeyLabel(h.Key)) + th.Fg(theme.Dim).Render(" "+h.Label) + " "
-		w := lipgloss.Width(text) + 1
-		if used+w > inner-1 {
+		hw := ansi.StringWidth(" "+KeyLabel(h.Key)+" "+h.Label+" ")
+		if x+hw+1 > w-2 {
 			break
 		}
-		b.WriteString(text + border.Render(edge.Bottom))
-		used += w
+		out = append(out, Slot{X: x, W: hw})
+		x += hw + 1
 	}
-	b.WriteString(border.Render(strings.Repeat(edge.Bottom, max(0, inner-used)) + edge.BottomRight))
-	return b.String()
+	return out
 }
 
 // KeyLabel is how a key is shown in hints: enter and space as glyphs.

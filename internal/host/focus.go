@@ -193,7 +193,7 @@ func (m Model) nearest(ri int) string {
 func (m Model) rects() map[string]layout.Rect {
 	f := m.frame()
 	if f.TooSmall {
-		f = layout.Compute(m.layout, m.titles(), f.Need.W, f.Need.H)
+		f = layout.Compute(m.layout, m.titles(), f.Need.W, f.Need.H, layout.Pointer{})
 	}
 	out := make(map[string]layout.Rect, len(f.Tiles))
 	for _, t := range f.Tiles {
