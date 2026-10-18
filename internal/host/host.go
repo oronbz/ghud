@@ -116,7 +116,7 @@ func (m Model) View() tea.View {
 		v.SetContent(m.tooSmall(f.Need))
 		return v
 	}
-	layers := make([]*lipgloss.Layer, 0, len(f.Tiles))
+	layers := make([]*lipgloss.Layer, 0, len(f.Tiles)+1)
 	for _, t := range f.Tiles {
 		w := m.widgets[t.ID]
 		layers = append(layers, lipgloss.NewLayer(render.Draw(m.opts.Theme, render.Tile{
@@ -131,6 +131,7 @@ func (m Model) View() tea.View {
 			}),
 		})).X(t.X).Y(t.Y))
 	}
+	layers = append(layers, lipgloss.NewLayer(m.footer()).Y(m.h-footerHeight))
 	canvas := lipgloss.NewCanvas(m.w, m.h)
 	lipgloss.NewCompositor(layers...).Draw(canvas, image.Rect(0, 0, m.w, m.h))
 	v.SetContent(canvas.Render())
@@ -149,7 +150,9 @@ func (m Model) tooSmall(need layout.Size) string {
 func (m Model) Zones() []layout.Zone { return m.frame().Zones }
 
 func (m Model) frame() layout.Frame {
-	return layout.Compute(m.layout, m.titles(), m.w, m.h)
+	f := layout.Compute(m.layout, m.titles(), m.w, m.h-footerHeight)
+	f.Need.H += footerHeight
+	return f
 }
 
 func (m Model) titles() map[string]string {

@@ -12,7 +12,7 @@ import (
 var sundayAfternoon = time.Date(2026, 10, 18, 14, 5, 9, 0, time.UTC)
 
 func TestClockShowsTimeAndDateInABorderedTile(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 80, Height: 9, Now: sundayAfternoon})
+	h := hosttest.New(t, hosttest.Options{Width: 80, Height: 10, Now: sundayAfternoon})
 
 	want := strings.Join([]string{
 		"╭─ Clock ──────────────────────────────╮",
@@ -25,7 +25,7 @@ func TestClockShowsTimeAndDateInABorderedTile(t *testing.T) {
 		"│                                      │",
 		"╰──────────────────────────────────────╯",
 	}, "\n")
-	if got := leftColumns(h.Screen(), 40); got != want {
+	if got := leftColumns(aboveFooter(h), 40); got != want {
 		t.Errorf("clock tile:\n%s\nwant:\n%s", got, want)
 	}
 }
@@ -67,7 +67,7 @@ func TestUnfocusedClockDrawsWithThemeTokens(t *testing.T) {
 }
 
 func TestClockTicksOnTheWallClockSecond(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 40, Height: 5, Now: sundayAfternoon.Add(400 * time.Millisecond)})
+	h := hosttest.New(t, hosttest.Options{Width: 40, Height: 6, Now: sundayAfternoon.Add(400 * time.Millisecond)})
 	if got, want := leftColumns(h.Line(1), 20), "│     14:05:09     │"; got != want {
 		t.Fatalf("at start: %q, want %q", got, want)
 	}
@@ -87,6 +87,12 @@ func TestClockTicksOnTheWallClockSecond(t *testing.T) {
 	if got, want := leftColumns(h.Line(2), 20), "│    Sun 18 Oct    │"; got != want {
 		t.Errorf("date: %q, want %q", got, want)
 	}
+}
+
+// aboveFooter is the screen without its last line, the footer.
+func aboveFooter(h *hosttest.Host) string {
+	lines := strings.Split(h.Screen(), "\n")
+	return strings.Join(lines[:len(lines)-1], "\n")
 }
 
 // leftColumns keeps the first n cells of every line: the leftmost tile of a row.
