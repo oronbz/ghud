@@ -181,6 +181,51 @@ func TestFailuresBackOffFrom15sDoublingTo15MinutesAndASuccessResetsIt(t *testing
 	}
 }
 
+func TestCtrlRRefreshesEveryWidgetAtOnceEvenInBackoff(t *testing.T) {
+	log := &feedLog{errs: []error{offline, offline}}
+	other := &feedLog{}
+	h := hosttest.New(t, hosttest.Options{Width: 90, Height: 10, Types: []widget.Type{
+		feedType("feed", "Feed", log), feedType("wire", "Wire", other),
+	}})
+	h.Advance(5 * time.Second)
+
+	h.Press("ctrl+r")
+	if log.count() != 2 || other.count() != 2 {
+		t.Fatalf("^R refreshed Feed %d and Wire %d times in all, want 2 each", log.count(), other.count())
+	}
+	// The second failure backs off 30s from now.
+	h.Advance(29 * time.Second)
+	if log.count() != 2 {
+		t.Errorf("Feed refreshed %d times, want 2 until its 30s backoff ends", log.count())
+	}
+	h.Advance(time.Second)
+	if log.count() != 3 {
+		t.Errorf("Feed refreshed %d times, want 3 once the backoff ends", log.count())
+	}
+	if _, _, ok := h.Find("headline"); !ok {
+		t.Errorf("Feed lacks its Item after a successful retry:\n%s", h.Screen())
+	}
+}
+
+func TestThePaletteListsRefreshForEachWidget(t *testing.T) {
+	log := &feedLog{}
+	h := hosttest.New(t, hosttest.Options{Width: 90, Height: 24, Types: []widget.Type{
+		liveViews[0], feedType("feed", "Feed", log),
+	}})
+
+	h.Press("ctrl+k")
+	entries := strings.Join(paletteEntries(h), " / ")
+	for _, want := range []string{"Clock refresh", "Feed refresh"} {
+		if !strings.Contains(entries, want) {
+			t.Errorf("palette lacks %q; it lists %q", want, entries)
+		}
+	}
+	h.Press("f", "e", "e", "d", "r", "e", "f", "enter")
+	if log.count() != 2 {
+		t.Errorf("Feed refreshed %d times, want 2 (start and the palette's refresh)", log.count())
+	}
+}
+
 func TestFailureWithDataShowsItStaleWithReasonAndAgeAndTheFullErrorWhenFocused(t *testing.T) {
 	h, log := withFeed(t, hosttest.Options{})
 	log.fail(offline, offline, offline)

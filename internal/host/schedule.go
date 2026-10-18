@@ -125,7 +125,7 @@ func (m Model) startAll() (Model, tea.Cmd) {
 		m, cmd = m.start(id)
 		cmds = append(cmds, cmd)
 	}
-	return m, tea.Batch(append(cmds, m.beat(now))...)
+	return m, tea.Batch(cmds...)
 }
 
 func (m Model) spun(msg spinMsg) (Model, tea.Cmd) {

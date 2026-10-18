@@ -175,7 +175,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case refreshedMsg:
 		return m.refreshed(msg)
 	case startMsg:
-		return m.startAll()
+		m, cmd := m.startAll()
+		return m, tea.Batch(cmd, m.beat(m.opts.Ports.Clock.Now()))
 	case dueMsg:
 		return m.due(msg)
 	case beatMsg:

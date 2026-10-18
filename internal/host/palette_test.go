@@ -126,16 +126,16 @@ func TestThePaletteMovesItsSelectionAndAsksBeforeAConfirmedAction(t *testing.T) 
 	h, _, todoRan := mailAndTodo(t, mailbox(), todo)
 
 	h.Press("ctrl+k")
-	want := "Mail archive a / Mail compose c / Mail hide / Todo sync s / Todo purge p / Todo hide"
+	want := "Mail archive a / Mail compose c / Mail refresh / Mail hide / Todo sync s / Todo purge p / Todo refresh / Todo hide"
 	if got := strings.Join(paletteEntries(h), " / "); got != want {
 		t.Fatalf("palette lists %q, want Layout order %q", got, want)
 	}
 	if x, y, _ := h.Find("archive"); !isSel(h, x, y) {
 		t.Errorf("first entry isn't selected:\n%s", h.Screen())
 	}
-	h.Press("down", "down", "down", "up", "ctrl+n")
+	h.Press("down", "down", "down", "down", "up", "ctrl+n")
 	if x, y, _ := h.Find("sync"); !isSel(h, x, y) {
-		t.Errorf("down down down up ctrl+n didn't select Todo sync:\n%s", h.Screen())
+		t.Errorf("down×4 up ctrl+n didn't select Todo sync:\n%s", h.Screen())
 	}
 	h.Press("down")
 	if x, y, _ := h.Find("purge"); !isSel(h, x, y) {

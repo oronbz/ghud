@@ -132,6 +132,7 @@ type hostAction int
 
 const (
 	none hostAction = iota
+	refreshNow
 	hide
 )
 
@@ -142,7 +143,10 @@ func (m Model) actions(id string) []bound {
 	if !ok {
 		return nil
 	}
-	host := []bound{{Action: widget.Action{ID: "hide", Label: "hide"}, by: hide}}
+	host := []bound{
+		{Action: widget.Action{ID: "refresh", Label: "refresh"}, by: refreshNow},
+		{Action: widget.Action{ID: "hide", Label: "hide"}, by: hide},
+	}
 	if m.widgets[id].setup != "" {
 		return host
 	}
@@ -227,6 +231,8 @@ func (m Model) run(id string, a bound) (Model, tea.Cmd) {
 // invoke performs host-provided Actions itself and hands the rest to the Widget.
 func (m Model) invoke(id string, a bound, text string) (Model, tea.Cmd) {
 	switch {
+	case a.by == refreshNow:
+		return m.start(id)
 	case a.by == hide:
 		return m.setHidden(id, true), nil
 	case a.Verb == widget.Open:
