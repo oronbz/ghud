@@ -31,3 +31,28 @@ func Load(configDir string) (Layout, error) {
 	}
 	return *f.Default, nil
 }
+
+// Save writes l as the saved Layout in configDir, atomically: a reader sees
+// the old file or the new one, never a partial write.
+func Save(configDir string, l Layout) error {
+	b, err := json.MarshalIndent(file{Default: &l}, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(configDir, ".layout-*.json")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+	if _, err := tmp.Write(append(b, '\n')); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), filepath.Join(configDir, FileName))
+}
