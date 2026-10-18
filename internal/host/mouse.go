@@ -2,6 +2,7 @@ package host
 
 import (
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/oronbz/ghud/internal/layout"
+	"github.com/oronbz/ghud/internal/render"
 	"github.com/oronbz/ghud/internal/theme"
 )
 
@@ -58,8 +60,62 @@ func (m Model) mouseMsg(msg tea.MouseMsg) (Model, tea.Cmd) {
 		}
 	case tea.MouseReleaseMsg:
 		return m.release(), nil
+	case tea.MouseWheelMsg:
+		switch {
+		case !hit || z.ID == "":
+		case ms.Button == tea.MouseWheelDown:
+			m.scroll(z.ID, 1)
+		case ms.Button == tea.MouseWheelUp:
+			m.scroll(z.ID, -1)
+		}
 	}
 	return m, nil
+}
+
+// scroll moves list id's view by lines, focus and all else staying put. A
+// selection scrolled out of view moves to the nearest Item still in it, so
+// the next refresh doesn't scroll back to it.
+func (m Model) scroll(id string, lines int) {
+	r, ok := m.rects()[id]
+	if !ok {
+		return
+	}
+	p := m.payloadIn(id, r)
+	if len(p.Items) == 0 {
+		return
+	}
+	rows := render.Rows(p)
+	h := max(1, r.H-2)
+	st := m.lists[id]
+	st.top = min(max(st.top+lines, 0), max(0, len(rows)-h))
+	if line := slices.Index(rows, st.idx); line < st.top || line >= st.top+h {
+		for j := st.top; j < min(len(rows), st.top+h); j++ {
+			if rows[j] == render.Header {
+				continue
+			}
+			st.idx = rows[j]
+			if line < st.top {
+				break
+			}
+		}
+		st.sel = p.Items[st.idx].ID
+	}
+	m.lists[id] = st
+}
+
+// selectItem focuses Widget id and selects its Item i where it's drawn,
+// without scrolling.
+func (m Model) selectItem(id string, i int) Model {
+	m.focus, m.last = id, id
+	r := m.rects()[id]
+	p := m.payloadIn(id, r)
+	if i >= len(p.Items) {
+		return m
+	}
+	st := m.lists[id]
+	st.idx, st.sel = i, p.Items[i].ID
+	m.lists[id] = st
+	return m
 }
 
 // pointer is the hover or drag the next frame draws; none while a modal
@@ -99,6 +155,10 @@ func (m Model) press(s scene, z layout.Zone, x, y int) (Model, tea.Cmd) {
 		m.drag = &drag{zone: z, dx: x - t.X, dy: y - t.Y, x: x, y: y}
 	case layout.WidgetSeam, layout.RowSeam:
 		m.drag = &drag{zone: z, dx: x - z.X, dy: y - z.Y, x: x, y: y, before: m.layout}
+	case layout.Item:
+		m = m.selectItem(z.ID, z.Index)
+	case layout.Body:
+		m.focus, m.last = z.ID, z.ID
 	}
 	return m, nil
 }

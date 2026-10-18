@@ -170,6 +170,53 @@ func TestDraggingASeamResizesLiveAndWritesTheLayoutOnRelease(t *testing.T) {
 	}
 }
 
+func longList() widget.Payload {
+	return widget.Payload{
+		Columns: []widget.Column{{Flex: true}},
+		Items: append(append(items("", "a1", "a2", "a3", "a4", "a5"),
+			items("Later", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9", "b10")...),
+			items("Someday", "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10")...),
+	}
+}
+
+func TestTheWheelScrollsWithoutFocusingAndAClickSelectsTheItemUnderIt(t *testing.T) {
+	// 40×12: the list shows 9 of its 27 lines (25 Items, 2 group headers).
+	h, _ := withInbox(t, 12, longList(), nil)
+	h.Wheel(10, 5, 8)
+	if got, want := strings.Trim(h.Line(1), "│▐ "), "b3"; got != want {
+		t.Errorf("after 8 notches the first line is %q, want %q:\n%s", got, want, h.Screen())
+	}
+	if footer := h.Line(11); !strings.Contains(footer, "Tab/hl focus") {
+		t.Errorf("the wheel focused the Widget: footer %q", footer)
+	}
+
+	h.Click(10, 3)
+	if x, y, ok := h.Find("b5"); !ok || y != 3 || !isSel(h, x, y) {
+		t.Errorf("clicking the line showing b5 didn't select it in place:\n%s", h.Screen())
+	}
+	if footer := h.Line(11); strings.Contains(footer, "Tab/hl focus") {
+		t.Errorf("clicking an Item didn't focus its Widget: footer %q", footer)
+	}
+
+	h.Click(10, 9)
+	if x, y, _ := h.Find("b5"); !isSel(h, x, y) {
+		t.Errorf("clicking the Someday header moved the selection off b5:\n%s", h.Screen())
+	}
+
+	h.Wheel(10, 5, 40)
+	if got, want := strings.Trim(h.Line(9), "│▐ "), "c10"; got != want {
+		t.Errorf("wheeling far down ends on %q, want the last Item %q", got, want)
+	}
+	h.Click(10, 2)
+	if x, y, ok := h.Find("c3"); !ok || y != 2 || !isSel(h, x, y) {
+		t.Errorf("clicking the line showing c3 at the end of the list didn't select it:\n%s", h.Screen())
+	}
+	h.Wheel(10, 5, -40)
+	if got, want := strings.Trim(h.Line(1), "│▐ "), "a1"; got != want {
+		t.Errorf("wheeling far up starts on %q, want %q", got, want)
+	}
+}
+
 func isFg(h *hosttest.Host, x, y int, want theme.Token) bool {
 	tok, ok := h.Fg(x, y)
 	return ok && tok == want
