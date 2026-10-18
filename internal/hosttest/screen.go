@@ -4,12 +4,20 @@ import (
 	"image/color"
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 
 	"github.com/oronbz/ghud/internal/host"
 	"github.com/oronbz/ghud/internal/layout"
 	"github.com/oronbz/ghud/internal/theme"
 )
+
+// View is the app's current tea.View, for the terminal state it declares
+// (background colour, mouse mode, keyboard flags).
+func (h *Host) View() tea.View { return h.model.View() }
+
+// Theme is the palette the app draws with now; Fg and Bg map cells back through it.
+func (h *Host) Theme() theme.Theme { return h.model.(host.Model).Theme() }
 
 // Buffer re-parses the current frame into a cell grid of the terminal size.
 func (h *Host) Buffer() uv.ScreenBuffer {
@@ -92,7 +100,7 @@ func (h *Host) token(c color.Color) (theme.Token, bool) {
 		return 0, false
 	}
 	for _, tok := range theme.Tokens() {
-		if sameColor(h.Theme.Color(tok), c) {
+		if sameColor(h.Theme().Color(tok), c) {
 			return tok, true
 		}
 	}

@@ -40,7 +40,7 @@ func (k ZoneKind) String() string {
 
 // Zone is a hit-test rectangle. ID names the Widget for Body and Title. For
 // seams, Row is the row above or containing the seam and Index the Widget to
-// its left.
+// its left. Row and Index count in the Layout's Visible rows.
 type Zone struct {
 	Kind ZoneKind
 	Rect
@@ -62,8 +62,10 @@ type Frame struct {
 	Need     Size
 }
 
-// Compute lays l out over a w×h area. titles gives each Widget's border title.
+// Compute lays l's visible Widgets out over a w×h area. titles gives each
+// Widget's border title.
 func Compute(l Layout, titles map[string]string, w, h int) Frame {
+	l = l.Visible()
 	var f Frame
 	for _, r := range l.Rows {
 		f.Need.W = max(f.Need.W, len(r.Widgets)*MinTile.W)

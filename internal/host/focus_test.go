@@ -176,6 +176,13 @@ var phoneticTitles = []string{"Alpha", "Bravo", "Charlie", "Delta", "Echo", "Fox
 // arranged by layoutJSON.
 func phonetic(t *testing.T, layoutJSON string) *hosttest.Host {
 	t.Helper()
+	return phoneticAt(t, savedLayout(t, layoutJSON))
+}
+
+// phoneticAt is phonetic over an existing root, so a second host can restart
+// on what the first one saved.
+func phoneticAt(t *testing.T, root string) *hosttest.Host {
+	t.Helper()
 	var types []widget.Type
 	for _, title := range phoneticTitles {
 		types = append(types, widget.Type{
@@ -184,7 +191,7 @@ func phonetic(t *testing.T, layoutJSON string) *hosttest.Host {
 			New:   func(widget.Config) widget.Widget { return blank{} },
 		})
 	}
-	return hosttest.New(t, hosttest.Options{Width: 96, Height: 31, Root: savedLayout(t, layoutJSON), Types: types})
+	return hosttest.New(t, hosttest.Options{Width: 96, Height: 31, Root: root, Types: types})
 }
 
 type blank struct{}

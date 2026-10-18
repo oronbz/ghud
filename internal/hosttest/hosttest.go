@@ -31,7 +31,9 @@ type Options struct {
 	Root string
 	// Endpoints overrides HTTP base URLs, typically with httptest servers. Unset fields keep the real URLs.
 	Endpoints ports.Endpoints
-	Theme     *theme.Theme
+	// Theme pins the palette. Left nil, the app picks it from config.toml and
+	// the terminal colour answers the test sends.
+	Theme *theme.Theme
 	// Config, when set, is written to config.toml in the config dir before the app starts.
 	Config string
 	// Types replaces the built-in Widget types (see host.Options.Types).
@@ -44,7 +46,6 @@ type Host struct {
 	t     testing.TB
 	Root  string
 	Paths paths.Paths
-	Theme theme.Theme
 
 	Clock     *Clock
 	Opener    *Opener
@@ -73,7 +74,7 @@ func New(t testing.TB, o Options) *Host {
 	if o.Root == "" {
 		o.Root = t.TempDir()
 	}
-	th := theme.Dark()
+	var th theme.Theme
 	if o.Theme != nil {
 		th = *o.Theme
 	}
@@ -81,7 +82,6 @@ func New(t testing.TB, o Options) *Host {
 		t:         t,
 		Root:      o.Root,
 		Paths:     paths.Under(o.Root),
-		Theme:     th,
 		Clock:     newClock(o.Now),
 		Opener:    &Opener{},
 		Clipboard: &Clipboard{},

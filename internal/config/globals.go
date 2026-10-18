@@ -26,7 +26,7 @@ func Globals(loc Locale) []widget.Setting {
 	return []widget.Setting{
 		{
 			Name: "theme", Kind: widget.String, Default: "ghud", Choices: []string{"ghud", "terminal"},
-			Description: `Colour theme: "ghud" is the built-in palette, "terminal" derives colours from your terminal's.`,
+			Description: `Colour theme: "ghud" is the built-in palette, light or dark to match your terminal's background; "terminal" derives colours from your terminal's own, falling back to "ghud" when the terminal doesn't answer.`,
 			Why:         `Pick "terminal" to match a terminal colour scheme you already like.`,
 		},
 		{
