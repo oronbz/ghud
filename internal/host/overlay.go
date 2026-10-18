@@ -2,6 +2,7 @@ package host
 
 import (
 	"slices"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -37,7 +38,7 @@ func (m Model) overlayKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	if o.kind == confirming {
 		if k == "enter" || k == "y" {
 			m.overlay = nil
-			if o.action.Input == widget.TextInput {
+			if o.action.Input == widget.TextInput || o.action.Input == widget.SecretInput {
 				o.action.Confirm = false
 				return m.run(o.widget, o.action)
 			}
@@ -70,14 +71,31 @@ func (m Model) overlayKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		o.value = slices.Clone(o.value[o.cursor:])
 		o.cursor = 0
 	default:
-		if msg.Text != "" {
-			r := []rune(msg.Text)
-			o.value = slices.Insert(slices.Clone(o.value), o.cursor, r...)
-			o.cursor += len(r)
-		}
+		o = o.insert(msg.Text)
 	}
 	m.overlay = &o
 	return m, nil
+}
+
+// overlayPaste types a paste into the prompt, on one line.
+func (m Model) overlayPaste(msg tea.PasteMsg) Model {
+	if m.overlay.kind != prompting {
+		return m
+	}
+	text := strings.TrimRight(msg.Content, "\r\n")
+	o := m.overlay.insert(strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ", "\t", " ").Replace(text))
+	m.overlay = &o
+	return m
+}
+
+func (o overlay) insert(text string) overlay {
+	if text == "" {
+		return o
+	}
+	r := []rune(text)
+	o.value = slices.Insert(slices.Clone(o.value), o.cursor, r...)
+	o.cursor += len(r)
+	return o
 }
 
 // overlayLayer draws the confirm or prompt box centred over the dashboard.
@@ -112,6 +130,9 @@ func (m Model) overlayLayer() *lipgloss.Layer {
 // the cursor in its w cells.
 func promptLine(o *overlay, w int) widget.Line {
 	v, c := o.value, o.cursor
+	if o.action.Input == widget.SecretInput {
+		v = []rune(strings.Repeat("•", len(v)))
+	}
 	if start := c - (w - 1); start > 0 {
 		v, c = v[start:], c-start
 	}

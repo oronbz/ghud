@@ -21,6 +21,8 @@ type client struct {
 	http      *http.Client
 	endpoints ports.Endpoints
 	token     string
+	// stored is set when the token is the one pasted into ghud.
+	stored bool
 	// now is when the call is made, for rate limit pauses given in seconds.
 	now time.Time
 }

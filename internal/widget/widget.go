@@ -224,7 +224,9 @@ type Action struct {
 	Confirm bool
 	Verb    Verb
 	// Target is the URL an Open Action opens or the text a Copy Action
-	// copies; the host performs both itself.
+	// copies; the host performs both itself. On an Action that asks for text
+	// or a secret it's a page the host opens as the prompt appears, such as
+	// where to create a token.
 	Target string
 	Input  Input
 	// Prompt titles a text input's prompt; Value is the text it starts with.
@@ -252,6 +254,9 @@ const (
 	// InlineInput edits Value in the host's multi-line editor over the
 	// Widget's body (INSERT mode); esc ends it and passes the text on.
 	InlineInput
+	// SecretInput asks for one line in a masked host prompt. The value
+	// reaches only Invocation.Text: it's never drawn, toasted, logged or cached.
+	SecretInput
 )
 
 type Line struct {

@@ -47,11 +47,11 @@ type prs struct {
 func (prs) Credential() string { return credential }
 
 func (w prs) client(ctx context.Context, now time.Time) (client, error) {
-	tok, err := token(ctx, w.ports)
+	tok, stored, err := token(ctx, w.ports)
 	if err != nil {
 		return client{}, err
 	}
-	return client{http: w.ports.HTTP, endpoints: w.ports.Endpoints, token: tok, now: now}, nil
+	return client{http: w.ports.HTTP, endpoints: w.ports.Endpoints, token: tok, stored: stored, now: now}, nil
 }
 
 // query fetches the viewer and both searches in one request.
@@ -114,8 +114,8 @@ type node struct {
 
 func (w prs) Refresh(ctx context.Context, now time.Time) (widget.Payload, error) {
 	c, err := w.client(ctx, now)
-	if errors.Is(err, errNoToken) {
-		return widget.Payload{}, needsToken()
+	if errors.Is(err, errNoToken) || errors.Is(err, errNoKeyring) {
+		return widget.Payload{}, needsToken(err)
 	}
 	if err != nil {
 		return widget.Payload{}, err
@@ -129,6 +129,9 @@ func (w prs) Refresh(ctx context.Context, now time.Time) (widget.Payload, error)
 		"requested": filter + " review-requested:@me",
 		"involved":  filter + " review-involves:@me",
 	}, &d)
+	if c.stored && errors.As(err, new(authError)) {
+		return widget.Payload{}, rejected()
+	}
 	if err != nil {
 		return widget.Payload{}, err
 	}
@@ -278,12 +281,15 @@ func age(d time.Duration) string {
 }
 
 func (w prs) Invoke(ctx context.Context, inv widget.Invocation) (widget.Result, error) {
+	if inv.Action == pasteToken {
+		return store(w.ports, inv.Text)
+	}
 	repo, num, ok := strings.Cut(inv.Item, "#")
 	if !ok {
 		return widget.Result{}, fmt.Errorf("PRs has no Item %q", inv.Item)
 	}
 	c, err := w.client(ctx, inv.Now)
-	if errors.Is(err, errNoToken) {
+	if errors.Is(err, errNoToken) || errors.Is(err, errNoKeyring) {
 		return widget.Result{}, errors.New("no GitHub token; run `gh auth login`")
 	}
 	if err != nil {

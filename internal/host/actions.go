@@ -2,6 +2,7 @@ package host
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strings"
 	"time"
@@ -245,8 +246,18 @@ func (m Model) run(id string, a bound) (Model, tea.Cmd) {
 	switch {
 	case a.Confirm:
 		m.overlay = &overlay{kind: confirming, widget: id, action: a}
-	case a.Input == widget.TextInput:
-		m.overlay = &overlay{kind: prompting, widget: id, action: a, value: []rune(a.Value), cursor: utf8.RuneCountInString(a.Value)}
+	case a.Input == widget.TextInput, a.Input == widget.SecretInput:
+		o := &overlay{kind: prompting, widget: id, action: a}
+		if a.Input == widget.TextInput {
+			o.value, o.cursor = []rune(a.Value), utf8.RuneCountInString(a.Value)
+		}
+		m.overlay = o
+		if a.Target != "" {
+			opener, target := m.opts.Ports.Opener, a.Target
+			return m, func() tea.Msg {
+				return actedMsg{id: id, action: a.Action, err: opener.Open(target), byHost: true}
+			}
+		}
 	case a.Input == widget.InlineInput:
 		return m.startEditing(id, a)
 	default:
@@ -278,10 +289,29 @@ func (m Model) invoke(id string, a bound, text string) (Model, tea.Cmd) {
 		return m, nil
 	}
 	inv := widget.Invocation{Action: a.ID, Item: a.item, Text: text, Base: a.Value, Now: m.opts.Ports.Clock.Now()}
+	secret := a.Input == widget.SecretInput
 	return m, func() tea.Msg {
 		res, err := actor.Invoke(context.Background(), inv)
+		if secret {
+			res.Toast, err = redact(res.Toast, text), redactErr(err, text)
+		}
 		return actedMsg{id: id, item: a.item, action: a.Action, result: res, err: err}
 	}
+}
+
+// redact hides a secret a Widget quoted back, so it can't reach a toast.
+func redact(s, secret string) string {
+	if secret == "" {
+		return s
+	}
+	return strings.ReplaceAll(s, secret, "••••")
+}
+
+func redactErr(err error, secret string) error {
+	if err == nil || secret == "" || !strings.Contains(err.Error(), secret) {
+		return err
+	}
+	return errors.New(redact(err.Error(), secret))
 }
 
 // acted toasts an Action's result and, after a success, refreshes its Widget

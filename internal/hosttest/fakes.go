@@ -206,14 +206,13 @@ func (e *Editor) Edit(path string, line int, done func(error) tea.Msg) tea.Cmd {
 	}
 }
 
-// Keyring is an in-memory keyring. A non-nil Err makes every call fail, as when no keyring exists.
+// Keyring is an in-memory keyring; the zero value is empty. A non-nil Err
+// makes every call fail, as when no keyring exists.
 type Keyring struct {
 	mu      sync.Mutex
 	secrets map[string]string
 	Err     error
 }
-
-func newKeyring() *Keyring { return &Keyring{secrets: map[string]string{}} }
 
 func (k *Keyring) Get(service, account string) (string, error) {
 	k.mu.Lock()
@@ -233,6 +232,9 @@ func (k *Keyring) Set(service, account, secret string) error {
 	defer k.mu.Unlock()
 	if k.Err != nil {
 		return k.Err
+	}
+	if k.secrets == nil {
+		k.secrets = map[string]string{}
 	}
 	k.secrets[service+"\x00"+account] = secret
 	return nil
