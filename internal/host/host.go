@@ -52,6 +52,13 @@ type Model struct {
 	// survives unfocusing so focus can return to it.
 	focus, last string
 	keyMap      bool
+	// arranging is arrange mode on the focused Widget; before is the Layout
+	// to revert to.
+	arranging bool
+	before    layout.Layout
+	// picking is the w list of Widgets to show or hide, cursor its selected row.
+	picking bool
+	cursor  int
 	// toast is the message in the footer; it stays until replaced.
 	toast string
 	// held is the modifier (Shift or Ctrl) held on its own, which swaps the
@@ -182,6 +189,7 @@ func (m Model) View() tea.View {
 				W:       t.W,
 				H:       t.H,
 				Focused: t.ID == m.focus,
+				Arrange: m.arranging && t.ID == m.focus,
 				Payload: m.payload(t.ID, widget.Frame{
 					Now:     m.now,
 					Size:    widget.Size{W: t.W - 2, H: t.H - 2},
@@ -190,6 +198,9 @@ func (m Model) View() tea.View {
 			})).X(t.X).Y(t.Y))
 		}
 		layers = append(layers, lipgloss.NewLayer(m.footer()).Y(m.h-footerHeight))
+	}
+	if m.picking {
+		layers = append(layers, m.pickerLayer())
 	}
 	if m.keyMap {
 		layers = append(layers, m.keyMapLayer())

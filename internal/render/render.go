@@ -16,6 +16,8 @@ type Tile struct {
 	Title   string
 	W, H    int
 	Focused bool
+	// Arrange draws the heavy warn border of the Widget being arranged.
+	Arrange bool
 	Payload widget.Payload
 }
 
@@ -26,21 +28,26 @@ func Draw(th theme.Theme, t Tile) string {
 	}
 	border := th.Fg(theme.Line)
 	title := th.Fg(theme.Fg)
-	if t.Focused {
+	b := lipgloss.RoundedBorder()
+	if t.Focused || t.Arrange {
 		border = th.Fg(theme.Accent)
 		title = th.Fg(theme.Bright).Bold(true)
+	}
+	if t.Arrange {
+		border = th.Fg(theme.Warn)
+		b = lipgloss.ThickBorder()
 	}
 	inner := t.W - 2
 
 	label := " " + title.Render(t.Title) + " "
-	top := border.Render("╭─") + label + border.Render(strings.Repeat("─", max(0, t.W-3-lipgloss.Width(label)))) + border.Render("╮")
+	top := border.Render(b.TopLeft+b.Top) + label + border.Render(strings.Repeat(b.Top, max(0, t.W-3-lipgloss.Width(label)))) + border.Render(b.TopRight)
 
 	out := make([]string, 0, t.H)
 	out = append(out, ansi.Truncate(top, t.W, ""))
 	for _, l := range Body(th, t.Payload, inner, t.H-2) {
-		out = append(out, border.Render("│")+l+border.Render("│"))
+		out = append(out, border.Render(b.Left)+l+border.Render(b.Right))
 	}
-	out = append(out, border.Render("╰"+strings.Repeat("─", inner)+"╯"))
+	out = append(out, border.Render(b.BottomLeft+strings.Repeat(b.Bottom, inner)+b.BottomRight))
 	return strings.Join(out, "\n")
 }
 
