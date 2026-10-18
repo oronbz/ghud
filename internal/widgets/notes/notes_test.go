@@ -150,6 +150,54 @@ func TestAFailedEditorRunIsToasted(t *testing.T) {
 	}
 }
 
+func TestTwoNotesWidgetsWithTheirOwnFilesEditIndependently(t *testing.T) {
+	root := t.TempDir()
+	work, home := notesFile(root, "work.md"), notesFile(root, "home.md")
+	writeNote(t, work, "Standup\n")
+	writeNote(t, home, "Groceries\n")
+	h := hosttest.New(t, hosttest.Options{Width: 60, Height: 9, Root: root, Config: `
+[[widget]]
+type = "notes"
+id = "work"
+title = "Work"
+file = "work.md"
+
+[[widget]]
+type = "notes"
+id = "home"
+title = "Home"
+file = "home.md"
+`})
+	h.Editor.OnEdit = func(p string) error { return os.WriteFile(p, []byte("Groceries\nGarden\n"), 0o644) }
+
+	h.Press("1", "i")
+	h.Type("Ship it")
+	h.Press("esc", "2", "E")
+
+	if got := readNote(t, work); got != "Standup\nShip it\n" {
+		t.Errorf("work.md = %q", got)
+	}
+	if got := readNote(t, home); got != "Groceries\nGarden\n" {
+		t.Errorf("home.md = %q", got)
+	}
+	if len(h.Editor.Edited) != 1 || h.Editor.Edited[0] != home {
+		t.Errorf("editor ran on %q, want [%s]", h.Editor.Edited, home)
+	}
+	if got := strings.Fields(h.Line(2)); strings.Join(got, " ") != "│ Ship it ││ Garden │" {
+		t.Errorf("second rows = %q", h.Line(2))
+	}
+}
+
+func TestTheInlineEditorFollowsATerminalResize(t *testing.T) {
+	h := withNotes(t, "", hosttest.Options{Width: 20, Height: 9})
+	h.Press("1", "i")
+	h.Type("alpha bravo charlie delta")
+	h.Resize(40, 9)
+	if got := body(h, 1)[0]; got != "alpha bravo charlie delta" {
+		t.Fatalf("first row after resize = %q", got)
+	}
+}
+
 func TestJAndKScrollTheFocusedNote(t *testing.T) {
 	h := withNotes(t, "one\ntwo\nthree\nfour\nfive\nsix\nseven\n", hosttest.Options{Width: 30, Height: 7})
 	shown := func() string { return strings.Join(body(h, 4), " ") }
