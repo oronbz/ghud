@@ -137,6 +137,19 @@ func (h *Host) Press(keys ...string) {
 	}
 }
 
+// Release sends one key release per argument, in Key syntax, the way a
+// terminal reporting event types does. A released modifier no longer sets its own Mod.
+func (h *Host) Release(keys ...string) {
+	h.t.Helper()
+	for _, k := range keys {
+		r := tea.KeyReleaseMsg(Key(k))
+		if m, ok := loneModifiers[k]; ok {
+			r.Mod &^= m.Mod
+		}
+		h.Send(r)
+	}
+}
+
 func (h *Host) Resize(w, hh int) {
 	h.t.Helper()
 	h.w, h.h = w, hh

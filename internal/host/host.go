@@ -42,6 +42,9 @@ type Model struct {
 	// survives unfocusing so focus can return to it.
 	focus, last string
 	keyMap      bool
+	// held is the modifier (Shift or Ctrl) held on its own, which swaps the
+	// footer to that modifier's keys; only kitty-protocol terminals report it.
+	held tea.KeyMod
 }
 
 type placed struct {
@@ -85,6 +88,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.nextTick()
 	case tea.KeyPressMsg:
 		return m.key(msg)
+	case tea.KeyReleaseMsg:
+		if _, ok := loneModifier(msg.Code); ok {
+			m.held = 0
+		}
 	}
 	return m, nil
 }
@@ -109,6 +116,14 @@ func (m Model) View() tea.View {
 	v := tea.NewView("")
 	v.AltScreen = true
 	v.BackgroundColor = m.opts.Theme.Color(theme.Bg)
+	// Report-all-keys and event types make lone modifier presses and releases
+	// arrive, for the modifier footer.
+	v.KeyboardEnhancements = tea.KeyboardEnhancements{
+		ReportEventTypes:           true,
+		ReportAlternateKeys:        true,
+		ReportAllKeysAsEscapeCodes: true,
+		ReportAssociatedText:       true,
+	}
 	if m.w == 0 || m.h == 0 {
 		return v
 	}

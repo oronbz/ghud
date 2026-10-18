@@ -57,6 +57,22 @@ func TestGhudDrawsTheClockAndQuitsOnQ(t *testing.T) {
 	}
 }
 
+func TestGhudEnablesKittyKeyboardFlagsAndRestoresThemOnExit(t *testing.T) {
+	// Shift press and release, then q, all kitty-encoded.
+	s, stdout, stderr := system(t, "\x1b[57441;2u\x1b[57441;1:3u\x1b[113u")
+
+	if code := run(t, s); code != 0 {
+		t.Fatalf("exit code %d, stderr: %s", code, stderr)
+	}
+	out := stdout.String()
+	flags := ansi.KittyDisambiguateEscapeCodes | ansi.KittyReportEventTypes | ansi.KittyReportAlternateKeys |
+		ansi.KittyReportAllKeysAsEscapeCodes | ansi.KittyReportAssociatedKeys
+	push, pop := ansi.PushKittyKeyboard(flags), ansi.PopKittyKeyboard(1)
+	if !strings.Contains(out, push) || strings.LastIndex(out, pop) < strings.Index(out, push) {
+		t.Errorf("kitty flags %d not pushed and then popped:\n%q", flags, out)
+	}
+}
+
 func TestVersionFlagPrintsTheVersionWithoutStartingTheTUI(t *testing.T) {
 	s, stdout, stderr := system(t, "", "--version")
 
