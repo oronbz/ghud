@@ -15,6 +15,8 @@ import (
 	"github.com/oronbz/ghud/internal/config"
 	"github.com/oronbz/ghud/internal/host"
 	"github.com/oronbz/ghud/internal/plugin/plugintest"
+	"github.com/oronbz/ghud/internal/weather"
+	"github.com/oronbz/ghud/internal/weather/weathertest"
 )
 
 // sandbox is a temp home with env on top of HOME.
@@ -65,6 +67,40 @@ func TestConfigDefaultDocumentsInstalledPluginTypes(t *testing.T) {
 		if !strings.Contains(stdout.String(), want) {
 			t.Errorf("reference has no %q", want)
 		}
+	}
+}
+
+// Package managers install ghud and ghud-weather side by side and link
+// ghud into a shared bin, which may hold no ghud-weather link of its own.
+func TestConfigDefaultDocumentsTheWeatherPluginInstalledBesideGhud(t *testing.T) {
+	cellar, bin := t.TempDir(), t.TempDir()
+	if err := os.Symlink(filepath.Join(weathertest.Dir(t), weather.Binary), filepath.Join(cellar, weather.Binary)); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(cellar, "ghud"), "")
+	if err := os.Symlink(filepath.Join(cellar, "ghud"), filepath.Join(bin, "ghud")); err != nil {
+		t.Fatal(err)
+	}
+	s, _, stdout, stderr := sandbox(t, nil, "", "config", "default")
+	s.Executable = filepath.Join(bin, "ghud")
+	if code := cli.Run(s); code != 0 {
+		t.Fatalf("exit %d: %s", code, stderr)
+	}
+	for _, want := range []string{`type = "weather"`, `units = "metric"`, "An IP address can place you in the wrong city"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Errorf("reference has no %q", want)
+		}
+	}
+}
+
+func TestConfigDefaultHasNoWeatherWithoutTheBundledPlugin(t *testing.T) {
+	s, _, stdout, stderr := sandbox(t, nil, "", "config", "default")
+	s.Executable = filepath.Join(t.TempDir(), "ghud")
+	if code := cli.Run(s); code != 0 {
+		t.Fatalf("exit %d: %s", code, stderr)
+	}
+	if strings.Contains(stdout.String(), `type = "weather"`) {
+		t.Error("reference documents weather with no ghud-weather installed")
 	}
 }
 

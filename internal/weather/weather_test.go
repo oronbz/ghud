@@ -1,6 +1,7 @@
 package weather_test
 
 import (
+	"net/http"
 	"strings"
 	"testing"
 
@@ -72,4 +73,44 @@ func TestWithACityWeatherShowsTheForecastCreditedToOpenMeteo(t *testing.T) {
 	if n := len(s.calls("ipapi")); n != 0 {
 		t.Errorf("ipapi.is was asked %d times with a city set", n)
 	}
+}
+
+func TestAShortWidgetDropsTheHourlyRowsAndKeepsTheCredit(t *testing.T) {
+	t.Setenv("TZ", "Asia/Jerusalem")
+	s := newSky(t)
+	h := hosttest.New(t, hosttest.Options{
+		Width: 48, Height: 9, Types: []widget.Type{}, Config: weatherWidget + "city = \"Petah Tikva\"\n",
+		BundleDir: weathertest.Dir(t), Endpoints: s.endpoints(),
+	})
+	h.Receive()
+	shows(t, h, "Petah Tikva", "21°C Partly cloudy", "humidity 74%", "Weather data by Open-Meteo.com")
+	hides(t, h, "now  23")
+	if n := len(s.calls("forecast")); n != 1 {
+		t.Errorf("fetched the forecast %d times; fitting a new size needs no fetch", n)
+	}
+}
+
+func TestImperialUnitsAskForFahrenheitAndMph(t *testing.T) {
+	t.Setenv("TZ", "Asia/Jerusalem")
+	s := newSky(t)
+	h := withWeather(t, s, weatherWidget+"city = \"Petah Tikva\"\nunits = \"imperial\"\n")
+	shows(t, h, "70°F Partly cloudy", "high 78° · low 64° · feels 73°", "wind 1 mph E")
+	if q := s.calls("forecast")[0]; q.Get("temperature_unit") != "fahrenheit" || q.Get("wind_speed_unit") != "mph" {
+		t.Errorf("forecast query = %v, want fahrenheit and mph", q)
+	}
+}
+
+func TestAnOpenMeteoErrorShowsItsReason(t *testing.T) {
+	t.Setenv("TZ", "Asia/Jerusalem")
+	s := newSky(t)
+	s.forecastStatus = http.StatusBadRequest
+	h := withWeather(t, s, weatherWidget+"city = \"Petah Tikva\"\n")
+	shows(t, h, "Latitude must be in range")
+}
+
+func TestWeatherIsInTheDefaultLayout(t *testing.T) {
+	t.Setenv("TZ", "Asia/Jerusalem")
+	s := newSky(t)
+	h := withWeather(t, s, "")
+	shows(t, h, "─ Weather ", "Tel Aviv · from IP")
 }

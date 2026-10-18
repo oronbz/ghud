@@ -73,7 +73,7 @@ func (r *report) payload(sz size) map[string]any {
 	return map[string]any{
 		"lines": shown(blocks, sz.Height),
 		"actions": []any{
-			map[string]any{"id": refreshLocation, "key": "l", "label": "refresh location"},
+			map[string]any{"id": refreshLocation, "key": "r", "label": "refresh location"},
 			map[string]any{"id": "open-meteo", "key": "o", "label": "open Open-Meteo.com", "verb": "open", "target": "https://open-meteo.com/"},
 		},
 	}

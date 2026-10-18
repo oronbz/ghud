@@ -34,8 +34,19 @@ func Dir(t testing.TB) string {
 		if runtime.GOOS == "windows" {
 			bin += ".exe"
 		}
+		root := filepath.Join(filepath.Dir(here), "..", "..", "..")
+		// The test binary links little of the Plugin, so reading its sources
+		// is what tells go test's cache that a change to them matters.
+		for _, src := range []string{"internal/weather", "cmd/ghud-weather"} {
+			files, _ := os.ReadDir(filepath.Join(root, src))
+			for _, f := range files {
+				if !f.IsDir() {
+					_, _ = os.ReadFile(filepath.Join(root, src, f.Name()))
+				}
+			}
+		}
 		cmd := exec.Command("go", "build", "-o", bin, "./cmd/ghud-weather")
-		cmd.Dir = filepath.Join(filepath.Dir(here), "..", "..", "..")
+		cmd.Dir = root
 		if out, err := cmd.CombinedOutput(); err != nil {
 			buildErr = fmt.Errorf("building ghud-weather: %v\n%s", err, out)
 		}
