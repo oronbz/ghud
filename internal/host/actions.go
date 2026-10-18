@@ -54,6 +54,8 @@ type actedMsg struct {
 	action widget.Action
 	result widget.Result
 	err    error
+	// byHost marks an Action the host performed, which leaves the Widget as it was.
+	byHost bool
 }
 
 // refresh fetches a Source's Payload off the UI thread; other Widgets need none.
@@ -239,8 +241,17 @@ func (m Model) run(id string, a bound) (Model, tea.Cmd) {
 
 // invoke performs host-provided Actions itself and hands the rest to the Widget.
 func (m Model) invoke(id string, a bound, text string) (Model, tea.Cmd) {
-	if a.by == hide {
+	switch {
+	case a.by == hide:
 		return m.setHidden(id, true), nil
+	case a.Verb == widget.Open:
+		opener, target := m.opts.Ports.Opener, a.Target
+		return m, func() tea.Msg {
+			return actedMsg{id: id, action: a.Action, err: opener.Open(target), byHost: true}
+		}
+	case a.Verb == widget.Copy:
+		m, toast := m.say("Copied to the clipboard", theme.Fg)
+		return m, tea.Batch(m.opts.Ports.Clipboard.Copy(a.Target), toast)
 	}
 	actor, ok := m.widgets[id].widget.(widget.Actor)
 	if !ok {
@@ -258,6 +269,9 @@ func (m Model) invoke(id string, a bound, text string) (Model, tea.Cmd) {
 func (m Model) acted(msg actedMsg) (Model, tea.Cmd) {
 	if msg.err != nil {
 		return m.say(capitalise(msg.action.Label)+" failed: "+msg.err.Error(), theme.Bad)
+	}
+	if msg.byHost {
+		return m, nil
 	}
 	var cmds []tea.Cmd
 	if msg.result.Toast != "" {

@@ -90,7 +90,7 @@ func TestHostKeysWinOverActionKeysAndEnterRunsThePrimaryAction(t *testing.T) {
 		its[i].Actions = []widget.Action{
 			{ID: "jump", Key: "j", Label: "jump"},
 			{ID: "explode", Key: "x", Label: "explode"},
-			{ID: "open", Label: "open", Primary: true, Verb: widget.Open},
+			{ID: "open", Label: "open", Primary: true},
 		}
 	}
 	h, ran := withInbox(t, 6, widget.Payload{Columns: []widget.Column{{Flex: true}}, Items: its}, nil)

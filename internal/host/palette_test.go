@@ -1,6 +1,7 @@
 package host_test
 
 import (
+	"errors"
 	"slices"
 	"strings"
 	"testing"
@@ -150,6 +151,66 @@ func TestThePaletteMovesItsSelectionAndAsksBeforeAConfirmedAction(t *testing.T) 
 	h.Press("y")
 	if len(*todoRan) != 1 || (*todoRan)[0].Action != "purge" {
 		t.Errorf("Todo ran %+v, want purge after confirming", *todoRan)
+	}
+}
+
+func TestTheHostOpensAndCopiesForOpenAndCopyVerbs(t *testing.T) {
+	mail := mailbox()
+	mail.Items[0].Actions = []widget.Action{
+		{ID: "browse", Label: "open in browser", Primary: true, Verb: widget.Open, Target: "https://mail.example/hello"},
+		{ID: "link", Key: "y", Label: "copy link", Verb: widget.Copy, Target: "https://mail.example/hello"},
+	}
+	h, mailRan, _ := mailAndTodo(t, mail, todoList())
+
+	h.Press("tab", "enter", "y")
+	if want := []string{"https://mail.example/hello"}; !slices.Equal(h.Opener.Opened, want) {
+		t.Errorf("opened %q, want %q", h.Opener.Opened, want)
+	}
+	if want := []string{"https://mail.example/hello"}; !slices.Equal(h.Clipboard.Copied, want) {
+		t.Errorf("copied %q over OSC 52, want %q", h.Clipboard.Copied, want)
+	}
+	if _, _, ok := h.Find("Copied"); !ok {
+		t.Errorf("no toast after copying:\n%s", h.Screen())
+	}
+
+	h.Press("esc", "ctrl+k", "c", "o", "p", "y", " ", "l", "enter")
+	if len(h.Clipboard.Copied) != 2 {
+		t.Errorf("copy from the palette copied %q, want a second copy", h.Clipboard.Copied)
+	}
+	if len(*mailRan) != 0 {
+		t.Errorf("the host's verbs reached the Widget: %+v", *mailRan)
+	}
+
+	h.Opener.Err = errors.New("no browser")
+	h.Press("tab", "enter")
+	if _, _, ok := h.Find("Open in browser failed: no browser"); !ok {
+		t.Errorf("no failure toast when the opener fails:\n%s", h.Screen())
+	}
+}
+
+func TestAWidgetActionOnAHostKeyRunsOnlyFromThePalette(t *testing.T) {
+	todo := todoList()
+	todo.Actions = append(todo.Actions, widget.Action{ID: "quarantine", Key: "q", Label: "quarantine"})
+	h, _, todoRan := mailAndTodo(t, mailbox(), todo)
+	h.Press("2")
+
+	if got := h.Line(22); strings.Contains(got, "quarantine") {
+		t.Errorf("bottom border %q offers the shadowed q", got)
+	}
+	h.Press("ctrl+k", "q", "u", "a", "r")
+	if got := paletteEntries(h); len(got) != 1 || got[0] != "Todo quarantine" {
+		t.Errorf("palette lists %q, want Todo quarantine without its shadowed key", got)
+	}
+	h.Press("enter")
+	if len(*todoRan) != 1 || (*todoRan)[0].Action != "quarantine" {
+		t.Fatalf("Todo ran %+v, want quarantine from the palette", *todoRan)
+	}
+	h.Press("q")
+	if !h.Quit() {
+		t.Error("q didn't quit while Todo has an Action on it")
+	}
+	if len(*todoRan) != 1 {
+		t.Errorf("q also ran the Widget's Action: %+v", *todoRan)
 	}
 }
 
