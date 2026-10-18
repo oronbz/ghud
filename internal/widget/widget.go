@@ -87,6 +87,9 @@ type Invocation struct {
 	Item string
 	// Text is what the user typed into a text input.
 	Text string
+	// Base is the Action's Value, the text an input started from, so a
+	// Widget can tell whether its data changed underneath the edit.
+	Base string
 	Now  time.Time
 }
 

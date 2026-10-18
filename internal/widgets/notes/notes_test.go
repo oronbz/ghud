@@ -126,6 +126,44 @@ func TestLeavingInsertModeWithoutChangesWritesNothing(t *testing.T) {
 	}
 }
 
+func TestAnInlineSaveOverANoteChangedElsewhereKeepsTheOtherVersionInAConflictFile(t *testing.T) {
+	h := withNotes(t, "Buy milk\n", hosttest.Options{Width: 100, Height: 9})
+	path := notesFile(h.Root, "notes.md")
+	h.Press("1", "i")
+	h.Type("Call mum")
+
+	writeNote(t, path, "Buy oat milk\n")
+	h.Changed(path)
+	h.Press("esc")
+
+	if got := readNote(t, path); got != "Buy milk\nCall mum\n" {
+		t.Errorf("notes.md = %q, want the user's save", got)
+	}
+	conflict := notesFile(h.Root, "notes.conflict-20261018-140509.md")
+	if got := readNote(t, conflict); got != "Buy oat milk\n" {
+		t.Errorf("conflict file = %q, want the version saved elsewhere", got)
+	}
+	if _, _, ok := h.Find("other version is in notes.conflict-20261018-140509.md"); !ok {
+		t.Errorf("no toast naming the conflict file:\n%s", h.Screen())
+	}
+}
+
+func TestAnInlineSaveOverAnUnchangedNoteMakesNoConflictFile(t *testing.T) {
+	h := withNotes(t, "Buy milk\n", hosttest.Options{Width: 100, Height: 9})
+	h.Press("1", "i")
+	h.Type("Call mum")
+	h.Press("esc")
+	entries, err := os.ReadDir(h.Paths.Data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if strings.Contains(e.Name(), "conflict") {
+			t.Errorf("conflict file %s written for an unchanged note", e.Name())
+		}
+	}
+}
+
 func TestEOpensTheNoteInTheEditorAndShowsTheEditedText(t *testing.T) {
 	h := withNotes(t, "Buy milk\n", hosttest.Options{Width: 40, Height: 9})
 	path := notesFile(h.Root, "notes.md")

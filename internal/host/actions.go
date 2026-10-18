@@ -301,7 +301,7 @@ func (m Model) invoke(id string, a bound, text string) (Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
-	inv := widget.Invocation{Action: a.ID, Item: a.item, Text: text, Now: m.opts.Ports.Clock.Now()}
+	inv := widget.Invocation{Action: a.ID, Item: a.item, Text: text, Base: a.Value, Now: m.opts.Ports.Clock.Now()}
 	return m, func() tea.Msg {
 		res, err := actor.Invoke(context.Background(), inv)
 		return actedMsg{id: id, action: a.Action, result: res, err: err}
