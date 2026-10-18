@@ -21,7 +21,7 @@ type Tile struct {
 	// Arrange draws the heavy warn border of the Widget being arranged.
 	Arrange bool
 	// Handle draws the ⠿ grab handle before the title.
-	Handle bool
+	Handle  bool
 	Payload widget.Payload
 	// List is how a list Payload is selected and scrolled.
 	List List
@@ -95,7 +95,7 @@ func HintSlots(hints []Hint, w int) []Slot {
 	var out []Slot
 	x := 2
 	for _, h := range hints {
-		hw := ansi.StringWidth(" "+KeyLabel(h.Key)+" "+h.Label+" ")
+		hw := ansi.StringWidth(" " + KeyLabel(h.Key) + " " + h.Label + " ")
 		if x+hw+1 > w-2 {
 			break
 		}
