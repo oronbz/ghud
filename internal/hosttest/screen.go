@@ -6,6 +6,8 @@ import (
 
 	uv "github.com/charmbracelet/ultraviolet"
 
+	"github.com/oronbz/ghud/internal/host"
+	"github.com/oronbz/ghud/internal/layout"
 	"github.com/oronbz/ghud/internal/theme"
 )
 
@@ -15,6 +17,9 @@ func (h *Host) Buffer() uv.ScreenBuffer {
 	uv.NewStyledString(h.model.View().Content).Draw(buf, buf.Bounds())
 	return buf
 }
+
+// Zones are the hit zones of the current frame, from the same layout pass that drew it.
+func (h *Host) Zones() []layout.Zone { return h.model.(host.Model).Zones() }
 
 // Screen is the current frame as plain text, one line per row, trailing spaces trimmed.
 func (h *Host) Screen() string {
@@ -66,6 +71,15 @@ func (h *Host) Fg(x, y int) (tok theme.Token, ok bool) {
 		return 0, false
 	}
 	return h.token(c.Style.Fg)
+}
+
+// Bg names the theme token of the cell's background colour, like Fg.
+func (h *Host) Bg(x, y int) (tok theme.Token, ok bool) {
+	c := h.Cell(x, y)
+	if c == nil {
+		return 0, false
+	}
+	return h.token(c.Style.Bg)
 }
 
 func (h *Host) Bold(x, y int) bool {

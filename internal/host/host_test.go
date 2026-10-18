@@ -12,7 +12,7 @@ import (
 var sundayAfternoon = time.Date(2026, 10, 18, 14, 5, 9, 0, time.UTC)
 
 func TestClockShowsTimeAndDateInABorderedTile(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 40, Height: 9, Now: sundayAfternoon})
+	h := hosttest.New(t, hosttest.Options{Width: 80, Height: 9, Now: sundayAfternoon})
 
 	want := strings.Join([]string{
 		"╭─ Clock ──────────────────────────────╮",
@@ -25,8 +25,8 @@ func TestClockShowsTimeAndDateInABorderedTile(t *testing.T) {
 		"│                                      │",
 		"╰──────────────────────────────────────╯",
 	}, "\n")
-	if got := h.Screen(); got != want {
-		t.Errorf("screen:\n%s\nwant:\n%s", got, want)
+	if got := leftColumns(h.Screen(), 40); got != want {
+		t.Errorf("clock tile:\n%s\nwant:\n%s", got, want)
 	}
 }
 
@@ -43,7 +43,7 @@ func TestQQuits(t *testing.T) {
 }
 
 func TestUnfocusedClockDrawsWithThemeTokens(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 40, Height: 9})
+	h := hosttest.New(t, hosttest.Options{Width: 80, Height: 9})
 
 	checks := []struct {
 		what string
@@ -67,24 +67,35 @@ func TestUnfocusedClockDrawsWithThemeTokens(t *testing.T) {
 }
 
 func TestClockTicksOnTheWallClockSecond(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 20, Height: 4, Now: sundayAfternoon.Add(400 * time.Millisecond)})
-	if got, want := h.Line(1), "│     14:05:09     │"; got != want {
+	h := hosttest.New(t, hosttest.Options{Width: 40, Height: 5, Now: sundayAfternoon.Add(400 * time.Millisecond)})
+	if got, want := leftColumns(h.Line(1), 20), "│     14:05:09     │"; got != want {
 		t.Fatalf("at start: %q, want %q", got, want)
 	}
 
 	h.Advance(599 * time.Millisecond)
-	if got, want := h.Line(1), "│     14:05:09     │"; got != want {
+	if got, want := leftColumns(h.Line(1), 20), "│     14:05:09     │"; got != want {
 		t.Errorf("just before the second: %q, want %q", got, want)
 	}
 	h.Advance(time.Millisecond)
-	if got, want := h.Line(1), "│     14:05:10     │"; got != want {
+	if got, want := leftColumns(h.Line(1), 20), "│     14:05:10     │"; got != want {
 		t.Errorf("on the second: %q, want %q", got, want)
 	}
 	h.Advance(time.Minute)
-	if got, want := h.Line(1), "│     14:06:10     │"; got != want {
+	if got, want := leftColumns(h.Line(1), 20), "│     14:06:10     │"; got != want {
 		t.Errorf("a minute later: %q, want %q", got, want)
 	}
-	if got, want := h.Line(2), "│    Sun 18 Oct    │"; got != want {
+	if got, want := leftColumns(h.Line(2), 20), "│    Sun 18 Oct    │"; got != want {
 		t.Errorf("date: %q, want %q", got, want)
 	}
+}
+
+// leftColumns keeps the first n cells of every line: the leftmost tile of a row.
+func leftColumns(screen string, n int) string {
+	lines := strings.Split(screen, "\n")
+	for i, l := range lines {
+		if r := []rune(l); len(r) > n {
+			lines[i] = string(r[:n])
+		}
+	}
+	return strings.Join(lines, "\n")
 }
