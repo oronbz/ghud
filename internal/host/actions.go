@@ -246,12 +246,21 @@ func subject(p widget.Payload, it widget.Item) string {
 // a host key shadows are left out.
 func (m Model) hints(id string) []render.Hint {
 	var hs []render.Hint
-	for _, a := range m.actions(id) {
-		if k := shownKey(a); k != "" {
-			hs = append(hs, render.Hint{Key: k, Label: a.Label})
-		}
+	for _, a := range m.hinted(id) {
+		hs = append(hs, render.Hint{Key: shownKey(a), Label: a.Label})
 	}
 	return hs
+}
+
+// hinted are the Actions behind hints(id), in the same order.
+func (m Model) hinted(id string) []bound {
+	var out []bound
+	for _, a := range m.actions(id) {
+		if shownKey(a) != "" {
+			out = append(out, a)
+		}
+	}
+	return out
 }
 
 // shownKey is the key that runs a while its Widget is focused, or "" when it
