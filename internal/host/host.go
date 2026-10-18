@@ -41,6 +41,7 @@ type Model struct {
 	// focus is the focused Widget's id, "" when ghud is unfocused; last
 	// survives unfocusing so focus can return to it.
 	focus, last string
+	keyMap      bool
 }
 
 type placed struct {
@@ -111,27 +112,29 @@ func (m Model) View() tea.View {
 	if m.w == 0 || m.h == 0 {
 		return v
 	}
-	f := m.frame()
-	if f.TooSmall {
-		v.SetContent(m.tooSmall(f.Need))
-		return v
-	}
-	layers := make([]*lipgloss.Layer, 0, len(f.Tiles)+1)
-	for _, t := range f.Tiles {
-		w := m.widgets[t.ID]
-		layers = append(layers, lipgloss.NewLayer(render.Draw(m.opts.Theme, render.Tile{
-			Title:   t.Title,
-			W:       t.W,
-			H:       t.H,
-			Focused: t.ID == m.focus,
-			Payload: w.widget.Payload(widget.Frame{
-				Now:     m.now,
-				Size:    widget.Size{W: t.W - 2, H: t.H - 2},
+	var layers []*lipgloss.Layer
+	if f := m.frame(); f.TooSmall {
+		layers = append(layers, lipgloss.NewLayer(m.tooSmall(f.Need)))
+	} else {
+		for _, t := range f.Tiles {
+			w := m.widgets[t.ID]
+			layers = append(layers, lipgloss.NewLayer(render.Draw(m.opts.Theme, render.Tile{
+				Title:   t.Title,
+				W:       t.W,
+				H:       t.H,
 				Focused: t.ID == m.focus,
-			}),
-		})).X(t.X).Y(t.Y))
+				Payload: w.widget.Payload(widget.Frame{
+					Now:     m.now,
+					Size:    widget.Size{W: t.W - 2, H: t.H - 2},
+					Focused: t.ID == m.focus,
+				}),
+			})).X(t.X).Y(t.Y))
+		}
+		layers = append(layers, lipgloss.NewLayer(m.footer()).Y(m.h-footerHeight))
 	}
-	layers = append(layers, lipgloss.NewLayer(m.footer()).Y(m.h-footerHeight))
+	if m.keyMap {
+		layers = append(layers, m.keyMapLayer())
+	}
 	canvas := lipgloss.NewCanvas(m.w, m.h)
 	lipgloss.NewCompositor(layers...).Draw(canvas, image.Rect(0, 0, m.w, m.h))
 	v.SetContent(canvas.Render())

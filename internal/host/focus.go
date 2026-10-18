@@ -12,14 +12,14 @@ import (
 type keyMap struct {
 	Quit, Unfocus, NextRow, PrevRow, Left, Right key.Binding
 	MoveLeft, MoveDown, MoveUp, MoveRight        key.Binding
-	Refocus, Jump                                key.Binding
+	Refocus, Jump, Help                          key.Binding
 }
 
 var keys = keyMap{
 	Quit:      key.NewBinding(key.WithKeys("q"), key.WithHelp("q", "quit")),
 	Unfocus:   key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "unfocus")),
 	NextRow:   key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next row")),
-	PrevRow:   key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("shift+tab", "previous row")),
+	PrevRow:   key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("S-tab", "previous row")),
 	Left:      key.NewBinding(key.WithKeys("h", "left"), key.WithHelp("h ←", "previous Widget in the row")),
 	Right:     key.NewBinding(key.WithKeys("l", "right"), key.WithHelp("l →", "next Widget in the row")),
 	MoveLeft:  key.NewBinding(key.WithKeys("H", "shift+left"), key.WithHelp("H S-←", "focus left")),
@@ -28,10 +28,28 @@ var keys = keyMap{
 	MoveRight: key.NewBinding(key.WithKeys("L", "shift+right"), key.WithHelp("L S-→", "focus right")),
 	Refocus:   key.NewBinding(key.WithKeys("m"), key.WithHelp("m", "focus the last-focused Widget")),
 	Jump:      key.NewBinding(key.WithKeys("1", "2", "3", "4", "5", "6", "7", "8", "9"), key.WithHelp("1–9", "jump to the Nth Widget")),
+	Help:      key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "key map")),
+}
+
+// Bindings lists every host key binding, in key map order.
+func Bindings() []key.Binding {
+	k := keys
+	return []key.Binding{
+		k.NextRow, k.PrevRow, k.Left, k.Right, k.MoveLeft, k.MoveDown, k.MoveUp, k.MoveRight,
+		k.Jump, k.Refocus, k.Unfocus, k.Help, k.Quit,
+	}
 }
 
 func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	if m.keyMap {
+		if key.Matches(msg, keys.Help, keys.Unfocus, keys.Quit) {
+			m.keyMap = false
+		}
+		return m, nil
+	}
 	switch {
+	case key.Matches(msg, keys.Help):
+		m.keyMap = true
 	case key.Matches(msg, keys.Quit):
 		return m, tea.Quit
 	case key.Matches(msg, keys.Unfocus):
