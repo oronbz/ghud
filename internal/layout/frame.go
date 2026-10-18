@@ -48,21 +48,38 @@ type Zone struct {
 	Row, Index int
 }
 
+type Size struct{ W, H int }
+
+// MinTile is the smallest tile, border included, that draws legibly.
+var MinTile = Size{W: 16, H: 5}
+
 // Frame is the result of one layout pass: what to draw and where to hit.
 type Frame struct {
 	Tiles []Tile
 	Zones []Zone
+	// TooSmall replaces the grid with a notice asking for Need.
+	TooSmall bool
+	Need     Size
 }
 
 // Compute lays l out over a w×h area. titles gives each Widget's border title.
 func Compute(l Layout, titles map[string]string, w, h int) Frame {
 	var f Frame
+	for _, r := range l.Rows {
+		f.Need.W = max(f.Need.W, len(r.Widgets)*MinTile.W)
+	}
+	f.Need.H = len(l.Rows) * MinTile.H
+	if w < f.Need.W || h < f.Need.H {
+		f.TooSmall = true
+		return f
+	}
+
 	rowWeights := make([]float64, len(l.Rows))
 	for i, r := range l.Rows {
 		rowWeights[i] = r.Weight
 	}
 	y := 0
-	heights := split(h, rowWeights)
+	heights := split(h, rowWeights, MinTile.H)
 	for ri, rh := range heights {
 		r := l.Rows[ri]
 		weights := make([]float64, len(r.Widgets))
@@ -70,7 +87,7 @@ func Compute(l Layout, titles map[string]string, w, h int) Frame {
 			weights[j] = c.Weight
 		}
 		x := 0
-		widths := split(w, weights)
+		widths := split(w, weights, MinTile.W)
 		for j, cw := range widths {
 			id := r.Widgets[j].ID
 			t := Tile{ID: id, Title: titles[id], Rect: Rect{x, y, cw, rh}}
@@ -93,21 +110,45 @@ func Compute(l Layout, titles map[string]string, w, h int) Frame {
 }
 
 // split shares total cells across weights with largest-remainder rounding.
-func split(total int, weights []float64) []int {
-	sum := 0.0
-	for _, w := range weights {
-		sum += w
-	}
+// Parts whose share falls below least are pinned at least and the rest is
+// re-shared, so proportions hold wherever there's room. The caller ensures
+// total >= least*len(weights).
+func split(total int, weights []float64, least int) []int {
 	out := make([]int, len(weights))
-	if sum <= 0 {
-		return out
+	pinned := make([]bool, len(weights))
+	for {
+		left, sum := total, 0.0
+		for i, w := range weights {
+			if pinned[i] {
+				left -= least
+			} else {
+				sum += max(w, 0)
+			}
+		}
+		changed := false
+		for i, w := range weights {
+			if !pinned[i] && (sum <= 0 || float64(left)*max(w, 0)/sum < float64(least)) {
+				pinned[i], out[i], changed = true, least, true
+			}
+		}
+		if !changed {
+			share(out, pinned, weights, left, sum)
+			return out
+		}
 	}
+}
+
+func share(out []int, pinned []bool, weights []float64, total int, sum float64) {
 	rem := make([]float64, len(weights))
 	used := 0
 	for i, w := range weights {
-		share := float64(total) * w / sum
-		out[i] = int(share)
-		rem[i] = share - float64(out[i])
+		rem[i] = -1
+		if pinned[i] {
+			continue
+		}
+		f := float64(total) * w / sum
+		out[i] = int(f)
+		rem[i] = f - float64(out[i])
 		used += out[i]
 	}
 	for ; used < total; used++ {
@@ -120,5 +161,4 @@ func split(total int, weights []float64) []int {
 		out[best]++
 		rem[best] = -1
 	}
-	return out
 }

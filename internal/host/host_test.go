@@ -67,7 +67,7 @@ func TestUnfocusedClockDrawsWithThemeTokens(t *testing.T) {
 }
 
 func TestClockTicksOnTheWallClockSecond(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 40, Height: 4, Now: sundayAfternoon.Add(400 * time.Millisecond)})
+	h := hosttest.New(t, hosttest.Options{Width: 40, Height: 5, Now: sundayAfternoon.Add(400 * time.Millisecond)})
 	if got, want := leftColumns(h.Line(1), 20), "│     14:05:09     │"; got != want {
 		t.Fatalf("at start: %q, want %q", got, want)
 	}

@@ -90,7 +90,7 @@ func TestWidgetWeightsHoldTheirProportionsWithinARow(t *testing.T) {
 	h := hosttest.New(t, hosttest.Options{Root: root})
 	for _, c := range []struct{ w, clock, calendar int }{{60, 20, 40}, {99, 33, 66}, {150, 50, 100}} {
 		h.Resize(c.w, 12)
-		if got := cornersOn(h.Line(0)); !slices.Equal(got,[]int{0, c.clock}) {
+		if got := cornersOn(h.Line(0)); !slices.Equal(got, []int{0, c.clock}) {
 			t.Errorf("at width %d tiles start at %v, want [0 %d]", c.w, got, c.clock)
 		}
 		if x, _, _ := h.Find("Calendar"); x != c.clock+3 {

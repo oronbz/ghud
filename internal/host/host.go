@@ -4,12 +4,15 @@
 package host
 
 import (
+	"fmt"
 	"image"
+	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/oronbz/ghud/internal/layout"
 	"github.com/oronbz/ghud/internal/paths"
@@ -104,6 +107,10 @@ func (m Model) View() tea.View {
 		return v
 	}
 	f := m.frame()
+	if f.TooSmall {
+		v.SetContent(m.tooSmall(f.Need))
+		return v
+	}
 	layers := make([]*lipgloss.Layer, 0, len(f.Tiles))
 	for _, t := range f.Tiles {
 		w := m.widgets[t.ID]
@@ -121,6 +128,14 @@ func (m Model) View() tea.View {
 	lipgloss.NewCompositor(layers...).Draw(canvas, image.Rect(0, 0, m.w, m.h))
 	v.SetContent(canvas.Render())
 	return v
+}
+
+func (m Model) tooSmall(need layout.Size) string {
+	text := ansi.Truncate(fmt.Sprintf("too small (needs %d×%d)", need.W, need.H), m.w, "…")
+	pad := (m.w - ansi.StringWidth(text)) / 2
+	lines := make([]string, m.h)
+	lines[(m.h-1)/2] = strings.Repeat(" ", pad) + m.opts.Theme.Fg(theme.Warn).Render(text)
+	return strings.Join(lines, "\n")
 }
 
 // Zones are the hit zones of the frame View draws.
