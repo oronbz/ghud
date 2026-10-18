@@ -8,6 +8,7 @@ import (
 
 	"github.com/oronbz/ghud/internal/hosttest"
 	"github.com/oronbz/ghud/internal/layout"
+	"github.com/oronbz/ghud/internal/theme"
 	"github.com/oronbz/ghud/internal/widget"
 )
 
@@ -27,6 +28,63 @@ const twoOverOne = `{"default": {"rows": [
 	{"weight": 1, "widgets": [{"id": "a", "weight": 1}, {"id": "b", "weight": 1}]},
 	{"weight": 1, "widgets": [{"id": "c", "weight": 1}]}
 ]}}`
+
+func TestADraggedTitleShowsASmallGhostWithTheTitleAndABarOnTheDropSide(t *testing.T) {
+	h := abc(t, twoOverOne)
+	x, y, _ := h.Find("─ Charlie ")
+	h.Grab(x+3, y)
+	h.DragTo(2, 7)
+
+	left, top, right, bottom := 1<<30, 1<<30, -1, -1
+	for gy, line := range strings.Split(h.Screen(), "\n") {
+		for gx, r := range []rune(line) {
+			if r == '┄' || r == '┆' {
+				left, top, right, bottom = min(left, gx), min(top, gy), max(right, gx), max(bottom, gy)
+			}
+		}
+	}
+	if right < 0 {
+		t.Fatalf("no dashed ghost while dragging Charlie:\n%s", h.Screen())
+	}
+	if w, gh := right-left+1, bottom-top+1; w > 34 || gh > 6 {
+		t.Errorf("ghost is %d×%d, want at most 34×6:\n%s", w, gh, h.Screen())
+	}
+	if !strings.Contains(h.Line(top), "Charlie") {
+		t.Errorf("ghost's top edge %q doesn't hold the title", h.Line(top))
+	}
+	for by := 0; by < 15; by++ {
+		if c := h.Cell(0, by); c == nil || c.Content != "┃" {
+			t.Fatalf("no heavy bar down Alpha's left side at row %d:\n%s", by, h.Screen())
+		}
+	}
+	if tok, _ := h.Fg(0, 7); tok != theme.Accent {
+		t.Errorf("drop bar drawn in %v, want accent", tok)
+	}
+	if saved, _ := layout.Load(h.Paths.Config); shapeOf(saved) != "a b / c" {
+		t.Errorf("layout.json reads %q mid-drag, want it untouched until the drop", shapeOf(saved))
+	}
+
+	h.Drop(2, 7)
+	if strings.ContainsAny(h.Screen(), "┄┆┃") {
+		t.Errorf("ghost or bar left on screen after the drop:\n%s", h.Screen())
+	}
+}
+
+func TestHoveringATitleShowsTheGrabHandle(t *testing.T) {
+	h := abc(t, twoOverOne)
+	x, y, _ := h.Find("─ Bravo ")
+	h.Hover(x+3, y)
+	if _, _, ok := h.Find("─ ⠿ Bravo "); !ok {
+		t.Fatalf("no grab handle on the hovered title:\n%s", h.Line(y))
+	}
+	if strings.Count(h.Screen(), "⠿") != 1 {
+		t.Errorf("grab handle on more than the hovered title:\n%s", h.Screen())
+	}
+	h.Hover(x+3, y+5)
+	if strings.Contains(h.Screen(), "⠿") {
+		t.Errorf("grab handle stays after the pointer leaves the title:\n%s", h.Line(y))
+	}
+}
 
 // abc is a 96×31 host of the blank Widgets Alpha, Bravo and Charlie, arranged by layoutJSON.
 func abc(t *testing.T, layoutJSON string) *hosttest.Host {
