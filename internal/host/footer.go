@@ -31,6 +31,13 @@ func (m Model) footer() string {
 	if m.picking {
 		hints = "jk move · ␣ show/hide · esc close"
 	}
+	if o := m.overlay; o != nil {
+		mode, modeColor = " INPUT ", theme.Ok
+		if o.kind == confirming {
+			mode, modeColor = " CONFIRM ", theme.Warn
+		}
+		hints = "⏎ " + o.action.Label + " · esc cancel"
+	}
 	badge := th.Fg(theme.Bg).Background(th.Color(modeColor)).Bold(true).Render(mode)
 	switch m.held {
 	case tea.ModShift:
@@ -39,8 +46,8 @@ func (m Model) footer() string {
 		hints = modifierHints("Ctrl", bindings, func(k string) bool { return strings.HasPrefix(k, "ctrl+") })
 	}
 	toast := ""
-	if m.toast != "" {
-		toast = th.Fg(theme.Warn).Render(m.toast) + "  "
+	if m.toast.text != "" {
+		toast = th.Fg(m.toast.tok).Render(m.toast.text) + "  "
 	}
 	return ansi.Truncate(badge+" "+toast+th.Fg(theme.Dim).Render(hints), m.w, "…")
 }

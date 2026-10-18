@@ -3,6 +3,7 @@
 package render
 
 import (
+	"fmt"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -19,7 +20,14 @@ type Tile struct {
 	// Arrange draws the heavy warn border of the Widget being arranged.
 	Arrange bool
 	Payload widget.Payload
+	// List is how a list Payload is selected and scrolled.
+	List List
+	// Hints are the key hints drawn in the bottom border.
+	Hints []Hint
 }
+
+// Hint is one key hint: the key as Bubble Tea prints it, and what it does.
+type Hint struct{ Key, Label string }
 
 // Draw renders a rounded-border tile exactly W×H cells, title in the top border.
 func Draw(th theme.Theme, t Tile) string {
@@ -28,10 +36,12 @@ func Draw(th theme.Theme, t Tile) string {
 	}
 	border := th.Fg(theme.Line)
 	title := th.Fg(theme.Fg)
+	count := th.Fg(theme.Dim)
 	b := lipgloss.RoundedBorder()
 	if t.Focused || t.Arrange {
 		border = th.Fg(theme.Accent)
 		title = th.Fg(theme.Bright).Bold(true)
+		count = th.Fg(theme.Accent)
 	}
 	if t.Arrange {
 		border = th.Fg(theme.Warn)
@@ -40,19 +50,55 @@ func Draw(th theme.Theme, t Tile) string {
 	inner := t.W - 2
 
 	label := " " + title.Render(t.Title) + " "
+	if t.Payload.IsList() {
+		label += count.Render(fmt.Sprint(t.Payload.Count)) + " "
+	}
 	top := border.Render(b.TopLeft+b.Top) + label + border.Render(strings.Repeat(b.Top, max(0, t.W-3-lipgloss.Width(label)))) + border.Render(b.TopRight)
 
 	out := make([]string, 0, t.H)
 	out = append(out, ansi.Truncate(top, t.W, ""))
-	for _, l := range Body(th, t.Payload, inner, t.H-2) {
+	t.List.Focused = t.Focused
+	for _, l := range body(th, t.Payload, t.List, inner, t.H-2) {
 		out = append(out, border.Render(b.Left)+l+border.Render(b.Right))
 	}
-	out = append(out, border.Render(b.BottomLeft+strings.Repeat(b.Bottom, inner)+b.BottomRight))
+	out = append(out, bottom(th, border, b, t.Hints, inner))
 	return strings.Join(out, "\n")
 }
 
-// Body renders a payload as exactly h lines, each exactly w cells wide.
-func Body(th theme.Theme, p widget.Payload, w, h int) []string {
+// bottom is the bottom border, carrying " key label " hints while they fit.
+func bottom(th theme.Theme, border lipgloss.Style, edge lipgloss.Border, hints []Hint, inner int) string {
+	var b strings.Builder
+	used := 1
+	b.WriteString(border.Render(edge.BottomLeft + edge.Bottom))
+	for _, h := range hints {
+		text := " " + th.Fg(theme.Accent).Bold(true).Render(KeyLabel(h.Key)) + th.Fg(theme.Dim).Render(" "+h.Label) + " "
+		w := lipgloss.Width(text) + 1
+		if used+w > inner-1 {
+			break
+		}
+		b.WriteString(text + border.Render(edge.Bottom))
+		used += w
+	}
+	b.WriteString(border.Render(strings.Repeat(edge.Bottom, max(0, inner-used)) + edge.BottomRight))
+	return b.String()
+}
+
+// KeyLabel is how a key is shown in hints: enter and space as glyphs.
+func KeyLabel(key string) string {
+	switch key {
+	case "enter":
+		return "⏎"
+	case "space":
+		return "␣"
+	}
+	return key
+}
+
+// body renders a payload as exactly h lines, each exactly w cells wide.
+func body(th theme.Theme, p widget.Payload, l List, w, h int) []string {
+	if p.IsList() {
+		return listBody(th, p, l, w, h)
+	}
 	var lines []string
 	for _, l := range p.Lines {
 		if l.Big {

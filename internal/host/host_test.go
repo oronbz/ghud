@@ -7,12 +7,15 @@ import (
 
 	"github.com/oronbz/ghud/internal/hosttest"
 	"github.com/oronbz/ghud/internal/theme"
+	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/ghud/internal/widgets/calendar"
+	"github.com/oronbz/ghud/internal/widgets/clock"
 )
 
 var sundayAfternoon = time.Date(2026, 10, 18, 14, 5, 9, 0, time.UTC)
 
 func TestClockShowsTimeAndDateInABorderedTile(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 80, Height: 10, Now: sundayAfternoon})
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 80, Height: 10, Now: sundayAfternoon})
 
 	want := strings.Join([]string{
 		"╭─ Clock ──────────────────────────────╮",
@@ -31,7 +34,7 @@ func TestClockShowsTimeAndDateInABorderedTile(t *testing.T) {
 }
 
 func TestQQuits(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{})
+	h := hosttest.New(t, hosttest.Options{Types: liveViews})
 	h.Press("j", "Q", "ctrl+q")
 	if h.Quit() {
 		t.Fatal("quit on a key other than q")
@@ -43,7 +46,7 @@ func TestQQuits(t *testing.T) {
 }
 
 func TestUnfocusedClockDrawsWithThemeTokens(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 80, Height: 9})
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 80, Height: 9})
 
 	checks := []struct {
 		what string
@@ -67,7 +70,7 @@ func TestUnfocusedClockDrawsWithThemeTokens(t *testing.T) {
 }
 
 func TestClockTicksOnTheWallClockSecond(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 40, Height: 6, Now: sundayAfternoon.Add(400 * time.Millisecond)})
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 40, Height: 6, Now: sundayAfternoon.Add(400 * time.Millisecond)})
 	if got, want := leftColumns(h.Line(1), 20), "│     14:05:09     │"; got != want {
 		t.Fatalf("at start: %q, want %q", got, want)
 	}
@@ -88,6 +91,10 @@ func TestClockTicksOnTheWallClockSecond(t *testing.T) {
 		t.Errorf("date: %q, want %q", got, want)
 	}
 }
+
+// liveViews are the Widget types that tests about live views and the grid
+// place, so Widget types added later don't reshape their Layouts.
+var liveViews = []widget.Type{clock.Type, calendar.Type}
 
 // aboveFooter is the screen without its last line, the footer.
 func aboveFooter(h *hosttest.Host) string {

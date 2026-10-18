@@ -37,7 +37,7 @@ func fgHex(t *testing.T, h *hosttest.Host, text string) string {
 var answered = uv.PrimaryDeviceAttributesEvent{62, 22}
 
 func TestALightTerminalBackgroundSelectsTheLightPalette(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 40, Height: 9})
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 40, Height: 9})
 
 	h.Send(tea.BackgroundColorMsg{Color: lipgloss.Color("#fdf6e3")})
 	h.Send(answered)
@@ -54,7 +54,7 @@ func TestALightTerminalBackgroundSelectsTheLightPalette(t *testing.T) {
 }
 
 func TestADarkTerminalBackgroundKeepsTheDarkPalette(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 40, Height: 9})
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 40, Height: 9})
 
 	h.Send(tea.BackgroundColorMsg{Color: lipgloss.Color("#1e1e2e")})
 	h.Send(answered)
@@ -73,7 +73,7 @@ func osc4(index int, spec string) uv.UnknownOscEvent {
 }
 
 func TestTerminalThemeDerivesTokensFromTheTerminalsColours(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 40, Height: 9, Config: `theme = "terminal"`})
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 40, Height: 9, Config: `theme = "terminal"`})
 
 	h.Send(tea.BackgroundColorMsg{Color: lipgloss.Color("#000000")})
 	h.Send(tea.ForegroundColorMsg{Color: lipgloss.Color("#ffffff")})
@@ -101,7 +101,7 @@ func TestTerminalThemeDerivesTokensFromTheTerminalsColours(t *testing.T) {
 }
 
 func TestTerminalThemeFallsBackToGhudWithoutAnswers(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 40, Height: 9, Config: `theme = "terminal"`})
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 40, Height: 9, Config: `theme = "terminal"`})
 
 	h.Send(answered)
 
@@ -114,7 +114,7 @@ func TestTerminalThemeFallsBackToGhudWithoutAnswers(t *testing.T) {
 }
 
 func TestAnAccentOverrideColoursTheFocusedBorder(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 40, Height: 9, Config: `
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 40, Height: 9, Config: `
 [colors.dark]
 accent = "#ff8800"
 
@@ -141,7 +141,7 @@ accent = "#0055aa"
 }
 
 func TestAnInvalidColourToastsAndIsIgnored(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 120, Height: 9, Config: `
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 120, Height: 9, Config: `
 [colors.dark]
 line = "#00ff00"
 accent = "orange"
@@ -160,7 +160,7 @@ accent = "orange"
 }
 
 func TestAnUnknownColourTokenToasts(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 120, Height: 9, Config: `
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 120, Height: 9, Config: `
 [colors.light]
 acent = "#ff8800"
 `})
@@ -171,7 +171,7 @@ acent = "#ff8800"
 }
 
 func TestOverridesApplyOnTopOfTheTerminalTheme(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 40, Height: 9, Config: `
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 40, Height: 9, Config: `
 theme = "terminal"
 
 [colors.dark]
@@ -186,7 +186,7 @@ line = "#00ff00"
 }
 
 func TestWithNoAnswerTheDarkPaletteIsUsed(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 40, Height: 9})
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 40, Height: 9})
 
 	if got := hexOf(h.View().BackgroundColor); got != "none" {
 		t.Errorf("terminal background set to %s before the terminal could answer the query", got)

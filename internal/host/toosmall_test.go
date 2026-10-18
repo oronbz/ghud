@@ -9,7 +9,7 @@ import (
 )
 
 func TestBelowTheMinimumTileSizeACentredNoticeReplacesTheGrid(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 32, Height: 6})
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 32, Height: 6})
 	if _, _, ok := h.Find("too small"); ok {
 		t.Fatalf("notice shown at exactly the minimum size:\n%s", h.Screen())
 	}
@@ -37,7 +37,7 @@ func TestBelowTheMinimumTileSizeACentredNoticeReplacesTheGrid(t *testing.T) {
 }
 
 func TestTheRequiredSizeFollowsTheLayout(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 40, Height: 9, Root: savedLayout(t, `{"default": {"rows": [
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 40, Height: 9, Root: savedLayout(t, `{"default": {"rows": [
 		{"weight": 1, "widgets": [{"id": "clock", "weight": 1}]},
 		{"weight": 1, "widgets": [{"id": "calendar", "weight": 1}]}
 	]}}`)})
@@ -47,7 +47,7 @@ func TestTheRequiredSizeFollowsTheLayout(t *testing.T) {
 }
 
 func TestASmallWeightStillGetsTheMinimumTileSize(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 60, Height: 12, Root: savedLayout(t, `{"default": {"rows": [
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 60, Height: 12, Root: savedLayout(t, `{"default": {"rows": [
 		{"weight": 1, "widgets": [{"id": "clock", "weight": 1}, {"id": "calendar", "weight": 9}]}
 	]}}`)})
 	if got := cornersOn(h.Line(0)); !slices.Equal(got, []int{0, 16}) {

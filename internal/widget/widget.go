@@ -4,6 +4,7 @@
 package widget
 
 import (
+	"context"
 	"time"
 
 	"github.com/oronbz/ghud/internal/theme"
@@ -33,10 +34,54 @@ type Config struct {
 	TimeFormat string
 	// WeekStart is a lower-case English weekday, such as "sunday".
 	WeekStart string
+	// DataDir is ghud's data directory, where local Widget data lives by default.
+	DataDir string
 }
 
-type Widget interface {
+// Widget is one placed Widget. It is a View, drawn afresh for every frame,
+// or a Source, whose Payload the host fetches and keeps; either may also be
+// an Actor.
+type Widget any
+
+// View is a live view such as the Clock: its payload depends only on the frame.
+type View interface {
 	Payload(Frame) Payload
+}
+
+// Source is a Widget whose data lives outside ghud, such as in a file or
+// behind an API. The host calls Refresh off the UI thread and draws the last
+// Payload it returned.
+type Source interface {
+	Refresh(ctx context.Context, now time.Time) (Payload, error)
+}
+
+// Watcher is a Source backed by local files. Widgets sharing a file refresh
+// together after an Action on any of them.
+type Watcher interface {
+	Files() []string
+}
+
+// Actor runs the Actions a Widget declares in its Payload. Invoke runs off
+// the UI thread; the Item's new state arrives with the next Refresh.
+type Actor interface {
+	Invoke(ctx context.Context, inv Invocation) (Result, error)
+}
+
+// Invocation is one run of an Action.
+type Invocation struct {
+	// Action is the Action's ID.
+	Action string
+	// Item is the selected Item's ID, or "" for a Widget Action.
+	Item string
+	// Text is what the user typed into a text input.
+	Text string
+	Now  time.Time
+}
+
+// Result is what a successful Action reports back.
+type Result struct {
+	// Toast is shown in the footer.
+	Toast string
 }
 
 type Size struct{ W, H int }
@@ -49,12 +94,94 @@ type Frame struct {
 	Focused bool
 }
 
-// Payload is a live view's styled lines.
+// Payload is what a Widget shows: a live view's styled Lines, or a list
+// Widget's Items under Columns. Either kind may carry Widget Actions.
 type Payload struct {
 	Lines []Line
 	// Center centres the block vertically and each line horizontally.
 	Center bool
+
+	// Columns make the Payload a list: every Item has one Field per Column.
+	Columns []Column
+	Items   []Item
+	// Count is drawn after a list Widget's title, such as the number of open tasks.
+	Count int
+	// Empty is shown when the list has no Items.
+	Empty string
+
+	// Actions apply to the whole Widget rather than to an Item.
+	Actions []Action
 }
+
+// IsList reports whether the Payload is a list of Items rather than lines.
+func (p Payload) IsList() bool { return len(p.Columns) > 0 }
+
+// Column is one column of a list.
+type Column struct {
+	// Priority decides which columns survive a narrow Widget: the
+	// highest-numbered column is dropped first.
+	Priority int
+	// Flex columns share the width the others leave and truncate to fit;
+	// the others are as wide as their widest Field.
+	Flex bool
+	// Right aligns the column's Fields to its right edge.
+	Right bool
+}
+
+// Item is one row of a list Widget.
+type Item struct {
+	// ID is stable across refreshes, so the selection follows the Item.
+	ID string
+	// Group, when set, puts the Item under a header; consecutive Items with
+	// the same Group share one.
+	Group   string
+	Fields  []Field
+	Actions []Action
+}
+
+// Field is one cell of an Item, in its Column.
+type Field []Span
+
+// F is a Field of one span.
+func F(tok theme.Token, text string) Field { return Field{{Text: text, Token: tok}} }
+
+// Action is something the user can do to an Item or to the whole Widget.
+type Action struct {
+	// ID is free-form; the Widget gets it back in Invocation.Action.
+	ID string
+	// Key runs the Action while its Widget is focused, written the way Bubble
+	// Tea prints keys ("a", "enter", "space"). Host keys win over it.
+	Key   string
+	Label string
+	// Primary runs on enter, whatever its Key.
+	Primary bool
+	// Confirm asks before running, for Actions that can't be taken back.
+	Confirm bool
+	Verb    Verb
+	Input   Input
+	// Prompt titles a text input's prompt; Value is the text it starts with.
+	Prompt, Value string
+}
+
+// Verb says what kind of thing an Action does.
+type Verb string
+
+const (
+	Open     Verb = "open"
+	Copy     Verb = "copy"
+	Complete Verb = "complete"
+	Delete   Verb = "delete"
+	Edit     Verb = "edit"
+)
+
+// Input is what the host asks for before running an Action.
+type Input int
+
+const (
+	NoInput Input = iota
+	// TextInput asks for one line in the host prompt.
+	TextInput
+)
 
 type Line struct {
 	Spans []Span

@@ -40,7 +40,7 @@ func TestArrangeMoveRightIsKeptWrittenAndRestoredOnRestart(t *testing.T) {
 }
 
 func TestArrangePushingPastTheLastRowOpensARowAndEscRevertsWithoutWriting(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 100, Height: 21})
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 100, Height: 21})
 	h.Press("1", "m", "j")
 	if _, y, _ := h.Find("━ Clock "); y == 0 {
 		t.Fatalf("m j left Clock in the top row:\n%s", h.Screen())
@@ -63,7 +63,7 @@ func TestArrangePushingPastTheLastRowOpensARowAndEscRevertsWithoutWriting(t *tes
 }
 
 func TestArrangeModeShowsAHeavyWarnBorderAndTheArrangeBadge(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 100, Height: 21})
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 100, Height: 21})
 	h.Press("2", "m")
 	x, y, ok := h.Find("┏━ Calendar ")
 	if !ok {

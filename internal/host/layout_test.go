@@ -13,7 +13,7 @@ import (
 )
 
 func TestDefaultLayoutPlacesClockThenCalendarInOneRow(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 100, Height: 21})
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 100, Height: 21})
 
 	if got, want := h.Line(0), "╭─ Clock ────────────────────────────────────────╮╭─ Calendar ─────────────────────────────────────╮"; got != want {
 		t.Errorf("top row:\n%s\nwant:\n%s", got, want)
@@ -24,7 +24,7 @@ func TestDefaultLayoutPlacesClockThenCalendarInOneRow(t *testing.T) {
 }
 
 func TestCalendarShowsTheMonthGridWithTodayHighlighted(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 100, Height: 20, Now: sundayAfternoon})
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 100, Height: 20, Now: sundayAfternoon})
 
 	want := []string{
 		"                  October 2026",
@@ -87,7 +87,7 @@ func TestWidgetWeightsHoldTheirProportionsWithinARow(t *testing.T) {
 	root := savedLayout(t, `{"default": {"rows": [
 		{"weight": 1, "widgets": [{"id": "clock", "weight": 1}, {"id": "calendar", "weight": 2}]}
 	]}}`)
-	h := hosttest.New(t, hosttest.Options{Root: root})
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Root: root})
 	for _, c := range []struct{ w, clock, calendar int }{{60, 20, 40}, {99, 33, 66}, {150, 50, 100}} {
 		h.Resize(c.w, 12)
 		if got := cornersOn(h.Line(0)); !slices.Equal(got, []int{0, c.clock}) {
@@ -107,7 +107,7 @@ func TestRowWeightsHoldTheirProportionsAsTheTerminalGrows(t *testing.T) {
 		{"weight": 1, "widgets": [{"id": "calendar", "weight": 1}]},
 		{"weight": 2, "widgets": [{"id": "clock", "weight": 1}]}
 	]}}`)
-	h := hosttest.New(t, hosttest.Options{Root: root})
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Root: root})
 	for _, c := range []struct{ h, calendar int }{{42, 14}, {18, 6}, {27, 9}} {
 		h.Resize(60, c.h+1)
 		if _, y, _ := h.Find("╭─ Calendar"); y != 0 {
@@ -126,7 +126,7 @@ func TestSavedLayoutJoinsTheWidgetsThatExist(t *testing.T) {
 	root := savedLayout(t, `{"default": {"rows": [
 		{"weight": 1, "widgets": [{"id": "gone", "weight": 5}, {"id": "clock", "weight": 1}]}
 	]}}`)
-	h := hosttest.New(t, hosttest.Options{Width: 60, Height: 20, Root: root})
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 60, Height: 20, Root: root})
 
 	if _, y, _ := h.Find("╭─ Clock"); y != 0 {
 		t.Errorf("Clock starts on row %d, want 0 as the only saved Widget left", y)

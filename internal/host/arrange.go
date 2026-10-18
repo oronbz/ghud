@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/oronbz/ghud/internal/layout"
+	"github.com/oronbz/ghud/internal/theme"
 )
 
 // arrangeKey handles a key in arrange mode, which works on the focused Widget.
@@ -52,7 +53,7 @@ func (m Model) saveLayout() Model {
 		}
 	}
 	if err := layout.Save(m.opts.Paths.Config, m.layout.Join(ids)); err != nil {
-		m.toast = "layout.json: " + err.Error()
+		m.toast = toast{text: "layout.json: " + err.Error(), tok: theme.Bad}
 	}
 	return m
 }
