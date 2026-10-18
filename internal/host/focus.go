@@ -135,7 +135,7 @@ func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case key.Matches(msg, keys.Quit):
 		return m, tea.Quit
 	case key.Matches(msg, keys.Refresh):
-		return m.startAll()
+		return m.startAll(true)
 	case key.Matches(msg, keys.Unfocus):
 		m.focus = ""
 	case key.Matches(msg, keys.Arrange):

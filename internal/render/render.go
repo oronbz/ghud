@@ -37,6 +37,9 @@ type Status struct {
 	Spinner string
 	// Stale is the stale marker, reason and age such as "offline · 12m", or "".
 	Stale string
+	// Age is how old data read from the cache is, such as "3m", drawn dim
+	// while it isn't stale.
+	Age string
 }
 
 // Hint is one key hint: the key as Bubble Tea prints it, and what it does.
@@ -87,17 +90,22 @@ func Draw(th theme.Theme, t Tile) string {
 	return strings.Join(out, "\n")
 }
 
-// status is the stale marker in warn and the spinner in accent, in at most
-// room cells; the marker is cut short to fit, and left out when it can't.
+// status is the stale marker in warn, or else the age in dim, and the
+// spinner in accent, in at most room cells; the marker is cut short to fit,
+// and left out when it can't.
 func status(th theme.Theme, st Status, room int) string {
 	spin := ""
 	if st.Spinner != "" {
 		spin = st.Spinner + " "
 	}
+	marker, tok := st.Stale, theme.Warn
+	if marker == "" {
+		marker, tok = st.Age, theme.Dim
+	}
 	stale := ""
-	if st.Stale != "" {
-		if w := room - lipgloss.Width(spin) - 2; w >= 4 {
-			stale = th.Fg(theme.Warn).Render(ansi.Truncate(st.Stale, w, "…")) + " "
+	if marker != "" {
+		if w := room - lipgloss.Width(spin) - 2; w >= min(4, lipgloss.Width(marker)) {
+			stale = th.Fg(tok).Render(ansi.Truncate(marker, w, "…")) + " "
 		}
 	}
 	if stale == "" && (spin == "" || room < 3) {

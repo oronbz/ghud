@@ -75,7 +75,7 @@ func (m Model) added(wc config.Widget) (Model, tea.Cmd) {
 	m.layout = m.layout.Join(m.ids())
 	m = m.saveLayout()
 	m, toast := m.say("Added "+p.title, theme.Fg)
-	m, fetch := m.start(wc.ID)
+	m, fetch := m.whenDue(wc.ID)
 	m, beat := m.beat()
 	cmds := []tea.Cmd{toast, fetch, beat}
 	// One tick chain serves every live view; start it only if none is running.

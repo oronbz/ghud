@@ -19,6 +19,9 @@ type filesChangedMsg struct{ files []string }
 func (m Model) watch() Model {
 	files := []string{m.edits.Path, m.layoutFile()}
 	for _, id := range m.ids() {
+		if key := m.sched[id].key; key != "" {
+			files = append(files, m.cache.File(key))
+		}
 		for _, f := range watched(m.widgets[id].widget) {
 			if !slices.Contains(files, f) {
 				files = append(files, f)
@@ -48,12 +51,17 @@ func (m Model) filesChanged(msg filesChangedMsg) (Model, tea.Cmd) {
 		m = m.reloadLayout()
 	}
 	for _, id := range m.ids() {
-		if slices.Contains(fresh, id) || slices.ContainsFunc(watched(m.widgets[id].widget), func(f string) bool { return slices.Contains(msg.files, f) }) {
-			var cmd tea.Cmd
+		var cmd tea.Cmd
+		switch {
+		case slices.ContainsFunc(watched(m.widgets[id].widget), func(f string) bool { return slices.Contains(msg.files, f) }):
 			m, cmd = m.start(id)
-			cmds = append(cmds, cmd)
+		case slices.Contains(fresh, id):
+			m, cmd = m.whenDue(id)
 		}
+		cmds = append(cmds, cmd)
 	}
+	m, adopted := m.adoptChanged(msg.files)
+	cmds = append(cmds, adopted...)
 	m, beat := m.beat()
 	return m, tea.Batch(append(cmds, beat)...)
 }
