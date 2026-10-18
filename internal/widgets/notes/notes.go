@@ -41,6 +41,7 @@ func (n notes) Refresh(context.Context, time.Time) (widget.Payload, error) {
 	}
 	p := widget.Payload{Wrap: true, Actions: []widget.Action{
 		{ID: "edit", Key: "i", Label: "edit", Verb: widget.Edit, Input: widget.InlineInput, Value: src},
+		{ID: "editor", Key: "E", Label: "$EDITOR", Verb: widget.Edit},
 	}}
 	for _, l := range strings.Split(strings.TrimSuffix(src, "\n"), "\n") {
 		l = strings.TrimSuffix(strings.ReplaceAll(l, "\t", "    "), "\r")
@@ -61,6 +62,9 @@ func (n notes) Invoke(_ context.Context, inv widget.Invocation) (widget.Result, 
 			text += "\n"
 		}
 		return widget.Result{Toast: "Saved " + filepath.Base(n.file)}, widget.WriteFile(n.file, []byte(text))
+	case "editor":
+		// The editor may be one that can't create the note's directory.
+		return widget.Result{Edit: n.file}, os.MkdirAll(filepath.Dir(n.file), 0o755)
 	}
 	return widget.Result{}, fmt.Errorf("notes has no Action %q", inv.Action)
 }

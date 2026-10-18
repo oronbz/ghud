@@ -82,6 +82,9 @@ type Invocation struct {
 type Result struct {
 	// Toast is shown in the footer.
 	Toast string
+	// Edit is a file for the host to open in $EDITOR, with the TUI
+	// suspended; the Widget refreshes once the editor exits.
+	Edit string
 }
 
 type Size struct{ W, H int }

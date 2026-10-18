@@ -1,6 +1,7 @@
 package notes_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -96,6 +97,56 @@ func TestIEditsTheNoteInInsertModeAndEscSavesIt(t *testing.T) {
 	}
 	if got := body(h, 2); got[0] != "Buy milk" || got[1] != "Call mum, quick?" {
 		t.Fatalf("Widget after save shows %q", got)
+	}
+}
+
+func TestCtrlKStaysAHostKeyInInsertMode(t *testing.T) {
+	h := withNotes(t, "", hosttest.Options{Width: 40, Height: 9})
+	h.Press("1", "i")
+	h.Type("abc")
+	// In the editor alone, ctrl+k would delete to the end of the line.
+	h.Press("left", "left", "ctrl+k", "esc")
+	if got := readNote(t, notesFile(h.Root, "notes.md")); got != "abc\n" {
+		t.Fatalf("notes.md = %q", got)
+	}
+}
+
+func TestLeavingInsertModeWithoutChangesWritesNothing(t *testing.T) {
+	h := withNotes(t, "Buy milk", hosttest.Options{Width: 40, Height: 9})
+	h.Press("1", "i", "left", "esc")
+	if got := readNote(t, notesFile(h.Root, "notes.md")); got != "Buy milk" {
+		t.Fatalf("notes.md = %q", got)
+	}
+	if got := h.Line(8); strings.Contains(got, "Saved") {
+		t.Fatalf("footer = %q", got)
+	}
+}
+
+func TestEOpensTheNoteInTheEditorAndShowsTheEditedText(t *testing.T) {
+	h := withNotes(t, "Buy milk\n", hosttest.Options{Width: 40, Height: 9})
+	path := notesFile(h.Root, "notes.md")
+	h.Editor.OnEdit = func(p string) error {
+		if got := body(h, 1)[0]; got != "Buy milk" {
+			t.Errorf("Widget reloaded before the editor returned: %q", got)
+		}
+		return os.WriteFile(p, []byte("Buy oat milk\n"), 0o644)
+	}
+
+	h.Press("1", "E")
+	if len(h.Editor.Edited) != 1 || h.Editor.Edited[0] != path {
+		t.Fatalf("editor ran on %q, want [%s]", h.Editor.Edited, path)
+	}
+	if got := body(h, 1)[0]; got != "Buy oat milk" {
+		t.Fatalf("Widget after the editor shows %q", got)
+	}
+}
+
+func TestAFailedEditorRunIsToasted(t *testing.T) {
+	h := withNotes(t, "Buy milk\n", hosttest.Options{Width: 60, Height: 9})
+	h.Editor.OnEdit = func(string) error { return errors.New("exit status 1") }
+	h.Press("1", "E")
+	if got := h.Line(8); !strings.Contains(got, "$EDITOR failed: exit status 1") {
+		t.Fatalf("footer = %q", got)
 	}
 }
 

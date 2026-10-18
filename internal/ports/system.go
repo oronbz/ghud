@@ -59,19 +59,23 @@ func (osc52) Copy(text string) tea.Cmd { return tea.SetClipboard(text) }
 type execEditor struct{ getenv func(string) string }
 
 func (e execEditor) Edit(path string, done func(error) tea.Msg) tea.Cmd {
-	editor := e.getenv("VISUAL")
+	return tea.ExecProcess(editorCommand(e.getenv, runtime.GOOS, path), func(err error) tea.Msg { return done(err) })
+}
+
+// editorCommand opens path in $VISUAL, else $EDITOR, else vi.
+func editorCommand(getenv func(string) string, goos, path string) *exec.Cmd {
+	editor := getenv("VISUAL")
 	if editor == "" {
-		editor = e.getenv("EDITOR")
+		editor = getenv("EDITOR")
 	}
 	if editor == "" {
 		editor = "vi"
 	}
-	// Through the shell so that EDITOR="code -w" works; the path stays out of the script as $0.
-	c := exec.Command("sh", "-c", editor+` "$0"`, path)
-	if runtime.GOOS == "windows" {
-		c = exec.Command(editor, path)
+	if goos == "windows" {
+		return exec.Command(editor, path)
 	}
-	return tea.ExecProcess(c, func(err error) tea.Msg { return done(err) })
+	// Through the shell so that EDITOR="code -w" works; the path stays out of the script as $0.
+	return exec.Command("sh", "-c", editor+` "$0"`, path)
 }
 
 type osKeyring struct{}

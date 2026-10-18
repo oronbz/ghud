@@ -161,6 +161,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.refreshed(msg)
 	case actedMsg:
 		return m.acted(msg)
+	case editedMsg:
+		return m.edited(msg)
 	case toastExpiredMsg:
 		if m.toast.seq == msg.seq {
 			m.toast = toast{}
