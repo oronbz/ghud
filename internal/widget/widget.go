@@ -87,6 +87,9 @@ type Invocation struct {
 	Item string
 	// Text is what the user typed into a text input.
 	Text string
+	// Base is the Action's Value, the text an input started from, so a
+	// Widget can tell whether its data changed underneath the edit.
+	Base string
 	Now  time.Time
 }
 
@@ -97,6 +100,9 @@ type Result struct {
 	// Edit is a file for the host to open in $EDITOR, with the TUI
 	// suspended; the Widget refreshes once the editor exits.
 	Edit string
+	// Then, with Edit, is the Action the host runs once the editor exits
+	// cleanly, with Text set to the Edit file and Base to Then's Value.
+	Then *Action
 }
 
 type Size struct{ W, H int }

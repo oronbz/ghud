@@ -124,6 +124,9 @@ func Run(s System) int {
 		opts = append(opts, tea.WithOutput(s.Stdout))
 	}
 	opts = append(opts, s.ProgramOptions...)
+	if c, ok := pp.Watcher.(io.Closer); ok {
+		defer c.Close()
+	}
 	if _, err := tea.NewProgram(m, opts...).Run(); err != nil {
 		fmt.Fprintln(s.Stderr, "ghud:", err)
 		return 1

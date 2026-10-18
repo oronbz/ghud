@@ -20,6 +20,7 @@ type Ports struct {
 	Commands  Commands
 	EventKit  EventKit
 	Machine   Machine
+	Watcher   Watcher
 	HTTP      *http.Client
 	Endpoints Endpoints
 }
@@ -51,6 +52,17 @@ type Keyring interface {
 	Get(service, account string) (string, error)
 	Set(service, account, secret string) error
 	Delete(service, account string) error
+}
+
+// Watcher reports changes to files on disk, whoever made them: another
+// ghud instance, an editor, or this instance itself.
+type Watcher interface {
+	// Watch replaces the set of watched files. A file that doesn't exist
+	// yet is reported when it's created.
+	Watch(files []string) error
+	// Next returns a Cmd that waits for the next change and delivers
+	// msg(files changed), each spelt as it was given to Watch.
+	Next(msg func(files []string) tea.Msg) tea.Cmd
 }
 
 // Machine reads how hard this machine is working.

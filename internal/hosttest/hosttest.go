@@ -58,6 +58,7 @@ type Host struct {
 	Commands  *Commands
 	EventKit  *EventKit
 	Machine   *Machine
+	Watcher   *Watcher
 
 	model tea.Model
 	w, h  int
@@ -94,6 +95,7 @@ func New(t testing.TB, o Options) *Host {
 		Commands:  &Commands{},
 		EventKit:  &EventKit{},
 		Machine:   &Machine{},
+		Watcher:   &Watcher{},
 	}
 	if o.Config != "" {
 		if err := os.MkdirAll(h.Paths.Config, 0o755); err != nil {
@@ -125,6 +127,7 @@ func New(t testing.TB, o Options) *Host {
 			Commands:  h.Commands,
 			EventKit:  h.EventKit,
 			Machine:   h.Machine,
+			Watcher:   h.Watcher,
 			HTTP:      &http.Client{Timeout: 5 * time.Second},
 			Endpoints: mergeEndpoints(ports.DefaultEndpoints(), o.Endpoints),
 		},
@@ -196,6 +199,20 @@ func (h *Host) Advance(d time.Duration) {
 		h.Send(msg)
 	}
 	h.Clock.set(target)
+}
+
+// Changed reports that files changed on disk, as the file watcher would.
+// Files the app doesn't watch are ignored, like a real watcher ignores them.
+func (h *Host) Changed(files ...string) {
+	h.t.Helper()
+	msg, watched, ok := h.Watcher.fire(files)
+	if !watched {
+		return
+	}
+	if !ok {
+		h.t.Fatalf("hosttest: %v changed but the app isn't waiting for file changes", files)
+	}
+	h.Send(msg)
 }
 
 // Quit reports whether the app has asked Bubble Tea to quit.
