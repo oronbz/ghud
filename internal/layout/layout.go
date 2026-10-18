@@ -14,7 +14,6 @@ type Row struct {
 	Widgets []Cell  `json:"widgets"`
 }
 
-// Cell is one Widget's place in a row.
 type Cell struct {
 	ID     string  `json:"id"`
 	Weight float64 `json:"weight"`

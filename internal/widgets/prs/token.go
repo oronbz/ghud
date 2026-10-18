@@ -98,7 +98,6 @@ func pasteAction() *widget.Action {
 	}
 }
 
-// store keeps a pasted classic token in the keyring.
 func store(p ports.Ports, text string) (widget.Result, error) {
 	tok := strings.TrimSpace(text)
 	switch {

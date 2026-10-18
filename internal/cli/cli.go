@@ -70,7 +70,6 @@ or GHUD_CONFIG, or --config.
 of two: --close-key cmd+shift+g --close-key 'ctrl+b d'.
 `
 
-// Run runs ghud and returns its exit code.
 func Run(s System) int {
 	fs := flag.NewFlagSet("ghud", flag.ContinueOnError)
 	fs.SetOutput(s.Stderr)

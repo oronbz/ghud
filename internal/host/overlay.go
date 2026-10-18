@@ -98,7 +98,6 @@ func (o overlay) insert(text string) overlay {
 	return o
 }
 
-// overlayLayer draws the confirm or prompt box centred over the dashboard.
 func (m Model) overlayLayer() *lipgloss.Layer {
 	o := m.overlay
 	w := min(76, m.w-6)

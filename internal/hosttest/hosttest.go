@@ -256,7 +256,6 @@ func (h *Host) Changed(files ...string) {
 	h.Send(msg)
 }
 
-// receiveWait is how long Receive waits for a message from outside the app.
 const receiveWait = 10 * time.Second
 
 // Receive waits for the next message that arrives on its own from outside

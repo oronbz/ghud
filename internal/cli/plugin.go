@@ -25,10 +25,8 @@ import (
 	"github.com/oronbz/ghud/internal/ports"
 )
 
-// fetchTimeout bounds one download of a Plugin's repository.
 const fetchTimeout = 5 * time.Minute
 
-// pluginManage runs `ghud plugin install|update|uninstall|list <args>`.
 func pluginManage(s System, pp ports.Ports, p paths.Paths, configFile string, locale config.Locale, args []string) int {
 	c := pluginCLI{s: s, in: bufio.NewReader(s.Stdin), installer: install.Installer{
 		Dir:     filepath.Join(p.Data, "plugins"),
@@ -220,7 +218,6 @@ func (c *pluginCLI) list(listed []string) int {
 	return 0
 }
 
-// trust shows what a Plugin provides and runs, and asks whether to go on.
 func (c *pluginCLI) trust(plan install.Plan) bool {
 	out := c.s.Stdout
 	m := plan.Manifest

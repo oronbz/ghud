@@ -93,8 +93,7 @@ func (g GitHub) get(ctx context.Context, owner, repo, kind, ref, accept string) 
 }
 
 // extract unpacks a GitHub tarball's files under subdir ("" for all) into
-// dir, dropping the tarball's top directory. It returns how many entries
-// it wrote.
+// dir, dropping the tarball's top directory.
 func extract(r io.Reader, subdir, dir string) (int, error) {
 	gz, err := gzip.NewReader(r)
 	if err != nil {

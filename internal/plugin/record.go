@@ -24,7 +24,6 @@ type Record struct {
 	Commit string `json:"commit"`
 }
 
-// ReadRecord reads the Record of the Plugin installed in dir.
 func ReadRecord(dir string) (Record, error) {
 	var r Record
 	b, err := os.ReadFile(filepath.Join(dir, RecordFile))
@@ -34,7 +33,6 @@ func ReadRecord(dir string) (Record, error) {
 	return r, json.Unmarshal(b, &r)
 }
 
-// Write saves r in dir.
 func (r Record) Write(dir string) error {
 	b, err := json.MarshalIndent(r, "", "  ")
 	if err != nil {
@@ -43,8 +41,7 @@ func (r Record) Write(dir string) error {
 	return os.WriteFile(filepath.Join(dir, RecordFile), append(b, '\n'), 0o644)
 }
 
-// buried is the hidden directory, inside the plugins directory, holding a
-// Tombstone for each uninstalled Plugin.
+// buried is hidden so ghud doesn't read it as a Plugin.
 const buried = ".uninstalled"
 
 // Tombstone is what ghud keeps of an uninstalled Plugin, so its Widgets can
@@ -58,7 +55,6 @@ type Tombstone struct {
 	} `json:"widgets"`
 }
 
-// Bury records Plugin m, installed from rec, as uninstalled from pluginsDir.
 func Bury(pluginsDir string, m Manifest, rec Record) error {
 	t := Tombstone{Name: m.Name, Record: rec}
 	for _, wt := range m.Widgets {
@@ -78,7 +74,6 @@ func Bury(pluginsDir string, m Manifest, rec Record) error {
 	return os.WriteFile(filepath.Join(dir, m.Name+".json"), append(b, '\n'), 0o644)
 }
 
-// Unbury forgets that Plugin name was uninstalled.
 func Unbury(pluginsDir, name string) error {
 	err := os.Remove(filepath.Join(pluginsDir, buried, name+".json"))
 	if errors.Is(err, fs.ErrNotExist) {
@@ -107,8 +102,7 @@ func Buried(pluginsDir string, taken []string) []widget.Type {
 	return types
 }
 
-// missing is the needs-setup hint for the Widgets of Plugin name, installed
-// from rec, once it's gone.
+// missing is the needs-setup hint of a gone Plugin's Widgets.
 func missing(name string, rec Record) string {
 	hint := fmt.Sprintf("Plugin `%s` isn't installed", name)
 	if rec.Source != "" {
@@ -117,7 +111,6 @@ func missing(name string, rec Record) string {
 	return hint
 }
 
-// InstallCommand is the command that installs the Plugin again.
 func (r Record) InstallCommand() string {
 	cmd := "ghud plugin install " + r.Source
 	if r.Ref != "" {

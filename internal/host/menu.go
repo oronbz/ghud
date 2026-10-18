@@ -83,8 +83,6 @@ func (m Model) menuKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// menuMouse runs the clicked entry, follows the pointer over entries, and
-// closes the menu on a click anywhere else.
 func (m Model) menuMouse(msg tea.MouseMsg) (Model, tea.Cmd) {
 	ms := msg.Mouse()
 	box := m.menuBox()
@@ -132,7 +130,6 @@ func menuLabelW(mu *menu) int {
 	return n
 }
 
-// entryLabel is what a menu entry reads: a choice's label, else its Action's.
 func entryLabel(a bound) string {
 	if a.choice != nil {
 		return a.choice.Label
@@ -140,7 +137,6 @@ func entryLabel(a bound) string {
 	return a.Label
 }
 
-// entryKey is the key shown beside a menu entry; choices have none.
 func entryKey(a bound) string {
 	if a.choice != nil {
 		return ""
@@ -148,8 +144,6 @@ func entryKey(a bound) string {
 	return shownKey(a)
 }
 
-// menuLayer draws each entry as its label and the key that runs it, the
-// selected one on the sel background.
 func (m Model) menuLayer() *lipgloss.Layer {
 	mu := m.menu
 	box := m.menuBox()

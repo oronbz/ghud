@@ -12,7 +12,6 @@ import (
 	"github.com/oronbz/ghud/internal/ports"
 )
 
-// pluginCommand runs `ghud plugin <args>`.
 func pluginCommand(s System, pp ports.Ports, p paths.Paths, configFile string, locale config.Locale, args []string) int {
 	if len(args) == 0 {
 		fmt.Fprint(s.Stderr, "ghud: plugin needs a command\n\n", usage)
@@ -31,7 +30,6 @@ func pluginCommand(s System, pp ports.Ports, p paths.Paths, configFile string, l
 	return 2
 }
 
-// pluginCheck runs `ghud plugin check [--timeout d] <dir>`.
 func pluginCheck(s System, pp ports.Ports, args []string) int {
 	fs := flag.NewFlagSet("ghud plugin check", flag.ContinueOnError)
 	fs.SetOutput(s.Stderr)

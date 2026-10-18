@@ -37,7 +37,6 @@ type Config struct {
 	Problems []string
 }
 
-// Widget is one [[widget]] block.
 type Widget struct {
 	ID    string
 	Type  string
@@ -66,7 +65,6 @@ type Plugin struct {
 	Path string
 }
 
-// common are the keys every [[widget]] block takes, besides its type's settings.
 var common = []string{"type", "id", "title", "refresh"}
 
 // Default is the config used with no config.toml: global defaults and one
@@ -102,7 +100,6 @@ func Load(path string, types []widget.Type, loc Locale) (Config, error) {
 	return parse(name, src, types, loc)
 }
 
-// parse reads config source named name, as Load does.
 func parse(name string, src []byte, types []widget.Type, loc Locale) (Config, error) {
 	var doc map[string]any
 	if err := toml.Unmarshal(src, &doc); err != nil {

@@ -24,10 +24,8 @@ type Tile struct {
 	Handle  bool
 	Payload widget.Payload
 	// List is how a list Payload is selected and scrolled.
-	List List
-	// Hints are the key hints drawn in the bottom border.
-	Hints []Hint
-	// Status is drawn at the right of the top border.
+	List   List
+	Hints  []Hint
 	Status Status
 }
 

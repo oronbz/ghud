@@ -70,7 +70,6 @@ func keyPath(p *unstable.Parser, n *unstable.Node) (string, int) {
 	return strings.Join(parts, "."), line
 }
 
-// headerLines are the 1-based lines of every [table] and [[array]] header, in order.
 func headerLines(src []byte) []int {
 	var lines []int
 	var p unstable.Parser

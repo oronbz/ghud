@@ -91,7 +91,6 @@ func (n notes) copyForEditor() (widget.Result, error) {
 	return widget.Result{Edit: cp, Then: &widget.Action{ID: "editor-save", Label: "$EDITOR", Value: src}}, nil
 }
 
-// saveEditorCopy saves the editor's copy over the note, if the user changed it.
 func (n notes) saveEditorCopy(cp, base string, now time.Time) (widget.Result, error) {
 	b, err := os.ReadFile(cp)
 	if err != nil {

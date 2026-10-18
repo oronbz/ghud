@@ -10,7 +10,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-// Ports bundles every outside-world adapter the host app uses.
 type Ports struct {
 	Clock     Clock
 	Opener    Opener
@@ -24,8 +23,7 @@ type Ports struct {
 	Inbox     Inbox
 	HTTP      *http.Client
 	Endpoints Endpoints
-	// Getenv reads the process environment, such as GH_TOKEN.
-	Getenv func(key string) string
+	Getenv    func(key string) string
 }
 
 // Clock is the only source of time. Timers go through After so that a fake
@@ -76,7 +74,6 @@ type Inbox interface {
 	Next(ch <-chan tea.Msg) tea.Cmd
 }
 
-// Machine reads how hard this machine is working.
 type Machine interface {
 	Stats() (Stats, error)
 }
@@ -124,11 +121,9 @@ type EventKit interface {
 	// Reminders are the reminders not yet completed, from every list.
 	// Without granted access it fails rather than asking.
 	Reminders(ctx context.Context) ([]Reminder, error)
-	// Complete marks reminder id completed and saves it.
 	Complete(ctx context.Context, id string) error
 }
 
-// Reminder is one open reminder.
 type Reminder struct {
 	ID    string
 	Title string
@@ -149,9 +144,8 @@ type Event struct {
 	AllDay     bool
 	Location   string
 	Calendar   string
-	// Declined is set when the user declined the invitation.
-	Declined bool
-	Canceled bool
+	Declined   bool
+	Canceled   bool
 }
 
 // Endpoints holds the base URLs of every HTTP service ghud talks to, so tests

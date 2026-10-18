@@ -20,7 +20,6 @@ import (
 	"github.com/oronbz/ghud/internal/plugin"
 )
 
-// Fetcher gets a GitHub repository's files.
 type Fetcher interface {
 	// Resolve returns the commit ref names; an empty ref is the default branch.
 	Resolve(ctx context.Context, owner, repo, ref string) (string, error)
@@ -41,7 +40,6 @@ type Source struct {
 	Subdir string
 }
 
-// ParseSource reads owner/repo or owner/repo/subdir.
 func ParseSource(s string) (Source, error) {
 	parts := strings.Split(strings.Trim(s, "/"), "/")
 	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
@@ -66,11 +64,9 @@ func (s Source) String() string {
 type Plan struct {
 	Manifest plugin.Manifest
 	Record   plugin.Record
-	// Dir is where it will be installed.
-	Dir string
+	Dir      string
 }
 
-// Installed is a Plugin in the plugins directory.
 type Installed struct {
 	Dir      string
 	Manifest plugin.Manifest
@@ -80,17 +76,13 @@ type Installed struct {
 	Err error
 }
 
-// Installer manages the Plugins in Dir.
 type Installer struct {
 	// Dir is the plugins directory.
 	Dir     string
 	Fetcher Fetcher
-	// Log receives what build steps print.
-	Log io.Writer
+	Log     io.Writer
 }
 
-// Install fetches src at ref, asks trust, builds it, and installs it
-// under its manifest's name.
 func (i Installer) Install(ctx context.Context, src Source, ref string, trust func(Plan) bool) (Plan, error) {
 	commit, err := i.Fetcher.Resolve(ctx, src.Owner, src.Repo, ref)
 	if err != nil {
@@ -159,8 +151,7 @@ func (i Installer) Update(ctx context.Context, name string, trust func(Plan) boo
 	return was, plan.Record, nil
 }
 
-// Uninstall deletes an installed Plugin, returning where it came from, and
-// keeps a Tombstone of it.
+// Uninstall keeps a Tombstone of the Plugin it deletes.
 func (i Installer) Uninstall(name string) (plugin.Record, error) {
 	dir, err := i.dir(name)
 	if err != nil {
@@ -179,7 +170,6 @@ func (i Installer) Uninstall(name string) (plugin.Record, error) {
 	return rec, os.RemoveAll(filepath.Dir(trash))
 }
 
-// List is every Plugin in the plugins directory.
 func (i Installer) List() []Installed {
 	entries, _ := os.ReadDir(i.Dir)
 	var list []Installed
@@ -195,7 +185,6 @@ func (i Installer) List() []Installed {
 	return list
 }
 
-// dir is the directory of installed Plugin name.
 func (i Installer) dir(name string) (string, error) {
 	if !validName.MatchString(name) {
 		return "", fmt.Errorf("%q isn't a Plugin name", name)
@@ -215,8 +204,6 @@ func (i Installer) staging() (string, error) {
 	return dir, os.MkdirAll(dir, 0o755)
 }
 
-// stage fetches src at commit into a new staging directory and reads its
-// manifest.
 func (i Installer) stage(ctx context.Context, src Source, ref, commit string) (Plan, string, error) {
 	root, err := i.staging()
 	if err != nil {
@@ -242,7 +229,6 @@ func (i Installer) stage(ctx context.Context, src Source, ref, commit string) (P
 	return plan, staged, nil
 }
 
-// build asks trust, runs the build steps in staged and records the source.
 func (i Installer) build(ctx context.Context, plan Plan, staged string, trust func(Plan) bool) error {
 	if !trust(plan) {
 		return ErrDeclined
@@ -262,7 +248,6 @@ func (i Installer) build(ctx context.Context, plan Plan, staged string, trust fu
 	return plan.Record.Write(staged)
 }
 
-// trash moves dir into the staging area, returning where it went.
 func (i Installer) trash(dir string) (string, error) {
 	root, err := i.staging()
 	if err != nil {

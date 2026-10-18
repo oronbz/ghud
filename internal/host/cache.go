@@ -54,7 +54,6 @@ func freshUntil(checked time.Time, fails int, interval time.Duration, midnight b
 	return at
 }
 
-// fresh reports whether Source id's data, cached or fetched, isn't due yet.
 func (m Model) fresh(id string, now time.Time) bool {
 	s := m.sched[id]
 	return s.key != "" && now.Before(freshUntil(s.checked, s.fails, s.interval, m.widgets[id].typ.Midnight))
@@ -155,7 +154,6 @@ func (m Model) adoptChanged(files []string) (Model, []tea.Cmd) {
 	return m, cmds
 }
 
-// cleanCache deletes the entries of Widgets no longer configured, once they're old.
 func (m Model) cleanCache() tea.Cmd {
 	var keep []string
 	for _, s := range m.sched {

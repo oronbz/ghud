@@ -15,15 +15,13 @@ import (
 )
 
 const (
-	// firstBackoff is the wait after a first failure; each further one doubles it, up to maxBackoff.
 	firstBackoff = 15 * time.Second
 	maxBackoff   = 15 * time.Minute
 	// beat is how often the host checks the wall clock for a jump, such as a wake from sleep.
 	beat = 10 * time.Second
 	// wakeSlack is how late a timer may fire before the host takes it for a wake from sleep.
 	wakeSlack = 30 * time.Second
-	// stagger spaces out the refreshes of Widgets that fell due during a sleep.
-	stagger = 3 * time.Second
+	stagger   = 3 * time.Second
 	// jitter is the most a fetching Widget's schedule moves either way, as a share of it.
 	jitter = 0.1
 )
@@ -31,25 +29,21 @@ const (
 // sched is a Source's refresh schedule and the outcome of its last refresh,
 // from which its Status follows.
 type sched struct {
-	// interval is how often it refreshes; zero means only on demand (and at
-	// midnight for types that ask).
+	// interval zero refreshes only on demand (and at midnight for types that ask).
 	interval time.Duration
-	// due is when the next refresh is planned; zero is none.
-	due time.Time
+	due      time.Time
 	// timer tells the armed timer from ones a newer plan, or a Widget
 	// rebuilt under the same id, replaced.
 	timer int
-	// busy is a refresh in flight; again asks for another once it lands.
+	// again asks for another refresh once the one in flight lands.
 	busy, again bool
-	// fails counts failures since the last success, for the backoff.
-	fails int
-	// fetched is when the data on show was fetched; zero is no data yet.
+	fails       int
+	// fetched is zero while there's no data yet.
 	fetched time.Time
-	// err is why the last refresh failed, nil after a success.
-	err   error
-	setup *widget.SetupError
-	// key is the Source's cache entry, "" when it isn't cached; checked is
-	// when its last refresh started, here or in another instance.
+	err     error
+	setup   *widget.SetupError
+	// key is "" for a Source that isn't cached; checked is when its last
+	// refresh started, here or in another instance.
 	key     string
 	checked time.Time
 	// cached is data read from the cache at start that no refresh has replaced yet.
@@ -60,31 +54,26 @@ type refreshedMsg struct {
 	id      string
 	payload widget.Payload
 	err     error
-	// at is when the refresh started.
-	at time.Time
+	at      time.Time
 	// skipped is a refresh another instance's fetch lock held off.
 	skipped bool
-	// entry is the cache entry another instance fetched meanwhile, taken instead of fetching.
+	// entry is what another instance fetched meanwhile, taken instead of fetching.
 	entry *cache.Entry
 }
 
-// dueMsg is Widget id's refresh timer firing at at; want is when it was meant to.
+// dueMsg's want is when the timer was meant to fire.
 type dueMsg struct {
 	id       string
 	seq      int
 	want, at time.Time
 }
 
-// beatMsg is the wall-clock check firing.
 type beatMsg struct{ want, at time.Time }
 
-// spinMsg advances the refresh spinners.
 type spinMsg struct{ at time.Time }
 
-// startMsg starts the first refresh of every visible Source.
 type startMsg struct{}
 
-// spinEvery is the spinner's frame time.
 const spinEvery = 100 * time.Millisecond
 
 var spinFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
@@ -171,7 +160,6 @@ func (m Model) spun(msg spinMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// plan arms Source id's next refresh for at.
 func (m Model) plan(id string, at time.Time) tea.Cmd {
 	s := m.sched[id]
 	s.due = at
@@ -212,14 +200,13 @@ func (m Model) shown(id string) (Model, tea.Cmd) {
 	return m.start(id)
 }
 
-// beat starts the wall-clock checks once anything is scheduled.
 func (m Model) beat() (Model, tea.Cmd) {
-	if m.beating {
+	if m.checkingWallClock {
 		return m, nil
 	}
 	for id, s := range m.sched {
 		if s.interval > 0 || m.widgets[id].typ.Midnight {
-			m.beating = true
+			m.checkingWallClock = true
 			return m, m.nextBeat(m.opts.Ports.Clock.Now())
 		}
 	}
@@ -270,7 +257,6 @@ func (m Model) woke() (Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-// refreshed records a refresh's outcome and plans the next one.
 func (m Model) refreshed(msg refreshedMsg) (Model, tea.Cmd) {
 	if _, ok := m.sched[msg.id]; !ok {
 		// The Widget was removed while it refreshed.
@@ -394,7 +380,6 @@ func (m Model) next(id string, now time.Time) time.Time {
 	return at
 }
 
-// backoff is the wait after the nth failure in a row: 15s doubling up to 15 minutes.
 func backoff(fails int) time.Duration {
 	d := firstBackoff
 	for i := 1; i < fails && d < maxBackoff; i++ {
@@ -403,8 +388,8 @@ func backoff(fails int) time.Duration {
 	return min(d, maxBackoff)
 }
 
-// jittered moves d by up to ±10% for fetching Widgets, so instances and
-// Widgets started together drift apart.
+// jittered spreads fetching Widgets' schedules so instances and Widgets
+// started together drift apart.
 func (m Model) jittered(typ widget.Type, d time.Duration) time.Duration {
 	if !typ.Fetches {
 		return d
@@ -412,7 +397,6 @@ func (m Model) jittered(typ widget.Type, d time.Duration) time.Duration {
 	return time.Duration(float64(d) * (1 - jitter + 2*jitter*m.rng.Float64()))
 }
 
-// pausedUntil is when the rate limit on Source id's credential lifts.
 func (m Model) pausedUntil(id string) time.Time {
 	if c, ok := m.widgets[id].widget.(widget.Credentialed); ok {
 		return m.paused[c.Credential()]
@@ -443,7 +427,6 @@ func (m Model) schedule(id string, refresh time.Duration) (problem string) {
 	return problem
 }
 
-// nextTimer numbers a timer uniquely for the life of the app.
 func (m Model) nextTimer() int {
 	*m.timers++
 	return *m.timers

@@ -55,7 +55,6 @@ func Binary(t testing.TB) string {
 	return binary
 }
 
-// Options shape a fixture Plugin's manifest.
 type Options struct {
 	// Name defaults to "fixture", which is also its Widget type's name.
 	Name string
@@ -71,8 +70,7 @@ type Options struct {
 	Mode string
 	// Command replaces the built fixture (and Args) as the command.
 	Command []string
-	// Build are the manifest's [[build]] steps.
-	Build [][]string
+	Build   [][]string
 }
 
 // Write lays out a fixture Plugin in dir: its ghud-plugin.toml, whose
@@ -88,7 +86,6 @@ func Write(t testing.TB, dir string, o Options) string {
 	return dir
 }
 
-// Manifest is the ghud-plugin.toml Write lays out.
 func Manifest(t testing.TB, o Options) string {
 	t.Helper()
 	if o.Name == "" {

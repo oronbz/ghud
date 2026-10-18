@@ -24,7 +24,6 @@ type pushedMsg struct {
 	push widget.Push
 }
 
-// retryMsg is the time a Widget asked to be refreshed again arriving.
 type retryMsg struct {
 	id   string
 	from widget.Widget
@@ -106,7 +105,6 @@ func (m Model) pluginPath(configFile, p string) string {
 // Close stops every Plugin's process.
 func (m Model) Close() { m.plugins.Close() }
 
-// listen starts the deliveries of the Pushers among ids.
 func (m Model) listen(ids []string) tea.Cmd {
 	var cmds []tea.Cmd
 	for _, id := range ids {
@@ -162,7 +160,6 @@ func (m Model) retried(msg retryMsg) (Model, tea.Cmd) {
 	return m.start(msg.id)
 }
 
-// observe tells every Observer how it's shown now, when that changed.
 func (m Model) observe() {
 	// Until the terminal reports its size, any size would be a guess, and a
 	// Plugin would fit its first payload to it.
@@ -191,7 +188,6 @@ func (m Model) observe() {
 	}
 }
 
-// closeDropped closes the Widgets in old that m no longer holds.
 func (m Model) closeDropped(old map[string]placed) {
 	for id, p := range old {
 		if c, ok := p.widget.(widget.Closer); ok && m.widgets[id].widget != p.widget {

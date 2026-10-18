@@ -35,8 +35,6 @@ func newTasks(c widget.Config) widget.Widget {
 
 type tasks struct {
 	file string
-	// lock serialises edits across ghud instances; it lives in the data dir
-	// so synced folders don't collect lock files.
 	lock string
 }
 
@@ -247,7 +245,6 @@ func parseInput(text string, now time.Time) (string, time.Time) {
 	return strings.TrimSpace(text[:m[0]]), due
 }
 
-// dueLabel says when a task is due relative to now.
 func dueLabel(due, now time.Time) (string, theme.Token) {
 	if due.IsZero() {
 		return "", theme.Dim

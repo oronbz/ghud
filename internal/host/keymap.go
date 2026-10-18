@@ -11,7 +11,6 @@ import (
 	"github.com/oronbz/ghud/internal/widget"
 )
 
-// keyMapLayer is the ? overlay: every host binding in a box centred over the dashboard.
 func (m Model) keyMapLayer() *lipgloss.Layer {
 	bs := Bindings()
 	keyW, descW := 0, 0

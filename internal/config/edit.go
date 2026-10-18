@@ -31,7 +31,6 @@ type Editor struct {
 	Locale  Locale
 }
 
-// NewEditor edits the config at path, locking under dataDir's locks.
 func NewEditor(path, dataDir string, types []widget.Type, loc Locale) Editor {
 	return Editor{Path: path, LockDir: filepath.Join(dataDir, "locks"), Types: types, Locale: loc}
 }
@@ -243,7 +242,6 @@ func (e Editor) SetSettings(typ string, r Ref, settings widget.Settings) (Widget
 	return set, err
 }
 
-// keyOf is the key a line of TOML sets, or "".
 func keyOf(line []byte) string {
 	k, _, ok := bytes.Cut(line, []byte("="))
 	if !ok {
@@ -273,7 +271,6 @@ func (e Editor) Locate(r Ref) (int, error) {
 // change neither.
 func SameWidgets(before, after Config) error { return sameWidgets(before, after, true) }
 
-// find is the index of Widget r among the Widgets with a block.
 func find(c Config, r Ref) (int, error) {
 	n := 0
 	for i, w := range c.Widgets {
@@ -318,7 +315,6 @@ func explicit(c Config) bool {
 	return slices.ContainsFunc(c.Widgets, func(w Widget) bool { return w.line != 0 })
 }
 
-// freshID is typ when no Widget has that id yet, else typ-2, typ-3 and so on.
 func freshID(typ string, c Config) string {
 	taken := func(id string) bool {
 		return slices.ContainsFunc(c.Widgets, func(w Widget) bool { return w.ID == id })
@@ -341,7 +337,6 @@ func block(typ, id string, settings []widget.Setting) string {
 	return b.String()
 }
 
-// appendBlock adds text at the end of src after one blank line.
 func appendBlock(src []byte, text string) []byte {
 	switch {
 	case len(src) == 0:

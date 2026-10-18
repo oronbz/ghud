@@ -16,7 +16,6 @@ import (
 	"github.com/oronbz/ghud/internal/widget"
 )
 
-// toastLife is how long an Action's toast stays in the footer.
 const toastLife = 5 * time.Second
 
 type toast struct {
@@ -28,7 +27,6 @@ type toast struct {
 
 type toastExpiredMsg struct{ seq int }
 
-// say shows text in the footer for toastLife.
 func (m Model) say(text string, tok theme.Token) (Model, tea.Cmd) {
 	seq := m.toast.seq + 1
 	m.toast = toast{text: text, tok: tok, seq: seq}
@@ -44,7 +42,6 @@ type listState struct {
 
 func (s listState) render() render.List { return render.List{Selected: s.idx, Top: s.top} }
 
-// editedMsg says $EDITOR exited after editing file for Widget id.
 type editedMsg struct {
 	id, file string
 	err      error
@@ -128,11 +125,10 @@ type bound struct {
 	item string
 	// subject names the Item in confirm questions.
 	subject string
-	// by is the host-provided Action this is, or none for the Widget's own.
+	// by is none for the Widget's own Actions.
 	by hostAction
-	// typ is the Widget type an addWidget Action places.
-	typ string
-	// choice is the Choice picked for a choice Action.
+	// typ is what an addWidget Action places.
+	typ    string
 	choice *widget.Choice
 }
 
@@ -145,7 +141,6 @@ const (
 	editSettings
 	removeWidget
 	addWidget
-	// saveSettings writes the settings an Action's Result gave into its Widget's block.
 	saveSettings
 	installSkills
 )
@@ -246,7 +241,6 @@ func (m Model) actionFor(key string) (bound, bool) {
 	return bound{}, false
 }
 
-// run starts an Action: it asks first when it must, then invokes it.
 func (m Model) run(id string, a bound) (Model, tea.Cmd) {
 	switch {
 	case a.Confirm:

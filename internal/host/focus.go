@@ -17,8 +17,7 @@ type keyMap struct {
 	Arrange, Widgets, Jump, Help, Palette, Menu  key.Binding
 	Refresh                                      key.Binding
 	Down, Up, First, Last, Primary               key.Binding
-	// Arrange mode.
-	Shift, Grow, Keep, Revert key.Binding
+	Shift, Grow, Keep, Revert                    key.Binding
 }
 
 var keys = keyMap{
@@ -80,13 +79,13 @@ func hostKey(key string) bool {
 func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	if mod, ok := loneModifier(msg.Code); ok {
 		if !msg.IsRepeat {
-			m.held = mod
+			m.heldModifier = mod
 		}
 		return m, nil
 	}
 	// Any other key means the modifier is no longer held alone, and a lost
 	// release can't leave the footer stuck.
-	m.held = 0
+	m.heldModifier = 0
 	var close closekey.Outcome
 	switch m.closing, close = m.closing.Press(msg, m.opts.Ports.Clock.Now()); close {
 	case closekey.Close:

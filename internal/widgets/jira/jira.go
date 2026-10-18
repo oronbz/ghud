@@ -78,7 +78,6 @@ func (w jira) Credential() string { return account(w.site, w.email) }
 
 func account(site, email string) string { return "jira:" + site + ":" + email }
 
-// browse is the issue's page on the site.
 func (w jira) browse(key string) string { return "https://" + w.site + "/browse/" + key }
 
 func (w jira) client(ctx context.Context, now time.Time) (client, error) {
@@ -209,7 +208,6 @@ func priority(p *struct{ Name string }) (string, theme.Token) {
 	return "·", theme.Faint
 }
 
-// category colours a status by its category: to do, in progress or done.
 func category(key string) theme.Token {
 	switch key {
 	case "indeterminate":

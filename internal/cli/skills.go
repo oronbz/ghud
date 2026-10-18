@@ -7,7 +7,6 @@ import (
 	"github.com/oronbz/ghud/internal/version"
 )
 
-// skillsCommand runs `ghud skills install|uninstall`.
 func skillsCommand(s System, args []string) int {
 	if len(args) != 1 || args[0] != "install" && args[0] != "uninstall" {
 		fmt.Fprint(s.Stderr, "ghud: skills needs install or uninstall\n\n", usage)

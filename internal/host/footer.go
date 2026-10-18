@@ -12,7 +12,6 @@ import (
 	"github.com/oronbz/ghud/internal/theme"
 )
 
-// footerHeight is the one line under the grid for the mode badge and hints.
 const footerHeight = 1
 
 func (m Model) footer() string {
@@ -56,7 +55,7 @@ func (m Model) footer() string {
 		hints = "⏎ " + o.action.Label + " · esc cancel"
 	}
 	badge := th.Fg(theme.Bg).Background(th.Color(modeColor)).Bold(true).Render(mode)
-	switch m.held {
+	switch m.heldModifier {
 	case tea.ModShift:
 		hints = modifierHints("Shift", bindings, isShifted)
 	case tea.ModCtrl:
@@ -66,13 +65,12 @@ func (m Model) footer() string {
 	switch {
 	case m.toast.text != "":
 		toast = th.Fg(m.toast.tok).Render(m.toast.text) + "  "
-	case m.sticky != "":
-		toast = th.Fg(theme.Warn).Render(m.sticky) + "  "
+	case m.configProblem != "":
+		toast = th.Fg(theme.Warn).Render(m.configProblem) + "  "
 	}
 	return ansi.Truncate(badge+" "+toast+th.Fg(hintTok).Render(hints), m.w, "…")
 }
 
-// modifierHints lists the bindings that have at least one key using the modifier.
 func modifierHints(name string, bindings []key.Binding, uses func(key string) bool) string {
 	var hints []string
 	for _, b := range bindings {

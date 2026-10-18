@@ -30,7 +30,6 @@ type client struct {
 // rateLimitWait is the pause when GitHub limits a request without saying for how long.
 const rateLimitWait = time.Minute
 
-// graphQL runs query and decodes its data into out.
 func (c client) graphQL(ctx context.Context, query string, vars map[string]any, out any) error {
 	body, err := json.Marshal(map[string]any{"query": query, "variables": vars})
 	if err != nil {
@@ -123,8 +122,6 @@ func limited(res *http.Response) bool {
 		(res.Header.Get("Retry-After") != "" || res.Header.Get("X-RateLimit-Remaining") == "0")
 }
 
-// resetAt is when GitHub says to retry: Retry-After seconds from now, else
-// the X-RateLimit-Reset time, else a minute from now.
 func (c client) resetAt(h http.Header) time.Time {
 	if s, err := strconv.Atoi(h.Get("Retry-After")); err == nil {
 		return c.now.Add(time.Duration(s) * time.Second)
@@ -137,7 +134,6 @@ func (c client) resetAt(h http.Header) time.Time {
 	return c.now.Add(rateLimitWait)
 }
 
-// message is GitHub's own explanation of a failed request, else its status.
 func message(body []byte, status string) string {
 	var e struct {
 		Message string `json:"message"`
@@ -148,7 +144,6 @@ func message(body []byte, status string) string {
 	return status
 }
 
-// authError is GitHub rejecting the token.
 type authError struct{ msg string }
 
 func (e authError) Error() string  { return "GitHub rejected the token: " + e.msg }

@@ -27,7 +27,6 @@ var glyphs = map[rune][5]string{
 	'M': {"10001", "11011", "10101", "10001", "10001"},
 }
 
-// DigitsSize is the size of text drawn as big digits d.
 func DigitsSize(text string, d widget.Digits) widget.Size {
 	if d == widget.NoDigits {
 		return widget.Size{W: len([]rune(text)), H: 1}

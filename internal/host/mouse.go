@@ -15,7 +15,6 @@ import (
 	"github.com/oronbz/ghud/internal/theme"
 )
 
-// doubleClick is how soon a second click on the same place counts as a double-click.
 const doubleClick = 400 * time.Millisecond
 
 // drag is a left-button drag of a title (moving its Widget) or of a seam
@@ -162,7 +161,6 @@ func (m Model) pointer() layout.Pointer {
 	return p
 }
 
-// press handles a left click on zone z.
 func (m Model) press(s scene, z layout.Zone, x, y int) (Model, tea.Cmd) {
 	switch z.Kind {
 	case layout.Title:
@@ -219,7 +217,6 @@ func (m Model) dragTo(f layout.Frame, x, y int) Model {
 	return m
 }
 
-// release ends a drag, writing the Layout when it changed.
 func (m Model) release() Model {
 	d := m.drag
 	m.drag = nil

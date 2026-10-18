@@ -191,10 +191,8 @@ func (l Layout) Visible() Layout {
 	return out
 }
 
-// IsHidden reports whether id is hidden.
 func (l Layout) IsHidden(id string) bool { return slices.Contains(l.Hidden, id) }
 
-// visibleIn lists the indices of row ri's Widgets that aren't hidden.
 func (l Layout) visibleIn(ri int) []int {
 	var out []int
 	for ci, c := range l.Rows[ri].Widgets {

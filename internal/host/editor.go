@@ -78,7 +78,6 @@ func (m Model) editKey(msg tea.Msg) (Model, tea.Cmd) {
 	return m, cmd
 }
 
-// saveEdit leaves INSERT mode, saving a changed text.
 func (m Model) saveEdit() (Model, tea.Cmd) {
 	e := *m.editing
 	m.editing = nil
@@ -90,7 +89,6 @@ func (m Model) saveEdit() (Model, tea.Cmd) {
 
 func editsKey(msg tea.KeyPressMsg) bool { return !slices.Contains(insertHostKeys, msg.String()) }
 
-// editorLayer draws the editor over the body of the tile at x, y.
 func (m Model) editorLayer(x, y int) *lipgloss.Layer {
 	return lipgloss.NewLayer(m.editing.ta.View()).X(x + 2).Y(y + 1).Z(1)
 }

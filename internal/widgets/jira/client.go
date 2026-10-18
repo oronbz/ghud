@@ -165,7 +165,6 @@ func (c client) call(ctx context.Context, target, method string, body []byte) ([
 	return nil, errors.New("Jira: " + msg)
 }
 
-// retryAt is when Jira says to retry: Retry-After seconds from now, else a minute from now.
 func (c client) retryAt(h http.Header) time.Time {
 	if s, err := strconv.Atoi(h.Get("Retry-After")); err == nil {
 		return c.now.Add(time.Duration(s) * time.Second)
@@ -173,7 +172,6 @@ func (c client) retryAt(h http.Header) time.Time {
 	return c.now.Add(rateLimitWait)
 }
 
-// message is Jira's own explanation of a failed request, else its status.
 func message(body []byte, status string) string {
 	var e struct {
 		ErrorMessages []string          `json:"errorMessages"`
@@ -197,7 +195,6 @@ func message(body []byte, status string) string {
 	return strings.Join(msgs, "; ")
 }
 
-// authError is Jira turning down the credentials.
 type authError struct{ msg string }
 
 func (e authError) Error() string { return "Jira rejected the token: " + e.msg }
