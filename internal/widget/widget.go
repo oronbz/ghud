@@ -7,6 +7,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/oronbz/ghud/internal/ports"
 	"github.com/oronbz/ghud/internal/theme"
 )
 
@@ -21,7 +22,10 @@ type Type struct {
 	// Settings is the schema a Widget's config.toml block is validated
 	// against and the config reference is generated from.
 	Settings []Setting
-	New      func(Config) Widget
+	// Refresh is how often the host refreshes a Source; zero means only at
+	// start and after its Actions.
+	Refresh time.Duration
+	New     func(Config) Widget
 }
 
 // Config is what a Widget is built from: its validated settings, defaults
@@ -34,6 +38,8 @@ type Config struct {
 	WeekStart string
 	// DataDir is ghud's data directory, where local Widget data lives by default.
 	DataDir string
+	// Ports are the outside-world adapters, the only way a Widget reaches the world.
+	Ports ports.Ports
 }
 
 // Widget is one placed Widget. It is a View, drawn afresh for every frame,
@@ -191,6 +197,18 @@ type Line struct {
 	Spans []Span
 	// Digits asks the host to draw the line's text as big digits.
 	Digits Digits
+	// Chart, when set, draws the line as a braille area chart instead of its Spans.
+	Chart *Chart
+}
+
+// Chart is a braille area chart, two samples per cell and four dots per row.
+type Chart struct {
+	// Values are samples from 0 to 1, oldest first; the newest is drawn at the
+	// right edge and the ones that don't fit are dropped.
+	Values []float64
+	// Rows is the chart's height; zero takes the rows the other lines leave.
+	Rows  int
+	Token theme.Token
 }
 
 // Digits is how big the host draws a line's text. Big digits cover 0-9,
@@ -211,6 +229,16 @@ type Span struct {
 	// Bg fills the span's cells; the zero value, theme.Bg, leaves the background alone.
 	Bg   theme.Token
 	Bold bool
+	// Bar, when set, draws the span as an eighth-block bar instead of its Text.
+	Bar *Bar
+}
+
+// Bar is a horizontal bar in the span's Token over a track in the line token.
+type Bar struct {
+	// Value is the filled share, 0 to 1.
+	Value float64
+	// Width is the bar's width in cells; zero takes the width the line's other spans leave.
+	Width int
 }
 
 func Text(tok theme.Token, s string) Line { return Line{Spans: []Span{{Text: s, Token: tok}}} }

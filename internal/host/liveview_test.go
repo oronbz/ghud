@@ -6,10 +6,12 @@ import (
 	"time"
 
 	"github.com/oronbz/ghud/internal/hosttest"
+	"github.com/oronbz/ghud/internal/ports"
 	"github.com/oronbz/ghud/internal/theme"
 	"github.com/oronbz/ghud/internal/widget"
 	"github.com/oronbz/ghud/internal/widgets/calendar"
 	"github.com/oronbz/ghud/internal/widgets/clock"
+	"github.com/oronbz/ghud/internal/widgets/cpu"
 )
 
 func TestLargeClockDrawsBlockDigits(t *testing.T) {
@@ -134,6 +136,48 @@ func TestCalendarMovesTodayAtMidnight(t *testing.T) {
 	h.Advance(30 * time.Second)
 	if got := highlighted(t, h); got != "19" {
 		t.Errorf("after midnight highlighted %q, want 19:\n%s", got, h.Screen())
+	}
+}
+
+func TestCPUDrawsBrailleHistoryMemoryBarAndLoad(t *testing.T) {
+	h := hosttest.New(t, hosttest.Options{Types: []widget.Type{cpu.Type}, Width: 40, Height: 10, Now: sundayAfternoon})
+	stats := ports.Stats{CPU: 0.5, MemUsed: 35 << 30, MemTotal: 100 << 30, Load: [3]float64{2.14, 1.96, 1.71}}
+	h.Machine.Set(stats)
+	h.Advance(2 * time.Second)
+	h.Advance(2 * time.Second)
+	stats.CPU = 1
+	h.Machine.Set(stats)
+	h.Advance(2 * time.Second)
+
+	// Samples 0 (read at start), 0.5, 0.5, 1.0 over 4 chart rows, newest at the right edge, two
+	// samples per cell: the full right column of the last cell is the 1.0.
+	chart := []string{" ⢸", " ⢸", "⢸⣿", "⢸⣿"}
+	for i, want := range chart {
+		if got := cells(h.Line(2+i), 37, 2); got != want {
+			t.Errorf("chart row %d ends %q, want %q:\n%s", i, got, want, h.Screen())
+		}
+		if got := strings.TrimSpace(cells(h.Line(2+i), 1, 36)); got != "" {
+			t.Errorf("chart row %d has %q left of the samples", i, got)
+		}
+	}
+	if fg, _ := h.Fg(38, 4); fg != theme.Accent {
+		t.Errorf("chart drawn in %v, want accent", fg)
+	}
+
+	want := map[int]string{
+		1: "│cpu 100%",
+		6: "│mem ██████████▌─────────────────── 35%│",
+		7: "│load 2.14 1.96 1.71",
+	}
+	for y, w := range want {
+		if got := h.Line(y); !strings.HasPrefix(got, w) {
+			t.Errorf("line %d %q, want %q", y, got, w)
+		}
+	}
+	for x, tok := range map[int]theme.Token{5: theme.Info, 15: theme.Info, 16: theme.Line} {
+		if got, _ := h.Fg(x, 6); got != tok {
+			t.Errorf("memory bar cell %d drawn in %v, want %v", x, got, tok)
+		}
 	}
 }
 

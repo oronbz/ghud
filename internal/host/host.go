@@ -24,6 +24,7 @@ import (
 	"github.com/oronbz/ghud/internal/widget"
 	"github.com/oronbz/ghud/internal/widgets/calendar"
 	"github.com/oronbz/ghud/internal/widgets/clock"
+	"github.com/oronbz/ghud/internal/widgets/cpu"
 	"github.com/oronbz/ghud/internal/widgets/tasks"
 )
 
@@ -65,6 +66,8 @@ type Model struct {
 	// Like every map here they're shared by Model copies, and only Update writes them.
 	fetched map[string]widget.Payload
 	lists   map[string]listState
+	// due is each scheduled Source's current refresh timer.
+	due map[string]int
 	// overlay is the open confirm or text prompt, which takes every key.
 	overlay *overlay
 	// held is the modifier (Shift or Ctrl) held on its own, which swaps the
@@ -84,11 +87,11 @@ type placed struct {
 type tickMsg struct{ at time.Time }
 
 // Builtins are the Widget types compiled into ghud, in reference order.
-var Builtins = []widget.Type{clock.Type, calendar.Type, tasks.Type}
+var Builtins = []widget.Type{clock.Type, calendar.Type, tasks.Type, cpu.Type}
 
 func New(o Options) Model {
 	m := Model{opts: o, now: o.Ports.Clock.Now(), widgets: map[string]placed{},
-		fetched: map[string]widget.Payload{}, lists: map[string]listState{}}
+		fetched: map[string]widget.Payload{}, lists: map[string]listState{}, due: map[string]int{}}
 	types := o.Types
 	if types == nil {
 		types = Builtins
@@ -117,7 +120,7 @@ func New(o Options) Model {
 			p.typ = types[i]
 		}
 		if p.setup == "" {
-			p.widget = p.typ.New(widget.Config{Settings: wc.Settings, TimeFormat: cfg.TimeFormat, WeekStart: cfg.WeekStart, DataDir: o.Paths.Data})
+			p.widget = p.typ.New(widget.Config{Settings: wc.Settings, TimeFormat: cfg.TimeFormat, WeekStart: cfg.WeekStart, DataDir: o.Paths.Data, Ports: o.Ports})
 		}
 		m.widgets[id] = p
 		ids = append(ids, id)
@@ -151,6 +154,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case refreshedMsg:
 		return m.refreshed(msg)
+	case refreshDueMsg:
+		return m, m.refreshDue(msg)
 	case actedMsg:
 		return m.acted(msg)
 	case toastExpiredMsg:

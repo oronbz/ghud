@@ -69,9 +69,35 @@ func (m Model) refresh(id string) tea.Cmd {
 	}
 }
 
+type refreshDueMsg struct {
+	id  string
+	seq int
+}
+
+// schedule arms Widget id's next refresh after its type's interval. A newer
+// schedule (after an Action's refresh) supersedes the armed one.
+func (m Model) schedule(id string) tea.Cmd {
+	d := m.widgets[id].typ.Refresh
+	if d <= 0 {
+		return nil
+	}
+	m.due[id]++
+	seq := m.due[id]
+	return m.opts.Ports.Clock.After(d, func(time.Time) tea.Msg { return refreshDueMsg{id: id, seq: seq} })
+}
+
+func (m Model) refreshDue(msg refreshDueMsg) tea.Cmd {
+	if m.due[msg.id] != msg.seq {
+		return nil
+	}
+	return m.refresh(msg.id)
+}
+
 func (m Model) refreshed(msg refreshedMsg) (Model, tea.Cmd) {
+	next := m.schedule(msg.id)
 	if msg.err != nil {
-		return m.say(m.widgets[msg.id].title+": "+msg.err.Error(), theme.Bad)
+		m, cmd := m.say(m.widgets[msg.id].title+": "+msg.err.Error(), theme.Bad)
+		return m, tea.Batch(cmd, next)
 	}
 	m.fetched[msg.id] = msg.payload
 	st := m.lists[msg.id]
@@ -80,7 +106,7 @@ func (m Model) refreshed(msg refreshedMsg) (Model, tea.Cmd) {
 	}
 	m.lists[msg.id] = st
 	m.clampList(msg.id)
-	return m, nil
+	return m, next
 }
 
 // clampList keeps the selection on an Item and in view, its group header

@@ -19,6 +19,7 @@ type Ports struct {
 	Keyring   Keyring
 	Commands  Commands
 	EventKit  EventKit
+	Machine   Machine
 	HTTP      *http.Client
 	Endpoints Endpoints
 }
@@ -49,6 +50,19 @@ type Keyring interface {
 	Get(service, account string) (string, error)
 	Set(service, account, secret string) error
 	Delete(service, account string) error
+}
+
+// Machine reads how hard this machine is working.
+type Machine interface {
+	Stats() (Stats, error)
+}
+
+type Stats struct {
+	// CPU is the share of CPU time in use since the previous read, 0 to 1.
+	CPU               float64
+	MemUsed, MemTotal uint64
+	// Load is the 1, 5 and 15 minute load averages.
+	Load [3]float64
 }
 
 // Commands runs other CLIs ghud borrows from, such as `gh auth token` and `herdr`.
