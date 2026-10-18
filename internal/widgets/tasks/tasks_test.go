@@ -377,6 +377,30 @@ func TestEditingTasksMdOutsideGhudUpdatesTheWidget(t *testing.T) {
 	}
 }
 
+func TestPointingTasksAtAnotherFileWhileRunningShowsAndWatchesThatFile(t *testing.T) {
+	h := withTasks(t, "- [ ] Call the bank\n", hosttest.Options{Width: 40, Height: 7})
+	other := filepath.Join(h.Paths.Data, "work.md")
+	if err := os.WriteFile(other, []byte("- [ ] Review PRs\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := filepath.Join(h.Paths.Config, "config.toml")
+	if err := os.WriteFile(cfg, []byte("[[widget]]\ntype = \"tasks\"\nfile = \"work.md\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.Changed(cfg)
+	if !strings.Contains(tile(h), "Review PRs") || strings.Contains(tile(h), "Call the bank") {
+		t.Fatalf("after the config change:\n%s", tile(h))
+	}
+
+	if err := os.WriteFile(other, []byte("- [ ] Review PRs\n- [ ] Ship it\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.Changed(other)
+	if !strings.Contains(tile(h), "Ship it") {
+		t.Errorf("an edit to the new file didn't show:\n%s", tile(h))
+	}
+}
+
 func TestTwoInstancesCompletingDifferentTasksBothLand(t *testing.T) {
 	a := withTasks(t, "- [ ] Call the bank\n- [ ] Water plants\n- [ ] Pay rent\n", hosttest.Options{Width: 40, Height: 7})
 	b := hosttest.New(t, hosttest.Options{Width: 40, Height: 7, Root: a.Root})
