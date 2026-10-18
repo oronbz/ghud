@@ -126,6 +126,85 @@ func TestLeavingInsertModeWithoutChangesWritesNothing(t *testing.T) {
 	}
 }
 
+func TestAnInlineSaveOverANoteChangedElsewhereKeepsTheOtherVersionInAConflictFile(t *testing.T) {
+	h := withNotes(t, "Buy milk\n", hosttest.Options{Width: 100, Height: 9})
+	path := notesFile(h.Root, "notes.md")
+	h.Press("1", "i")
+	h.Type("Call mum")
+
+	writeNote(t, path, "Buy oat milk\n")
+	h.Changed(path)
+	h.Press("esc")
+
+	if got := readNote(t, path); got != "Buy milk\nCall mum\n" {
+		t.Errorf("notes.md = %q, want the user's save", got)
+	}
+	conflict := notesFile(h.Root, "notes.conflict-20261018-140509.md")
+	if got := readNote(t, conflict); got != "Buy oat milk\n" {
+		t.Errorf("conflict file = %q, want the version saved elsewhere", got)
+	}
+	if _, _, ok := h.Find("other version is in notes.conflict-20261018-140509.md"); !ok {
+		t.Errorf("no toast naming the conflict file:\n%s", h.Screen())
+	}
+}
+
+func TestAnInlineSaveOverAnUnchangedNoteMakesNoConflictFile(t *testing.T) {
+	h := withNotes(t, "Buy milk\n", hosttest.Options{Width: 100, Height: 9})
+	h.Press("1", "i")
+	h.Type("Call mum")
+	h.Press("esc")
+	entries, err := os.ReadDir(h.Paths.Data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if strings.Contains(e.Name(), "conflict") {
+			t.Errorf("conflict file %s written for an unchanged note", e.Name())
+		}
+	}
+}
+
+func TestAnEditorSaveOverANoteChangedElsewhereKeepsTheOtherVersionInAConflictFile(t *testing.T) {
+	h := withNotes(t, "Buy milk\n", hosttest.Options{Width: 100, Height: 9})
+	path := notesFile(h.Root, "notes.md")
+	h.Editor.OnEdit = func(p string) error {
+		// Another instance saves while the editor is open.
+		writeNote(t, path, "Buy oat milk\n")
+		return os.WriteFile(p, []byte("Buy milk\nCall mum\n"), 0o644)
+	}
+
+	h.Press("1", "E")
+	if got := readNote(t, path); got != "Buy milk\nCall mum\n" {
+		t.Errorf("notes.md = %q, want the editor's save", got)
+	}
+	if got := readNote(t, notesFile(h.Root, "notes.conflict-20261018-140509.md")); got != "Buy oat milk\n" {
+		t.Errorf("conflict file = %q, want the version saved elsewhere", got)
+	}
+	if _, _, ok := h.Find("other version is in notes.conflict-20261018-140509.md"); !ok {
+		t.Errorf("no toast naming the conflict file:\n%s", h.Screen())
+	}
+}
+
+func TestQuittingTheEditorWithoutSavingLeavesANoteChangedElsewhere(t *testing.T) {
+	h := withNotes(t, "Buy milk\n", hosttest.Options{Width: 100, Height: 9})
+	path := notesFile(h.Root, "notes.md")
+	h.Editor.OnEdit = func(string) error {
+		writeNote(t, path, "Buy oat milk\n")
+		return nil
+	}
+
+	h.Press("1", "E")
+	if got := readNote(t, path); got != "Buy oat milk\n" {
+		t.Errorf("notes.md = %q, want the other instance's version untouched", got)
+	}
+	if _, err := os.Stat(notesFile(h.Root, "notes.conflict-20261018-140509.md")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("conflict file written although the editor saved nothing (stat error %v)", err)
+	}
+	if got := body(h, 1)[0]; got != "Buy oat milk" {
+		t.Errorf("Widget shows %q, want the note as it is on disk", got)
+	}
+}
+
 func TestEOpensTheNoteInTheEditorAndShowsTheEditedText(t *testing.T) {
 	h := withNotes(t, "Buy milk\n", hosttest.Options{Width: 40, Height: 9})
 	path := notesFile(h.Root, "notes.md")
@@ -133,15 +212,25 @@ func TestEOpensTheNoteInTheEditorAndShowsTheEditedText(t *testing.T) {
 		if got := body(h, 1)[0]; got != "Buy milk" {
 			t.Errorf("Widget reloaded before the editor returned: %q", got)
 		}
+		if got := readNote(t, p); got != "Buy milk\n" {
+			t.Errorf("the editor got %q, want the note", got)
+		}
 		return os.WriteFile(p, []byte("Buy oat milk\n"), 0o644)
 	}
 
 	h.Press("1", "E")
-	if len(h.Editor.Edited) != 1 || h.Editor.Edited[0] != path {
-		t.Fatalf("editor ran on %q, want [%s]", h.Editor.Edited, path)
+	// The editor works on a copy named like the note, saved over it on exit.
+	if len(h.Editor.Edited) != 1 || filepath.Base(h.Editor.Edited[0]) != "notes.md" {
+		t.Fatalf("editor ran on %q, want one notes.md", h.Editor.Edited)
+	}
+	if got := readNote(t, path); got != "Buy oat milk\n" {
+		t.Errorf("notes.md = %q", got)
 	}
 	if got := body(h, 1)[0]; got != "Buy oat milk" {
 		t.Fatalf("Widget after the editor shows %q", got)
+	}
+	if _, err := os.Stat(h.Editor.Edited[0]); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("the editor's copy is still there (stat error %v)", err)
 	}
 }
 
@@ -184,8 +273,8 @@ file = "home.md"
 	if got := readNote(t, home); got != "Groceries\nGarden\n" {
 		t.Errorf("home.md = %q", got)
 	}
-	if len(h.Editor.Edited) != 1 || h.Editor.Edited[0] != home {
-		t.Errorf("editor ran on %q, want [%s]", h.Editor.Edited, home)
+	if len(h.Editor.Edited) != 1 || filepath.Base(h.Editor.Edited[0]) != "home.md" {
+		t.Errorf("editor ran on %q, want one copy of home.md", h.Editor.Edited)
 	}
 	if got := strings.Fields(h.Line(2)); strings.Join(got, " ") != "│ Ship it ││ Garden │" {
 		t.Errorf("second rows = %q", h.Line(2))

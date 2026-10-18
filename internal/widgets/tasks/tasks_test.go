@@ -364,6 +364,60 @@ file = "lists/today.md"
 	}
 }
 
+func TestEditingTasksMdOutsideGhudUpdatesTheWidget(t *testing.T) {
+	h := withTasks(t, "- [ ] Call the bank\n", hosttest.Options{Width: 40, Height: 7})
+
+	writeTasks(t, h.Root, "- [ ] Call the bank\n- [ ] Water plants\n")
+	if strings.Contains(tile(h), "Water plants") {
+		t.Fatalf("Widget changed before the watcher reported the file:\n%s", tile(h))
+	}
+	h.Changed(tasksFile(h.Root))
+	if !strings.Contains(tile(h), "○ Water plants") || !strings.Contains(h.Line(0), "Tasks 2") {
+		t.Fatalf("Widget after the external edit:\n%s", tile(h))
+	}
+}
+
+func TestPointingTasksAtAnotherFileWhileRunningShowsAndWatchesThatFile(t *testing.T) {
+	h := withTasks(t, "- [ ] Call the bank\n", hosttest.Options{Width: 40, Height: 7})
+	other := filepath.Join(h.Paths.Data, "work.md")
+	if err := os.WriteFile(other, []byte("- [ ] Review PRs\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := filepath.Join(h.Paths.Config, "config.toml")
+	if err := os.WriteFile(cfg, []byte("[[widget]]\ntype = \"tasks\"\nfile = \"work.md\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.Changed(cfg)
+	if !strings.Contains(tile(h), "Review PRs") || strings.Contains(tile(h), "Call the bank") {
+		t.Fatalf("after the config change:\n%s", tile(h))
+	}
+
+	if err := os.WriteFile(other, []byte("- [ ] Review PRs\n- [ ] Ship it\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.Changed(other)
+	if !strings.Contains(tile(h), "Ship it") {
+		t.Errorf("an edit to the new file didn't show:\n%s", tile(h))
+	}
+}
+
+func TestTwoInstancesCompletingDifferentTasksBothLand(t *testing.T) {
+	a := withTasks(t, "- [ ] Call the bank\n- [ ] Water plants\n- [ ] Pay rent\n", hosttest.Options{Width: 40, Height: 7})
+	b := hosttest.New(t, hosttest.Options{Width: 40, Height: 7, Root: a.Root})
+
+	a.Press("tab", "space")
+	// b hasn't heard of a's change yet, so it still lists all three.
+	b.Press("tab", "G", "space")
+
+	if got, want := readTasks(t, a), "- [x] Call the bank\n- [ ] Water plants\n- [x] Pay rent\n"; got != want {
+		t.Fatalf("tasks.md = %q, want %q", got, want)
+	}
+	a.Changed(tasksFile(a.Root))
+	if got := strings.Split(tile(a), "\n")[1]; !strings.Contains(got, "Water plants") || strings.Contains(tile(a), "Pay rent") {
+		t.Errorf("a after b's change:\n%s", tile(a))
+	}
+}
+
 // typeText presses one key per character of s.
 func typeText(h *hosttest.Host, s string) {
 	for _, r := range s {
