@@ -77,7 +77,7 @@ func (m Model) added(wc config.Widget) (Model, tea.Cmd) {
 	m, toast := m.say("Added "+p.title, theme.Fg)
 	m, fetch := m.whenDue(wc.ID)
 	m, beat := m.beat()
-	cmds := []tea.Cmd{toast, fetch, beat}
+	cmds := []tea.Cmd{toast, fetch, beat, m.listen([]string{wc.ID})}
 	// One tick chain serves every live view; start it only if none is running.
 	if !ticking {
 		cmds = append(cmds, m.nextTick())
@@ -88,6 +88,7 @@ func (m Model) added(wc config.Widget) (Model, tea.Cmd) {
 func (m Model) removed(id string) (Model, tea.Cmd) {
 	gone := m.widgets[id]
 	delete(m.widgets, id)
+	m.closeDropped(map[string]placed{id: gone})
 	delete(m.fetched, id)
 	delete(m.lists, id)
 	delete(m.sched, id)

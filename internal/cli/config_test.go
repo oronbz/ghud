@@ -14,6 +14,7 @@ import (
 	"github.com/oronbz/ghud/internal/cli"
 	"github.com/oronbz/ghud/internal/config"
 	"github.com/oronbz/ghud/internal/host"
+	"github.com/oronbz/ghud/internal/plugin/plugintest"
 )
 
 // sandbox is a temp home with env on top of HOME.
@@ -52,6 +53,19 @@ func writeFile(t *testing.T, path, content string) {
 
 func titledClock(title string) string {
 	return "[[widget]]\ntype = \"clock\"\ntitle = \"" + title + "\"\n"
+}
+
+func TestConfigDefaultDocumentsInstalledPluginTypes(t *testing.T) {
+	s, home, stdout, stderr := sandbox(t, nil, "", "config", "default")
+	plugintest.Write(t, filepath.Join(home, ".local", "share", "ghud", "plugins", "fixture"), plugintest.Options{})
+	if code := cli.Run(s); code != 0 {
+		t.Fatalf("exit %d: %s", code, stderr)
+	}
+	for _, want := range []string{"Fixture Widget. Shows what the fixture Plugin is told to", `type = "fixture"`, `greeting = "hello"`, "Words in front of every Item"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Errorf("reference has no %q", want)
+		}
+	}
 }
 
 func TestConfigIsReadFromXDGConfigHome(t *testing.T) {

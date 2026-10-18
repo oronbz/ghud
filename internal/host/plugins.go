@@ -9,7 +9,9 @@ import (
 
 	"github.com/oronbz/ghud/internal/config"
 	"github.com/oronbz/ghud/internal/layout"
+	"github.com/oronbz/ghud/internal/paths"
 	"github.com/oronbz/ghud/internal/plugin"
+	"github.com/oronbz/ghud/internal/ports"
 	"github.com/oronbz/ghud/internal/widget"
 )
 
@@ -53,6 +55,15 @@ func (m Model) loadConfig(file string, base []widget.Type) (config.Config, error
 	types := append(append([]widget.Type{}, base...), found...)
 	cfg, err = config.Load(file, types, m.opts.Locale)
 	return cfg, err, types, problems
+}
+
+// Types are the built-in Widget types plus those of the Plugins installed in
+// p's data dir or listed in configFile, with the Plugins' problems. No
+// Plugin is started.
+func Types(p paths.Paths, configFile string, loc config.Locale, getenv func(string) string) ([]widget.Type, []string) {
+	m := Model{opts: Options{Paths: p, Locale: loc, Ports: ports.Ports{Getenv: getenv}}, plugins: plugin.NewRegistry()}
+	_, _, types, problems := m.loadConfig(configFile, Builtins)
+	return types, problems
 }
 
 // pluginPath resolves a [[plugin]] path: ~/ is the home directory and a

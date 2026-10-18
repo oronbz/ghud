@@ -1,6 +1,7 @@
 package host_test
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -129,6 +130,34 @@ func TestACrashedPluginShowsAnErrorAndRestartsWithGrowingDelays(t *testing.T) {
 	hides(t, h, "hello alpha")
 	h.Advance(time.Second)
 	shows(t, h, "hello alpha")
+}
+
+func TestAnAddedPluginWidgetGetsItsPushes(t *testing.T) {
+	h := withPlugin(t, plugintest.Options{}, fixtureWidget)
+	h.Resize(60, 24)
+	runFromPalette(t, h, "add fixture")
+	shows(t, h, "Added Fixture")
+	h.Press("2")
+	h.Receive()
+	_, y, _ := h.Find("pushed: focused")
+	if _, top, _ := h.Find("refresh 1"); y < top {
+		t.Errorf("the push landed in the first Widget, not the one added:\n%s", h.Screen())
+	}
+}
+
+func TestAPluginListedInAReloadedConfigProvidesItsTypes(t *testing.T) {
+	root := t.TempDir()
+	cfgDir := paths.Under(root).Config
+	plugintest.Write(t, filepath.Join(cfgDir, "dev", "fixture"), plugintest.Options{})
+	h := hosttest.New(t, hosttest.Options{Root: root, Width: 60, Height: 12, Types: []widget.Type{}, Config: fixtureWidget})
+	shows(t, h, "unknown Widget type `fixture`")
+	file := filepath.Join(cfgDir, "config.toml")
+	if err := os.WriteFile(file, []byte("[[plugin]]\npath = \"dev/fixture\"\n\n"+fixtureWidget), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.Changed(file)
+	shows(t, h, "hello alpha")
+	hides(t, h, "unknown Widget type")
 }
 
 func TestPluginsListedInConfigAreFoundRelativeToIt(t *testing.T) {
