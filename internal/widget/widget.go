@@ -150,7 +150,13 @@ type Result struct {
 	Edit string
 	// Then, with Edit, is the Action the host runs once the editor exits
 	// cleanly, with Text set to the Edit file and Base to Then's Value.
+	// Without Edit the host runs it at once, asking for its input, so one
+	// Action can lead into the next, as a setup flow's prompts do.
 	Then *Action
+	// Settings are written into the Widget's [[widget]] block in
+	// config.toml, the old block commented out, and the Widget is rebuilt
+	// with them.
+	Settings Settings
 }
 
 type Size struct{ W, H int }

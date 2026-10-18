@@ -29,6 +29,9 @@ func token(p ports.Ports, site, email, account string) (string, bool) {
 	}
 	if p.Keyring != nil {
 		for _, item := range [][2]string{{service, account}, {cliService, email}} {
+			if item[1] == "" {
+				continue
+			}
 			if t, err := p.Keyring.Get(item[0], item[1]); err == nil && strings.TrimSpace(t) != "" {
 				return strings.TrimSpace(t), true
 			}

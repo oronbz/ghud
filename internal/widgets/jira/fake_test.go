@@ -13,7 +13,9 @@ import (
 )
 
 // fakeJira is a fake Jira Cloud site: JQL search with cursor paging over
-// fixture issues, and each issue's transitions. It records every request.
+// fixture issues, and each issue's transitions. It also stands in for
+// api.atlassian.com's /ex/jira/{cloudId} route to the same site. It records
+// every request.
 type fakeJira struct {
 	srv *httptest.Server
 
@@ -26,7 +28,16 @@ type fakeJira struct {
 	requests []request
 	// reply, when set, answers a request instead of the fixtures; status 0 falls through.
 	reply func(r request) (status int, header http.Header, body string)
+	// scoped is a scoped token: the site turns it down, only the
+	// api.atlassian.com route takes it.
+	scoped string
 }
+
+// cloudID is the site's id, from its tenant info.
+const cloudID = "0f3c1e2d-7a4b-4c5d-9e8f-123456789abc"
+
+// apiRoute is the api.atlassian.com path prefix to the site.
+const apiRoute = "/ex/jira/" + cloudID
 
 type issue struct {
 	key, summary, status string
@@ -75,8 +86,21 @@ func (j *fakeJira) serve(w http.ResponseWriter, r *http.Request) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	w.Header().Set("Content-Type", "application/json")
-	switch key, ok := strings.CutPrefix(r.URL.Path, "/rest/api/3/issue/"); {
-	case r.Method == http.MethodGet && r.URL.Path == "/rest/api/3/search/jql":
+	path, viaAPI := strings.CutPrefix(r.URL.Path, apiRoute)
+	if r.URL.Path == "/_edge/tenant_info" {
+		if req.Auth != "" {
+			http.Error(w, "tenant info takes no credentials", http.StatusBadRequest)
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]string{"cloudId": cloudID})
+		return
+	}
+	if _, pass, _ := r.BasicAuth(); j.scoped != "" && pass == j.scoped && !viaAPI {
+		http.Error(w, `{"errorMessages":["Client must be authenticated to access this resource."]}`, http.StatusUnauthorized)
+		return
+	}
+	switch key, ok := strings.CutPrefix(path, "/rest/api/3/issue/"); {
+	case r.Method == http.MethodGet && path == "/rest/api/3/search/jql":
 		j.search(w, req.Query)
 	case ok && r.Method == http.MethodGet && strings.HasSuffix(key, "/transitions"):
 		j.transitions(w, strings.TrimSuffix(key, "/transitions"))
@@ -190,7 +214,7 @@ func (j *fakeJira) Requests() []request {
 func (j *fakeJira) searches() []request {
 	var out []request
 	for _, r := range j.Requests() {
-		if r.Path == "/rest/api/3/search/jql" {
+		if strings.HasSuffix(r.Path, "/rest/api/3/search/jql") {
 			out = append(out, r)
 		}
 	}

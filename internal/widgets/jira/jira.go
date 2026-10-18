@@ -31,7 +31,7 @@ var Type = widget.Type{
 		},
 		{
 			Name: "email", Kind: widget.String, Default: "",
-			Description: "The email you sign in to Jira with.",
+			Description: "The email you sign in to Jira with; leave it empty for a Data Center personal access token.",
 			Why:         "With an API token it signs ghud in as you.",
 		},
 		{
@@ -52,6 +52,7 @@ func newJira(c widget.Config) widget.Widget {
 		site:  host(c.Settings.String("site")),
 		email: strings.TrimSpace(c.Settings.String("email")),
 		jql:   c.Settings.String("jql"),
+		route: &route{},
 	}
 }
 
@@ -59,6 +60,7 @@ type jira struct {
 	ports ports.Ports
 	// site is the site's host name, such as acme.atlassian.net.
 	site, email, jql string
+	route            *route
 }
 
 // host is a site setting's host name, whether or not it was given as a URL.
@@ -72,29 +74,35 @@ func host(site string) string {
 
 // Credential is the account of ghud's keyring item, jira:<site>:<email>,
 // which also names the token every Widget on that site and account shares.
-func (w jira) Credential() string { return "jira:" + w.site + ":" + w.email }
+func (w jira) Credential() string { return account(w.site, w.email) }
+
+func account(site, email string) string { return "jira:" + site + ":" + email }
 
 // browse is the issue's page on the site.
 func (w jira) browse(key string) string { return "https://" + w.site + "/browse/" + key }
 
 func (w jira) client(ctx context.Context, now time.Time) (client, error) {
-	if w.site == "" || w.email == "" {
-		return client{}, needsSetup("Set `site` and `email` for this Jira Widget")
+	if w.site == "" {
+		return client{}, w.needsSetup("Set `site` for this Jira Widget")
 	}
 	tok, ok := token(w.ports, w.site, w.email, w.Credential())
 	if !ok {
-		return client{}, needsSetup("No Jira API token: set JIRA_API_TOKEN, or sign in with jira-cli")
+		return client{}, w.needsSetup("No Jira API token: set JIRA_API_TOKEN, or sign in with jira-cli")
 	}
-	base := "https://" + w.site
+	site := "https://" + w.site
 	if e := w.ports.Endpoints.Jira; e != "" {
-		base = strings.TrimSuffix(e, "/")
+		site = strings.TrimSuffix(e, "/")
 	}
-	return client{http: w.ports.HTTP, base: base, email: w.email, token: tok, now: now}, nil
+	api := strings.TrimSuffix(w.ports.Endpoints.AtlassianAPI, "/")
+	return client{http: w.ports.HTTP, site: site, api: api, route: w.route, email: w.email, token: tok, now: now}, nil
 }
 
-// needsSetup is the Status of a Widget ghud can't sign in with. The setup
-// Action that fixes it is #43's.
-func needsSetup(hint string) *widget.SetupError { return &widget.SetupError{Hint: hint} }
+// needsSetup is the Status of a Widget ghud can't sign in with, fixed by
+// the Set up Jira flow.
+func (w jira) needsSetup(hint string) *widget.SetupError {
+	a := Setup{}.Start(w.site, w.email)
+	return &widget.SetupError{Hint: hint, Action: &a}
+}
 
 // maxPages caps a search, so a runaway cursor can't page forever.
 const maxPages = 20
@@ -145,7 +153,10 @@ func (w jira) Refresh(ctx context.Context, now time.Time) (widget.Payload, error
 // status turns a rejected token into needs setup.
 func (w jira) status(err error) error {
 	if errors.As(err, new(authError)) {
-		return needsSetup(fmt.Sprintf("Jira rejected the API token for %s; check JIRA_API_TOKEN or sign in again", w.email))
+		if w.email == "" {
+			return w.needsSetup("Jira rejected the personal access token; check JIRA_API_TOKEN or set up Jira again")
+		}
+		return w.needsSetup(fmt.Sprintf("Jira rejected the API token for %s; check JIRA_API_TOKEN or set up Jira again", w.email))
 	}
 	return err
 }
@@ -250,6 +261,9 @@ func (w jira) Choices(ctx context.Context, inv widget.Invocation) ([]widget.Choi
 }
 
 func (w jira) Invoke(ctx context.Context, inv widget.Invocation) (widget.Result, error) {
+	if IsSetup(inv.Action) {
+		return Setup{Keyring: w.ports.Keyring}.Invoke(ctx, inv)
+	}
 	if inv.Action != transitionAction {
 		return widget.Result{}, fmt.Errorf("Jira has no Action %q", inv.Action)
 	}
