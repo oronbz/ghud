@@ -16,6 +16,8 @@ import (
 	"github.com/oronbz/ghud/internal/paths"
 	"github.com/oronbz/ghud/internal/theme"
 	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/ghud/internal/widgets/meetings"
+	"github.com/oronbz/ghud/internal/widgets/prs"
 )
 
 // upstream is an API that several hosts' News Widgets fetch from; every
@@ -285,5 +287,15 @@ func TestAnInstanceSkipsTheFetchAnotherIsMakingAndShowsItsResult(t *testing.T) {
 	b.Changed(entryFile(t, root))
 	if !strings.Contains(b.Screen(), "world edition 1") {
 		t.Errorf("b shows:\n%s\nwant edition 1 from a's fetch", b.Screen())
+	}
+}
+
+func TestPRsAndMeetingsAreCachedWidgets(t *testing.T) {
+	for _, typ := range []widget.Type{prs.Type, meetings.Type} {
+		t.Run(typ.Name, func(t *testing.T) {
+			h := hosttest.New(t, hosttest.Options{Width: 60, Height: 10, Types: []widget.Type{typ},
+				Config: "[[widget]]\ntype = \"" + typ.Name + "\"\n"})
+			entryFile(t, h.Root)
+		})
 	}
 }
