@@ -6,6 +6,7 @@ package host
 import (
 	"fmt"
 	"image"
+	"math/rand/v2"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -26,6 +27,7 @@ import (
 	"github.com/oronbz/ghud/internal/widgets/clock"
 	"github.com/oronbz/ghud/internal/widgets/cpu"
 	"github.com/oronbz/ghud/internal/widgets/notes"
+	"github.com/oronbz/ghud/internal/widgets/script"
 	"github.com/oronbz/ghud/internal/widgets/tasks"
 )
 
@@ -67,8 +69,12 @@ type Model struct {
 	// Like every map here they're shared by Model copies, and only Update writes them.
 	fetched map[string]widget.Payload
 	lists   map[string]listState
-	// due is each scheduled Source's current refresh timer.
-	due map[string]int
+	// sched is each Source's refresh schedule and Status; paused, when each
+	// rate-limited credential may be used again.
+	sched    map[string]sched
+	paused   map[string]time.Time
+	rng      *rand.Rand
+	spinning bool
 	// overlay is the open confirm or text prompt, which takes every key.
 	overlay *overlay
 	// editing is INSERT mode's editor, which takes every key but insertHostKeys.
@@ -92,11 +98,12 @@ type placed struct {
 type tickMsg struct{ at time.Time }
 
 // Builtins are the Widget types compiled into ghud, in reference order.
-var Builtins = []widget.Type{clock.Type, calendar.Type, tasks.Type, cpu.Type, notes.Type}
+var Builtins = []widget.Type{clock.Type, calendar.Type, tasks.Type, cpu.Type, notes.Type, script.Type}
 
 func New(o Options) Model {
 	m := Model{opts: o, now: o.Ports.Clock.Now(), widgets: map[string]placed{},
-		fetched: map[string]widget.Payload{}, lists: map[string]listState{}, due: map[string]int{}}
+		fetched: map[string]widget.Payload{}, lists: map[string]listState{},
+		sched: map[string]sched{}, paused: map[string]time.Time{}, rng: newRand(o.Ports.Clock.Now())}
 	types := o.Types
 	if types == nil {
 		types = Builtins
@@ -110,7 +117,6 @@ func New(o Options) Model {
 	if err != nil {
 		problems = append(problems, err.Error())
 	}
-	m.toast = toast{text: toastOf(append(problems, cfg.Problems...)), tok: theme.Warn}
 	m.colors = colors{pinned: !o.Theme.IsZero(), name: cfg.Theme, over: cfg.Colors, asking: o.Theme.IsZero()}
 	m = m.resolveTheme()
 	var ids []string
@@ -129,7 +135,15 @@ func New(o Options) Model {
 		}
 		m.widgets[id] = p
 		ids = append(ids, id)
+		if _, ok := p.widget.(widget.Source); ok {
+			iv, problem := interval(p, wc.Refresh)
+			if problem != "" {
+				problems = append(problems, problem)
+			}
+			m.sched[id] = sched{interval: iv}
+		}
 	}
+	m.toast = toast{text: toastOf(append(problems, cfg.Problems...)), tok: theme.Warn}
 	// An unreadable layout.json falls back to the default rather than blocking launch.
 	saved, err := layout.Load(o.Paths.Config)
 	if err != nil {
@@ -140,11 +154,7 @@ func New(o Options) Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.nextTick(), m.queryColors()}
-	for _, id := range m.ids() {
-		cmds = append(cmds, m.refresh(id))
-	}
-	return tea.Batch(cmds...)
+	return tea.Batch(m.nextTick(), m.queryColors(), func() tea.Msg { return startMsg{} })
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -164,8 +174,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case refreshedMsg:
 		return m.refreshed(msg)
-	case refreshDueMsg:
-		return m, m.refreshDue(msg)
+	case startMsg:
+		return m.startAll()
+	case dueMsg:
+		return m.due(msg)
+	case beatMsg:
+		return m.beaten(msg)
+	case spinMsg:
+		return m.spun(msg)
 	case actedMsg:
 		return m.acted(msg)
 	case editedMsg:

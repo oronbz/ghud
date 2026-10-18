@@ -25,9 +25,19 @@ type Type struct {
 	// against and the config reference is generated from.
 	Settings []Setting
 	// Refresh is how often the host refreshes a Source; zero means only at
-	// start and after its Actions.
+	// start and after its Actions. A Widget's `refresh` setting overrides it.
 	Refresh time.Duration
-	New     func(Config) Widget
+	// Floor is the shortest `refresh` allowed; shorter ones are clamped to it.
+	Floor time.Duration
+	// Midnight also refreshes a Source at local midnight, for payloads that
+	// depend on the date.
+	Midnight bool
+	// Fetches marks a Source that reaches beyond the machine, such as an API
+	// or a command; its schedules are jittered so instances spread out.
+	Fetches bool
+	// OptIn leaves the type out of the Widgets shown when config.toml places none.
+	OptIn bool
+	New   func(Config) Widget
 }
 
 // Config is what a Widget is built from: its validated settings, defaults
@@ -65,6 +75,19 @@ type Ticker interface {
 // Payload it returned.
 type Source interface {
 	Refresh(ctx context.Context, now time.Time) (Payload, error)
+}
+
+// Scheduled is a Source that sets its own default interval, such as a script
+// Widget's `interval`; the `refresh` setting still wins.
+type Scheduled interface {
+	Interval() time.Duration
+}
+
+// Credentialed is a Source that signs in with a credential other Widgets may
+// share; a rate limit on one pauses them all.
+type Credentialed interface {
+	// Credential names the credential, such as "github:github.com".
+	Credential() string
 }
 
 // Watcher is a Source backed by local files. Widgets sharing a file refresh

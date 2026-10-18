@@ -43,12 +43,6 @@ type listState struct {
 
 func (s listState) render() render.List { return render.List{Selected: s.idx, Top: s.top} }
 
-type refreshedMsg struct {
-	id      string
-	payload widget.Payload
-	err     error
-}
-
 // editedMsg says $EDITOR exited after editing Widget id's file.
 type editedMsg struct {
 	id  string
@@ -62,59 +56,6 @@ type actedMsg struct {
 	err    error
 	// byHost marks an Action the host performed, which leaves the Widget as it was.
 	byHost bool
-}
-
-// refresh fetches a Source's Payload off the UI thread; other Widgets need none.
-func (m Model) refresh(id string) tea.Cmd {
-	src, ok := m.widgets[id].widget.(widget.Source)
-	if !ok {
-		return nil
-	}
-	now := m.opts.Ports.Clock.Now()
-	return func() tea.Msg {
-		p, err := src.Refresh(context.Background(), now)
-		return refreshedMsg{id: id, payload: p, err: err}
-	}
-}
-
-type refreshDueMsg struct {
-	id  string
-	seq int
-}
-
-// schedule arms Widget id's next refresh after its type's interval. A newer
-// schedule (after an Action's refresh) supersedes the armed one.
-func (m Model) schedule(id string) tea.Cmd {
-	d := m.widgets[id].typ.Refresh
-	if d <= 0 {
-		return nil
-	}
-	m.due[id]++
-	seq := m.due[id]
-	return m.opts.Ports.Clock.After(d, func(time.Time) tea.Msg { return refreshDueMsg{id: id, seq: seq} })
-}
-
-func (m Model) refreshDue(msg refreshDueMsg) tea.Cmd {
-	if m.due[msg.id] != msg.seq {
-		return nil
-	}
-	return m.refresh(msg.id)
-}
-
-func (m Model) refreshed(msg refreshedMsg) (Model, tea.Cmd) {
-	next := m.schedule(msg.id)
-	if msg.err != nil {
-		m, cmd := m.say(m.widgets[msg.id].title+": "+msg.err.Error(), theme.Bad)
-		return m, tea.Batch(cmd, next)
-	}
-	m.fetched[msg.id] = msg.payload
-	st := m.lists[msg.id]
-	if i := slices.IndexFunc(msg.payload.Items, func(it widget.Item) bool { return it.ID == st.sel }); i >= 0 {
-		st.idx = i
-	}
-	m.lists[msg.id] = st
-	m.clampList(msg.id)
-	return m, next
 }
 
 // clampList keeps the selection on an Item and in view, its group header
@@ -343,7 +284,9 @@ func (m Model) after(id, toast string) (Model, tea.Cmd) {
 	files := watched(m.widgets[id].widget)
 	for _, other := range m.ids() {
 		if other == id || slices.ContainsFunc(watched(m.widgets[other].widget), func(f string) bool { return slices.Contains(files, f) }) {
-			cmds = append(cmds, m.refresh(other))
+			var cmd tea.Cmd
+			m, cmd = m.start(other)
+			cmds = append(cmds, cmd)
 		}
 	}
 	return m, tea.Batch(cmds...)
