@@ -66,6 +66,17 @@ func Types(p paths.Paths, configFile string, loc config.Locale, getenv func(stri
 	return types, problems
 }
 
+// PluginPaths are the Plugin directories configFile lists with [[plugin]] path.
+func PluginPaths(configFile string, loc config.Locale, getenv func(string) string) []string {
+	m := Model{opts: Options{Locale: loc, Ports: ports.Ports{Getenv: getenv}}}
+	cfg, _ := config.Load(configFile, Builtins, loc)
+	var dirs []string
+	for _, p := range cfg.Plugins {
+		dirs = append(dirs, m.pluginPath(configFile, p.Path))
+	}
+	return dirs
+}
+
 // pluginPath resolves a [[plugin]] path: ~/ is the home directory and a
 // relative path is relative to config.toml.
 func (m Model) pluginPath(configFile, p string) string {
