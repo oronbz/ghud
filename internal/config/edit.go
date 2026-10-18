@@ -94,10 +94,10 @@ func (e Editor) verify(src []byte, check func(Config) error) (Config, error) {
 	name := filepath.Base(e.Path)
 	after, err := parse(name, src, e.Types, e.Locale)
 	if err != nil {
-		return Config{}, fmt.Errorf("the edit would break %s (%v); left it unchanged", name, err)
+		return Config{}, fmt.Errorf("%s left unchanged, the edit wouldn't parse: %v", name, err)
 	}
 	if err := check(after); err != nil {
-		return Config{}, fmt.Errorf("%s wouldn't read back as intended (%v); left it unchanged", name, err)
+		return Config{}, fmt.Errorf("%s left unchanged, the edit wouldn't read back as intended: %v", name, err)
 	}
 	return after, nil
 }

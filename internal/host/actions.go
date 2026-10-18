@@ -185,6 +185,8 @@ type bound struct {
 	subject string
 	// by is the host-provided Action this is, or none for the Widget's own.
 	by hostAction
+	// typ is the Widget type an addWidget Action places.
+	typ string
 }
 
 type hostAction int
@@ -192,6 +194,9 @@ type hostAction int
 const (
 	none hostAction = iota
 	hide
+	editSettings
+	removeWidget
+	addWidget
 )
 
 // actions are Widget id's Actions as they apply now: the selected Item's,
@@ -201,7 +206,11 @@ func (m Model) actions(id string) []bound {
 	if !ok {
 		return nil
 	}
-	host := []bound{{Action: widget.Action{ID: "hide", Label: "hide"}, by: hide}}
+	host := []bound{
+		{Action: widget.Action{ID: "hide", Label: "hide"}, by: hide},
+		{Action: widget.Action{ID: "edit-settings", Label: "edit settings"}, by: editSettings},
+		{Action: widget.Action{ID: "remove", Label: "remove"}, by: removeWidget},
+	}
 	if m.widgets[id].setup != "" {
 		return host
 	}
@@ -288,6 +297,8 @@ func (m Model) invoke(id string, a bound, text string) (Model, tea.Cmd) {
 	switch {
 	case a.by == hide:
 		return m.setHidden(id, true), nil
+	case a.by == editSettings, a.by == removeWidget, a.by == addWidget:
+		return m, m.editConfig(id, a)
 	case a.Verb == widget.Open:
 		opener, target := m.opts.Ports.Opener, a.Target
 		return m, func() tea.Msg {
