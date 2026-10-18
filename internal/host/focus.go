@@ -10,17 +10,24 @@ import (
 )
 
 type keyMap struct {
-	Quit, Unfocus, NextRow, PrevRow, Left, Right, Jump key.Binding
+	Quit, Unfocus, NextRow, PrevRow, Left, Right key.Binding
+	MoveLeft, MoveDown, MoveUp, MoveRight        key.Binding
+	Refocus, Jump                                key.Binding
 }
 
 var keys = keyMap{
-	Quit:    key.NewBinding(key.WithKeys("q"), key.WithHelp("q", "quit")),
-	Unfocus: key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "unfocus")),
-	NextRow: key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next row")),
-	PrevRow: key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("shift+tab", "previous row")),
-	Left:    key.NewBinding(key.WithKeys("h", "left"), key.WithHelp("h ←", "previous Widget in the row")),
-	Right:   key.NewBinding(key.WithKeys("l", "right"), key.WithHelp("l →", "next Widget in the row")),
-	Jump:    key.NewBinding(key.WithKeys("1", "2", "3", "4", "5", "6", "7", "8", "9"), key.WithHelp("1–9", "jump to the Nth Widget")),
+	Quit:      key.NewBinding(key.WithKeys("q"), key.WithHelp("q", "quit")),
+	Unfocus:   key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "unfocus")),
+	NextRow:   key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next row")),
+	PrevRow:   key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("shift+tab", "previous row")),
+	Left:      key.NewBinding(key.WithKeys("h", "left"), key.WithHelp("h ←", "previous Widget in the row")),
+	Right:     key.NewBinding(key.WithKeys("l", "right"), key.WithHelp("l →", "next Widget in the row")),
+	MoveLeft:  key.NewBinding(key.WithKeys("H", "shift+left"), key.WithHelp("H S-←", "focus left")),
+	MoveDown:  key.NewBinding(key.WithKeys("J", "shift+down"), key.WithHelp("J S-↓", "focus down")),
+	MoveUp:    key.NewBinding(key.WithKeys("K", "shift+up"), key.WithHelp("K S-↑", "focus up")),
+	MoveRight: key.NewBinding(key.WithKeys("L", "shift+right"), key.WithHelp("L S-→", "focus right")),
+	Refocus:   key.NewBinding(key.WithKeys("m"), key.WithHelp("m", "focus the last-focused Widget")),
+	Jump:      key.NewBinding(key.WithKeys("1", "2", "3", "4", "5", "6", "7", "8", "9"), key.WithHelp("1–9", "jump to the Nth Widget")),
 }
 
 func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
@@ -29,11 +36,15 @@ func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, tea.Quit
 	case key.Matches(msg, keys.Unfocus):
 		m.focus = ""
+	case key.Matches(msg, keys.Refocus):
+		if m.focus == "" {
+			m.focus = m.lastFocus()
+		}
 	case key.Matches(msg, keys.Jump):
 		if id := m.nth(int(msg.Code - '1')); id != "" {
 			m.focus = id
 		}
-	case key.Matches(msg, keys.NextRow, keys.PrevRow, keys.Left, keys.Right):
+	case key.Matches(msg, keys.NextRow, keys.PrevRow, keys.Left, keys.Right, keys.MoveLeft, keys.MoveDown, keys.MoveUp, keys.MoveRight):
 		if m.focus == "" {
 			m.focus = m.lastFocus()
 			break
@@ -41,12 +52,16 @@ func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		ri, ci := m.find(m.focus)
 		rows := m.layout.Rows
 		switch {
-		case key.Matches(msg, keys.Left):
+		case key.Matches(msg, keys.Left, keys.MoveLeft):
 			m.focus = rows[ri].Widgets[max(ci-1, 0)].ID
-		case key.Matches(msg, keys.Right):
+		case key.Matches(msg, keys.Right, keys.MoveRight):
 			m.focus = rows[ri].Widgets[min(ci+1, len(rows[ri].Widgets)-1)].ID
+		case key.Matches(msg, keys.MoveDown):
+			m.focus = m.nearest(min(ri+1, len(rows)-1))
+		case key.Matches(msg, keys.MoveUp):
+			m.focus = m.nearest(max(ri-1, 0))
 		case key.Matches(msg, keys.NextRow):
-			m.focus = m.nearest((ri+1)%len(rows))
+			m.focus = m.nearest((ri + 1) % len(rows))
 		case key.Matches(msg, keys.PrevRow):
 			m.focus = m.nearest((ri - 1 + len(rows)) % len(rows))
 		}
