@@ -2,6 +2,8 @@ package host_test
 
 import (
 	"context"
+	"errors"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -87,6 +89,35 @@ func TestRefreshBelowTheFloorIsClampedWithAToast(t *testing.T) {
 	h.Advance(time.Second)
 	if log.count() != 2 {
 		t.Errorf("refreshed %d times by 30s, want 2", log.count())
+	}
+}
+
+func TestARefreshShowsASpinnerInTheTopBorderOrCentredWhileLoading(t *testing.T) {
+	root := savedLayout(t, `{"default": {"rows": [{"weight": 1, "widgets": [{"id": "clock", "weight": 1}]}, {"weight": 1, "widgets": [{"id": "feed", "weight": 1}]}], "hidden": ["feed"]}}`)
+	h, log := withFeed(t, hosttest.Options{Root: root, Width: 40, Height: 19, Types: []widget.Type{liveViews[0]}})
+	var during []string
+	log.during = func() { during = strings.Split(h.Screen(), "\n") }
+	spinner := regexp.MustCompile(`[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]`)
+
+	// Feed's tile is rows 9–17 once shown.
+	h.Press("w", "j", "space", "esc")
+	if during == nil {
+		t.Fatal("showing the Widget didn't refresh it")
+	}
+	if !spinner.MatchString(during[13]) || !strings.Contains(during[9], "Feed") {
+		t.Errorf("while loading, the body's middle line is %q, want a spinner:\n%s", during[13], strings.Join(during, "\n"))
+	}
+	if spinner.MatchString(h.Screen()) {
+		t.Errorf("a spinner is left once the refresh landed:\n%s", h.Screen())
+	}
+
+	during = nil
+	h.Advance(2 * time.Minute)
+	if top := during[9]; !spinner.MatchString(top) || !strings.HasSuffix(top, " ─╮") {
+		t.Errorf("while refreshing, the top border is %q, want a spinner at its right", top)
+	}
+	if !strings.Contains(strings.Join(during, "\n"), "headline") {
+		t.Errorf("while refreshing, the data went away:\n%s", strings.Join(during, "\n"))
 	}
 }
 
@@ -273,6 +304,47 @@ func TestNeedsSetupMakesTheSetupActionPrimary(t *testing.T) {
 	}
 	if _, _, ok := h.Find("standup"); !ok {
 		t.Errorf("the Widget didn't refresh after its setup Action:\n%s", h.Screen())
+	}
+}
+
+// tokenFeed is a feed signing in with a shared token.
+type tokenFeed struct{ feed }
+
+func (tokenFeed) Credential() string { return "github:github.com" }
+
+func TestARateLimitPausesEveryWidgetSharingTheCredential(t *testing.T) {
+	first, second, other := &feedLog{}, &feedLog{}, &feedLog{}
+	typ := func(name string, log *feedLog) widget.Type {
+		return widget.Type{Name: name, Title: name, Refresh: 2 * time.Minute,
+			New: func(widget.Config) widget.Widget { return tokenFeed{feed{log: log}} }}
+	}
+	h := hosttest.New(t, hosttest.Options{Width: 90, Height: 12, Types: []widget.Type{
+		typ("prs", first), typ("mine", second), feedType("feed", "Feed", other),
+	}})
+	h.Advance(time.Minute)
+	first.fail(&widget.RateLimitError{Until: h.Clock.Now().Add(9 * time.Minute), Err: errors.New("API rate limit exceeded")})
+	h.Press("ctrl+k", "p", "r", "s", " ", "r", "e", "f", "enter")
+	if first.count() != 2 {
+		t.Fatalf("refreshing prs from the palette ran it %d times in all, want 2", first.count())
+	}
+	h.Press("ctrl+r")
+	if first.count() != 2 || second.count() != 1 {
+		t.Errorf("^R during the pause refreshed prs %d and mine %d times, want 2 and 1", first.count(), second.count())
+	}
+	if top := h.Line(0); !strings.Contains(top, "rate limited") {
+		t.Errorf("top border %q, want rate limited on the stale marker:\n%s", top, h.Screen())
+	}
+
+	h.Advance(8 * time.Minute)
+	if first.count() != 2 || second.count() != 1 {
+		t.Errorf("during the pause prs refreshed %d and mine %d times, want 2 and 1", first.count(), second.count())
+	}
+	if other.count() < 5 {
+		t.Errorf("a Widget on another credential refreshed only %d times during the pause", other.count())
+	}
+	h.Advance(time.Minute)
+	if first.count() != 3 || second.count() != 2 {
+		t.Errorf("once the pause lifts prs refreshed %d and mine %d times, want 3 and 2", first.count(), second.count())
 	}
 }
 
