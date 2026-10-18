@@ -58,6 +58,8 @@ type Options struct {
 	Refresh string
 	// Default places a Widget of the type when config.toml places none.
 	Default bool
+	// Mode is the `mode` setting's default; "" is "items".
+	Mode string
 	// Command replaces the built fixture (and Args) as the command.
 	Command []string
 	// Build are the manifest's [[build]] steps.
@@ -89,6 +91,9 @@ func Manifest(t testing.TB, o Options) string {
 	if o.Refresh == "" {
 		o.Refresh = "1m"
 	}
+	if o.Mode == "" {
+		o.Mode = "items"
+	}
 	if o.Command == nil {
 		o.Command = append([]string{Binary(t)}, o.Args...)
 	}
@@ -118,10 +123,10 @@ description = "Words in front of every Item"
 [[widget.setting]]
 name = "mode"
 kind = "string"
-default = "items"
+default = %q
 description = "What refreshes return"
-choices = ["items", "lines", "raw-colour", "malformed", "setup", "error"]
-%s`, o.Name, o.Protocol, quoted(o.Command), o.Name, o.Refresh, o.Default, build.String())
+choices = ["items", "lines", "raw-colour", "malformed", "unknown-field", "setup", "error"]
+%s`, o.Name, o.Protocol, quoted(o.Command), o.Name, o.Refresh, o.Default, o.Mode, build.String())
 }
 
 func quoted(args []string) string {

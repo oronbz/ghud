@@ -50,6 +50,10 @@ const usage = `Usage: ghud [--config <path>] [--close-key <keys>]... [--version]
                              rebuild installed Plugins that have new commits
        ghud plugin uninstall <name>
        ghud plugin list      installed and [[plugin]] path Plugins
+       ghud plugin schema    print the JSON Schema of Plugin manifests and
+                             the protocol
+       ghud plugin check [--timeout 10s] <dir>
+                             test the Plugin in <dir> against the protocol
 
 ghud draws a full-screen dashboard of your day. Press q to quit.
 The config is $XDG_CONFIG_HOME/ghud/config.toml (default ~/.config/ghud),

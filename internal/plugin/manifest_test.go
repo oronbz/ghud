@@ -150,6 +150,28 @@ func TestTheProtocolSchemaDescribesARealSession(t *testing.T) {
 	}
 }
 
+// The host refuses exactly the refreshes the shipped schema rejects, so
+// `ghud plugin check` passes a Plugin only if ghud can show what it sends.
+func TestTheHostAndTheSchemaRejectTheSameRefreshes(t *testing.T) {
+	for mode, rejected := range map[string]bool{
+		"items": false, "lines": false, "setup": false, "error": false,
+		"raw-colour": true, "malformed": true, "unknown-field": true,
+	} {
+		t.Run(mode, func(t *testing.T) {
+			o := plugintest.Options{Mode: mode}
+			_, typ := fixture(t, o)
+			_, err := refresh(t, open(t, typ, "fx", &clock{now: t0}, nil))
+			if host := err != nil && strings.HasPrefix(err.Error(), "Plugin `fixture` sent"); host != rejected {
+				t.Errorf("the host rejects it: %t (%v), want %t", host, err, rejected)
+			}
+			var out bytes.Buffer
+			if passed := plugin.Check(plugintest.Write(t, t.TempDir(), o), plugin.CheckOptions{Clock: &clock{now: t0}}, &out); passed == rejected {
+				t.Errorf("the check passes it: %t, want %t\n%s", passed, !rejected, &out)
+			}
+		})
+	}
+}
+
 func TestTheFixtureManifestMatchesTheSchema(t *testing.T) {
 	dir := plugintest.Write(t, t.TempDir(), plugintest.Options{})
 	if _, err := plugin.ReadManifest(dir); err != nil {

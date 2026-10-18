@@ -33,6 +33,7 @@ func (e *RPCError) Error() string { return e.Message }
 // newline-delimited. Writes are queued, so senders never wait on the Plugin.
 type conn struct {
 	w      io.Writer
+	tap    func(out bool, raw []byte)
 	notify func(method string, params json.RawMessage)
 
 	mu      sync.Mutex
@@ -45,11 +46,12 @@ type conn struct {
 	done chan struct{}
 }
 
-// newConn starts reading r and writing w. notify receives the Plugin's
-// notifications on the reader's goroutine; closed is called once with why
-// the session ended, after every pending call has failed with it.
-func newConn(r io.Reader, w io.Writer, notify func(string, json.RawMessage), closed func(error)) *conn {
-	c := &conn{w: w, notify: notify, pending: map[int64]chan message{}, wake: make(chan struct{}, 1), done: make(chan struct{})}
+// newConn starts reading r and writing w. tap, when not nil, sees each
+// message as it's sent or read, before anything acts on it. notify receives
+// the Plugin's notifications on the reader's goroutine; closed is called
+// once with why the session ended, after every pending call has failed with it.
+func newConn(r io.Reader, w io.Writer, tap func(bool, []byte), notify func(string, json.RawMessage), closed func(error)) *conn {
+	c := &conn{w: w, tap: tap, notify: notify, pending: map[int64]chan message{}, wake: make(chan struct{}, 1), done: make(chan struct{})}
 	go c.write()
 	go func() { closed(c.read(r)) }()
 	return c
@@ -66,6 +68,9 @@ func (c *conn) read(r io.Reader) error {
 				err = fmt.Errorf("sent a malformed message: %w", err)
 			}
 			return c.fail(err)
+		}
+		if c.tap != nil {
+			c.tap(false, raw)
 		}
 		var msg message
 		if err := json.Unmarshal(raw, &msg); err != nil || msg.JSONRPC != "2.0" {
@@ -137,6 +142,9 @@ func (c *conn) send(msg message) error {
 	defer c.mu.Unlock()
 	if c.err != nil {
 		return c.err
+	}
+	if c.tap != nil {
+		c.tap(true, buf.Bytes())
 	}
 	c.queue = append(c.queue, buf.Bytes())
 	select {

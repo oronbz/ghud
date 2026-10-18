@@ -24,12 +24,8 @@ import (
 // fetchTimeout bounds one download of a Plugin's repository.
 const fetchTimeout = 5 * time.Minute
 
-// pluginCommand runs `ghud plugin <args>`.
-func pluginCommand(s System, pp ports.Ports, p paths.Paths, configFile string, locale config.Locale, args []string) int {
-	if len(args) == 0 {
-		fmt.Fprint(s.Stderr, usage)
-		return 2
-	}
+// pluginManage runs `ghud plugin install|update|uninstall|list <args>`.
+func pluginManage(s System, pp ports.Ports, p paths.Paths, configFile string, locale config.Locale, args []string) int {
 	c := pluginCLI{s: s, in: bufio.NewReader(s.Stdin), installer: install.Installer{
 		Dir:     filepath.Join(p.Data, "plugins"),
 		Fetcher: githubFetcher(s.Getenv, pp),
@@ -42,11 +38,8 @@ func pluginCommand(s System, pp ports.Ports, p paths.Paths, configFile string, l
 		return c.update(args[1:])
 	case "uninstall":
 		return c.uninstall(args[1:])
-	case "list":
-		return c.list(host.PluginPaths(configFile, locale, s.Getenv))
 	}
-	fmt.Fprintf(s.Stderr, "ghud: unknown command %q\n\n%s", "plugin "+strings.Join(args, " "), usage)
-	return 2
+	return c.list(host.PluginPaths(configFile, locale, s.Getenv))
 }
 
 func githubFetcher(getenv func(string) string, pp ports.Ports) install.GitHub {
