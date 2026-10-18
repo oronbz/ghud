@@ -88,6 +88,49 @@ func (k *macEventKit) Events(_ context.Context, from, to time.Time) ([]Event, er
 	return out, nil
 }
 
+func (k *macEventKit) Reminders(_ context.Context) ([]Reminder, error) {
+	if k.Status(Reminders) != AccessGranted {
+		return nil, ErrNoAccess
+	}
+	r, err := k.reminders()
+	if err != nil {
+		return nil, err
+	}
+	rs, err := r.Reminders(reminders.WithCompleted(false))
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Reminder, 0, len(rs))
+	for _, r := range rs {
+		out = append(out, reminderOf(r))
+	}
+	return out, nil
+}
+
+// reminderOf converts r. EventKit keeps a due day without a time as date
+// components, which go-eventkit returns as local midnight.
+func reminderOf(r reminders.Reminder) Reminder {
+	out := Reminder{ID: r.ID, Title: r.Title, List: r.List}
+	if r.DueDate != nil {
+		out.Due = r.DueDate.In(time.Local)
+		h, m, s := out.Due.Clock()
+		out.DateOnly = h == 0 && m == 0 && s == 0
+	}
+	return out
+}
+
+func (k *macEventKit) Complete(_ context.Context, id string) error {
+	if k.Status(Reminders) != AccessGranted {
+		return ErrNoAccess
+	}
+	r, err := k.reminders()
+	if err != nil {
+		return err
+	}
+	_, err = r.CompleteReminder(id)
+	return err
+}
+
 func (k *macEventKit) calendar() (*calendar.Client, error) {
 	k.mu.Lock()
 	defer k.mu.Unlock()

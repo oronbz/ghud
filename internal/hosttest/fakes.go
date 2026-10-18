@@ -2,6 +2,7 @@ package hosttest
 
 import (
 	"context"
+	"errors"
 	"os/exec"
 	"slices"
 	"strings"
@@ -284,7 +285,7 @@ func (c *Commands) Output(_ context.Context, name string, args ...string) ([]byt
 	return []byte(r.out), r.err
 }
 
-// EventKit fakes macOS calendar access. Access defaults to AccessUnsupported.
+// EventKit fakes macOS calendars and reminders. Access defaults to AccessUnsupported.
 type EventKit struct {
 	mu       sync.Mutex
 	Access   map[ports.Entity]ports.Access
@@ -292,7 +293,11 @@ type EventKit struct {
 	Requests []ports.Entity
 	// Calendar is every event; Events returns the ones overlapping its range.
 	Calendar []ports.Event
-	// Err, when set, fails every read.
+	// Open is every open reminder; Complete removes one and records its ID
+	// in Completed.
+	Open      []ports.Reminder
+	Completed []string
+	// Err, when set, fails every read and Complete.
 	Err error
 }
 
@@ -331,4 +336,34 @@ func (e *EventKit) Events(_ context.Context, from, to time.Time) ([]ports.Event,
 		}
 	}
 	return out, nil
+}
+
+func (e *EventKit) Reminders(context.Context) ([]ports.Reminder, error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.Access[ports.Reminders] != ports.AccessGranted {
+		return nil, ports.ErrNoAccess
+	}
+	if e.Err != nil {
+		return nil, e.Err
+	}
+	return slices.Clone(e.Open), nil
+}
+
+func (e *EventKit) Complete(_ context.Context, id string) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.Access[ports.Reminders] != ports.AccessGranted {
+		return ports.ErrNoAccess
+	}
+	if e.Err != nil {
+		return e.Err
+	}
+	i := slices.IndexFunc(e.Open, func(r ports.Reminder) bool { return r.ID == id })
+	if i < 0 {
+		return errors.New("reminder not found")
+	}
+	e.Open = slices.Delete(e.Open, i, i+1)
+	e.Completed = append(e.Completed, id)
+	return nil
 }
