@@ -10,4 +10,4 @@
 
 **Action**: Something the user can do, either to an Item (open, approve, complete) or to a whole Widget (add a task, change the calendar month, edit the note). Some Actions ask for confirmation before they run because they can't be taken back.
 
-**Layout**: The saved arrangement and sizes of Widgets on the dashboard.
+**Layout**: The saved arrangement and sizes of Widgets on the dashboard, including which Widgets are hidden. Hiding a Widget changes only the Layout; removing a Widget takes it off the dashboard.
