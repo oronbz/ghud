@@ -12,7 +12,9 @@ import (
 type keyMap struct {
 	Quit, Unfocus, NextRow, PrevRow, Left, Right key.Binding
 	MoveLeft, MoveDown, MoveUp, MoveRight        key.Binding
-	Refocus, Jump, Help                          key.Binding
+	Arrange, Widgets, Jump, Help                 key.Binding
+	// Arrange mode.
+	Shift, Grow, Keep, Revert key.Binding
 }
 
 var keys = keyMap{
@@ -26,18 +28,30 @@ var keys = keyMap{
 	MoveDown:  key.NewBinding(key.WithKeys("J", "shift+down"), key.WithHelp("J S-↓", "focus down")),
 	MoveUp:    key.NewBinding(key.WithKeys("K", "shift+up"), key.WithHelp("K S-↑", "focus up")),
 	MoveRight: key.NewBinding(key.WithKeys("L", "shift+right"), key.WithHelp("L S-→", "focus right")),
-	Refocus:   key.NewBinding(key.WithKeys("m"), key.WithHelp("m", "focus the last-focused Widget")),
+	Arrange:   key.NewBinding(key.WithKeys("m"), key.WithHelp("m", "arrange the focused Widget (unfocused: focus the last one)")),
+	Widgets:   key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "show or hide Widgets")),
 	Jump:      key.NewBinding(key.WithKeys("1", "2", "3", "4", "5", "6", "7", "8", "9"), key.WithHelp("1–9", "jump to the Nth Widget")),
 	Help:      key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "key map")),
+
+	Shift:  key.NewBinding(key.WithKeys("h", "j", "k", "l", "left", "down", "up", "right"), key.WithHelp("hjkl", "arrange: move (past an edge opens a row)")),
+	Grow:   key.NewBinding(key.WithKeys("H", "J", "K", "L", "shift+left", "shift+down", "shift+up", "shift+right"), key.WithHelp("HJKL", "arrange: resize")),
+	Keep:   key.NewBinding(key.WithKeys("enter"), key.WithHelp("⏎", "arrange: keep")),
+	Revert: key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "arrange: revert")),
 }
 
 // Bindings lists every host key binding, in key map order.
-func Bindings() []key.Binding {
+func Bindings() []key.Binding { return append(normalBindings(), arrangeBindings()...) }
+
+func normalBindings() []key.Binding {
 	k := keys
 	return []key.Binding{
 		k.NextRow, k.PrevRow, k.Left, k.Right, k.MoveLeft, k.MoveDown, k.MoveUp, k.MoveRight,
-		k.Jump, k.Refocus, k.Unfocus, k.Help, k.Quit,
+		k.Jump, k.Arrange, k.Widgets, k.Unfocus, k.Help, k.Quit,
 	}
+}
+
+func arrangeBindings() []key.Binding {
+	return []key.Binding{keys.Shift, keys.Grow, keys.Keep, keys.Revert}
 }
 
 func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
@@ -56,6 +70,12 @@ func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		}
 		return m, nil
 	}
+	if m.picker != nil {
+		return m.pickerKey(msg), nil
+	}
+	if m.arranging {
+		return m.arrangeKey(msg), nil
+	}
 	switch {
 	case key.Matches(msg, keys.Help):
 		m.keyMap = true
@@ -63,10 +83,14 @@ func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, tea.Quit
 	case key.Matches(msg, keys.Unfocus):
 		m.focus = ""
-	case key.Matches(msg, keys.Refocus):
+	case key.Matches(msg, keys.Arrange):
 		if m.focus == "" {
 			m.focus = m.lastFocus()
+		} else {
+			m.arranging, m.before = true, m.layout
 		}
+	case key.Matches(msg, keys.Widgets):
+		m.picker = &picker{}
 	case key.Matches(msg, keys.Jump):
 		if id := m.nth(int(msg.Code - '1')); id != "" {
 			m.focus = id
@@ -77,7 +101,7 @@ func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 			break
 		}
 		ri, ci := m.find(m.focus)
-		rows := m.layout.Rows
+		rows := m.rows()
 		switch {
 		case key.Matches(msg, keys.Left, keys.MoveLeft):
 			m.focus = rows[ri].Widgets[max(ci-1, 0)].ID
@@ -106,7 +130,7 @@ func (m Model) nearest(ri int) string {
 	cur := rects[m.focus]
 	cx := cur.X + cur.W/2
 	best, bestD := "", math.MaxInt
-	for _, c := range m.layout.Rows[ri].Widgets {
+	for _, c := range m.rows()[ri].Widgets {
 		r := rects[c.ID]
 		d := 0
 		if cx < r.X {
@@ -137,7 +161,7 @@ func (m Model) rects() map[string]layout.Rect {
 
 // nth is the id of the Nth Widget counting row by row from 0, or "".
 func (m Model) nth(n int) string {
-	for _, r := range m.layout.Rows {
+	for _, r := range m.rows() {
 		if n < len(r.Widgets) {
 			return r.Widgets[n].ID
 		}
@@ -155,8 +179,12 @@ func (m Model) lastFocus() string {
 	return m.nth(0)
 }
 
+// rows are the visible rows, the ones focus moves over.
+func (m Model) rows() []layout.Row { return m.layout.Visible().Rows }
+
+// find is id's place among the visible rows, or -1, -1.
 func (m Model) find(id string) (row, index int) {
-	for ri, r := range m.layout.Rows {
+	for ri, r := range m.rows() {
 		for ci, c := range r.Widgets {
 			if c.ID == id {
 				return ri, ci

@@ -5,6 +5,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
@@ -16,16 +17,23 @@ const footerHeight = 1
 
 func (m Model) footer() string {
 	th := m.opts.Theme
-	badge := th.Fg(theme.Bg).Background(th.Color(theme.Accent)).Bold(true).Render(" NORMAL ")
-	hints := "Tab/hl focus · 1–9 jump · ? keys · q quit"
+	mode, modeColor := " NORMAL ", theme.Accent
+	bindings := normalBindings()
+	hints := "Tab/hl focus · 1–9 jump · w widgets · ? keys · q quit"
 	if m.focus != "" {
-		hints = "Tab rows · hl widgets · HJKL any direction · esc unfocus · ? keys"
+		hints = "Tab rows · hl widgets · HJKL any direction · m arrange · esc unfocus · ? keys"
 	}
+	if m.arranging {
+		mode, modeColor = " ARRANGE ", theme.Warn
+		bindings = arrangeBindings()
+		hints = "hjkl move · HJKL resize · ⏎ keep · esc revert"
+	}
+	badge := th.Fg(theme.Bg).Background(th.Color(modeColor)).Bold(true).Render(mode)
 	switch m.held {
 	case tea.ModShift:
-		hints = modifierHints("Shift", isShifted)
+		hints = modifierHints("Shift", bindings, isShifted)
 	case tea.ModCtrl:
-		hints = modifierHints("Ctrl", func(k string) bool { return strings.HasPrefix(k, "ctrl+") })
+		hints = modifierHints("Ctrl", bindings, func(k string) bool { return strings.HasPrefix(k, "ctrl+") })
 	}
 	toast := ""
 	if m.toast != "" {
@@ -35,9 +43,9 @@ func (m Model) footer() string {
 }
 
 // modifierHints lists the bindings that have at least one key using the modifier.
-func modifierHints(name string, uses func(key string) bool) string {
+func modifierHints(name string, bindings []key.Binding, uses func(key string) bool) string {
 	var hints []string
-	for _, b := range Bindings() {
+	for _, b := range bindings {
 		for _, k := range b.Keys() {
 			if uses(k) {
 				hints = append(hints, b.Help().Key+" "+b.Help().Desc)
