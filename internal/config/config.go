@@ -107,7 +107,13 @@ type parser struct {
 
 func (p *parser) problem(key, format string, args ...any) string {
 	msg := fmt.Sprintf(format, args...)
-	p.problems = append(p.problems, fmt.Sprintf("%s:%d: %s", p.name, p.lines[key], msg))
+	line, ok := p.lines[key]
+	// Entries of an inline array have no line of their own; use the array's.
+	for !ok && strings.Contains(key, ".") {
+		key = key[:strings.LastIndex(key, ".")]
+		line, ok = p.lines[key]
+	}
+	p.problems = append(p.problems, fmt.Sprintf("%s:%d: %s", p.name, line, msg))
 	return msg
 }
 
@@ -124,7 +130,7 @@ func (p *parser) parse(doc map[string]any, loc Locale) Config {
 				continue
 			}
 			for i, b := range blocks {
-				if w, ok := p.widget(i, b.(map[string]any)); ok {
+				if w, ok := p.widget(i, b); ok {
 					c.Widgets = append(c.Widgets, w)
 				}
 			}
@@ -136,7 +142,7 @@ func (p *parser) parse(doc map[string]any, loc Locale) Config {
 				continue
 			}
 			for i, b := range blocks {
-				if pl, ok := p.plugin(i, b.(map[string]any)); ok {
+				if pl, ok := p.plugin(i, b); ok {
 					c.Plugins = append(c.Plugins, pl)
 				}
 			}
@@ -171,7 +177,8 @@ func (p *parser) parse(doc map[string]any, loc Locale) Config {
 	return c
 }
 
-func (p *parser) widget(i int, block map[string]any) (Widget, bool) {
+func (p *parser) widget(i int, v any) (Widget, bool) {
+	block, _ := v.(map[string]any)
 	at := fmt.Sprintf("widget.%d", i)
 	typeName, ok := block["type"].(string)
 	if !ok || typeName == "" {
@@ -243,7 +250,8 @@ func (p *parser) widget(i int, block map[string]any) (Widget, bool) {
 	return w, true
 }
 
-func (p *parser) plugin(i int, block map[string]any) (Plugin, bool) {
+func (p *parser) plugin(i int, v any) (Plugin, bool) {
+	block, _ := v.(map[string]any)
 	at := fmt.Sprintf("plugin.%d", i)
 	path, ok := block["path"].(string)
 	if !ok || path == "" {

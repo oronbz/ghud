@@ -38,6 +38,18 @@ title = "London"
 	}
 }
 
+func TestWidgetIsBuiltFromItsSettings(t *testing.T) {
+	h := hosttest.New(t, hosttest.Options{Width: 40, Height: 5, Config: `
+[[widget]]
+type = "clock"
+seconds = false
+`})
+
+	if got := strings.Trim(h.Line(1), "│ "); got != "14:05" {
+		t.Errorf("clock without seconds shows %q, want 14:05", got)
+	}
+}
+
 func TestTwoWidgetsOfATypeWithoutIdsBothNeedSetup(t *testing.T) {
 	h := hosttest.New(t, hosttest.Options{Width: 100, Height: 12, Config: `
 [[widget]]
@@ -174,6 +186,20 @@ time_format = "25h"
 	}
 	if _, _, ok := h.Find("╭─ Calendar "); !ok {
 		t.Errorf("a config with no [[widget]] blocks doesn't show the default Widgets:\n%s", h.Screen())
+	}
+}
+
+func TestMisshapenWidgetAndPluginEntriesToastWithoutCrashing(t *testing.T) {
+	h := hosttest.New(t, hosttest.Options{Width: 100, Height: 12, Config: `
+widget = [1, 2]
+plugin = ["x"]
+`})
+
+	if _, _, ok := h.Find("config.toml:2: [[widget]] needs a `type` (+2 more)"); !ok {
+		t.Errorf("no toast for the misshapen entries:\n%s", h.Screen())
+	}
+	if _, _, ok := h.Find("╭─ Clock "); !ok {
+		t.Errorf("the default Widgets don't render:\n%s", h.Screen())
 	}
 }
 

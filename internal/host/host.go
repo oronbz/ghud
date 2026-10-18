@@ -59,8 +59,8 @@ type tickMsg struct{ at time.Time }
 
 var quitKey = key.NewBinding(key.WithKeys("q"), key.WithHelp("q", "quit"))
 
-// builtins are the Widget types compiled into ghud, in config order.
-var builtins = []widget.Type{clock.Type, calendar.Type}
+// Builtins are the Widget types compiled into ghud, in reference order.
+var Builtins = []widget.Type{clock.Type, calendar.Type}
 
 func New(o Options) Model {
 	m := Model{opts: o, now: o.Ports.Clock.Now(), widgets: map[string]placed{}}
@@ -68,7 +68,7 @@ func New(o Options) Model {
 	if file == "" {
 		file = filepath.Join(o.Paths.Config, config.FileName)
 	}
-	cfg, err := config.Load(file, builtins, o.Locale)
+	cfg, err := config.Load(file, Builtins, o.Locale)
 	var problems []string
 	if err != nil {
 		problems = append(problems, err.Error())
@@ -82,8 +82,8 @@ func New(o Options) Model {
 			id = fmt.Sprintf("%s~%d", wc.ID, n)
 		}
 		p := placed{title: wc.Title, setup: wc.Setup}
-		if i := slices.IndexFunc(builtins, func(t widget.Type) bool { return t.Name == wc.Type }); i >= 0 {
-			p.typ = builtins[i]
+		if i := slices.IndexFunc(Builtins, func(t widget.Type) bool { return t.Name == wc.Type }); i >= 0 {
+			p.typ = Builtins[i]
 		}
 		if p.setup == "" {
 			p.widget = p.typ.New(widget.Config{Settings: wc.Settings, TimeFormat: cfg.TimeFormat, WeekStart: cfg.WeekStart})
