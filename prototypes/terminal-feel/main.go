@@ -23,7 +23,7 @@ import (
 var (
 	cBg     = lipgloss.Color("#13171d")
 	cSel    = lipgloss.Color("#222a36")
-	cLine   = lipgloss.Color("#303845")
+	cLine   = lipgloss.Color("#3d4757")
 	cFaint  = lipgloss.Color("#4e5766")
 	cDim    = lipgloss.Color("#7e8797")
 	cFg     = lipgloss.Color("#d3d9e2")
@@ -122,6 +122,7 @@ type model struct {
 	fpsAt       time.Time
 	lastClick   time.Time
 	lastClickAt string
+	lastFocus   string
 }
 
 type tickMsg time.Time
@@ -140,14 +141,14 @@ func initialModel() model {
 			{weight: 3, cells: []cell{{"prs", 2.2}, {"clock", 1}}},
 			{weight: 2, cells: []cell{{"notes", 1}, {"cpu", 1}, {"probe", 1.3}}},
 		},
-		focus:    "prs",
-		sel:      map[string]int{},
-		scroll:   map[string]int{},
-		held:     map[string]bool{},
-		mode:     "NORMAL",
-		note:     ta,
-		noteText: "# Scratch\n- ask maya about column priorities\n- E opens $EDITOR, i edits inline\n- drag a title, drag a border",
-		fpsAt:    time.Now(),
+		lastFocus: "prs",
+		sel:       map[string]int{},
+		scroll:    map[string]int{},
+		held:      map[string]bool{},
+		mode:      "NORMAL",
+		note:      ta,
+		noteText:  "# Scratch\n- ask maya about column priorities\n- E opens $EDITOR, i edits inline\n- drag a title, drag a border",
+		fpsAt:     time.Now(),
 	}
 	for range 120 {
 		m.cpu = append(m.cpu, 0.3)
@@ -415,6 +416,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
 		m.logf("resize %dx%d", m.w, m.h)
+		m.clampScroll()
 		return m, nil
 
 	case tea.KeyboardEnhancementsMsg:
@@ -509,24 +511,33 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	ids := m.order()
-	idx := 0
-	for i, id := range ids {
-		if id == m.focus {
-			idx = i
-		}
-	}
 	switch s {
 	case "q", "ctrl+c":
 		return m, tea.Quit
-	case "tab", "l", "right":
-		m.focus = ids[(idx+1)%len(ids)]
-	case "shift+tab", "h", "left":
-		m.focus = ids[(idx+len(ids)-1)%len(ids)]
+	case "esc":
+		if m.focus != "" {
+			m.lastFocus, m.focus = m.focus, ""
+		}
+	case "tab", "shift+tab", "h", "l", "left", "right":
+		if m.focus == "" {
+			m.focus = m.lastFocus
+			return m, nil
+		}
+		m.focus = m.neighbour(s)
 	case "j", "down":
-		m.sel[m.focus] = min(m.sel[m.focus]+1, len(prs)-1)
+		if m.focus == "prs" {
+			m.sel["prs"] = min(m.sel["prs"]+1, len(prs)-1)
+			m.reveal()
+		}
 	case "k", "up":
-		m.sel[m.focus] = max(m.sel[m.focus]-1, 0)
+		if m.focus == "prs" {
+			m.sel["prs"] = max(m.sel["prs"]-1, 0)
+			m.reveal()
+		}
 	case "m":
+		if m.focus == "" {
+			m.focus = m.lastFocus
+		}
 		m.mode, m.arrange = "ARRANGE", cloneRows(m.rows)
 	case "enter":
 		if m.focus == "prs" {
@@ -554,6 +565,78 @@ func (m model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// neighbour: h/l walk the focused row and stop at its edges; Tab/S-Tab jump to
+// the next/previous row (wrapping), landing on the Widget nearest horizontally.
+func (m model) neighbour(s string) string {
+	ri, ci := m.find(m.focus)
+	switch s {
+	case "h", "left":
+		return m.rows[ri].cells[max(ci-1, 0)].id
+	case "l", "right":
+		return m.rows[ri].cells[min(ci+1, len(m.rows[ri].cells)-1)].id
+	}
+	step := 1
+	if s == "shift+tab" {
+		step = -1
+	}
+	target := (ri + step + len(m.rows)) % len(m.rows)
+	rects := layout(m.rows, m.w, m.h-1)
+	cur := rects[m.focus]
+	cx := cur.x + cur.w/2
+	best, bestD := m.rows[target].cells[0].id, math.MaxInt
+	for _, c := range m.rows[target].cells {
+		rc := rects[c.id]
+		d := 0
+		if cx < rc.x {
+			d = rc.x - cx
+		} else if cx >= rc.x+rc.w {
+			d = cx - rc.x - rc.w + 1
+		}
+		if d < bestD {
+			best, bestD = c.id, d
+		}
+	}
+	return best
+}
+
+// prRows returns the PR list's lines and, per line, the PR index it shows (-1 for the divider).
+func prRows() []int {
+	var idx []int
+	shown := false
+	for i, p := range prs {
+		if p.handled != "" && !shown {
+			idx = append(idx, -1)
+			shown = true
+		}
+		idx = append(idx, i)
+	}
+	return idx
+}
+
+func (m model) prHeight() int {
+	return layout(m.rows, m.w, m.h-1)["prs"].h - 2
+}
+
+func (m *model) clampScroll() {
+	m.scroll["prs"] = min(max(m.scroll["prs"], 0), max(0, len(prRows())-m.prHeight()))
+}
+
+func (m *model) reveal() {
+	line := 0
+	for l, i := range prRows() {
+		if i == m.sel["prs"] {
+			line = l
+		}
+	}
+	h := m.prHeight()
+	if line < m.scroll["prs"] {
+		m.scroll["prs"] = line
+	} else if line >= m.scroll["prs"]+h {
+		m.scroll["prs"] = line - h + 1
+	}
+	m.clampScroll()
+}
+
 func (m model) openEditor() tea.Cmd {
 	f, err := os.CreateTemp("", "ghud-note-*.md")
 	if err != nil {
@@ -579,6 +662,7 @@ func (m model) openEditor() tea.Cmd {
 
 func (m model) mouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	ms := msg.Mouse()
+	m.clampScroll()
 	hit := m.hitZones().Hit(ms.X, ms.Y)
 	m.lastHit = hit.ID()
 	m.lastMouse = fmt.Sprintf("%T %d,%d %s", msg, ms.X, ms.Y, ms.Button)
@@ -587,12 +671,13 @@ func (m model) mouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.MouseWheelMsg:
 		kind, id, _ := strings.Cut(hit.ID(), ":")
-		if kind == "panel" || kind == "title" {
+		if (kind == "panel" || kind == "title") && id == "prs" {
 			if msg.Button == tea.MouseWheelDown {
 				m.scroll[id]++
 			} else {
-				m.scroll[id] = max(0, m.scroll[id]-1)
+				m.scroll[id]--
 			}
+			m.clampScroll()
 		}
 		return m, nil
 
@@ -624,9 +709,9 @@ func (m model) mouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			m.focus = rest
 			rc := rects[rest]
 			if rest == "prs" {
-				i := ms.Y - rc.y - 1 + m.scroll["prs"]
-				if i >= 0 && i < len(prs) {
-					m.sel["prs"] = i
+				rows := prRows()
+				if l := ms.Y - rc.y - 1 + m.scroll["prs"]; l >= 0 && l < len(rows) && rows[l] >= 0 {
+					m.sel["prs"] = rows[l]
 				}
 			}
 			if time.Since(m.lastClick) < 400*time.Millisecond && m.lastClickAt == hit.ID() {
@@ -731,7 +816,7 @@ func (m model) panel(id string, rc rect) string {
 		tl, tr, bl, br, hz, vt = "┏", "┓", "┗", "┛", "━", "┃"
 	}
 	inner := rc.w - 2
-	tStyle := fg(cDim)
+	tStyle := fg(cFg)
 	if focused {
 		tStyle = fg(cBright).Bold(true)
 	}
@@ -752,9 +837,6 @@ func (m model) panel(id string, rc rect) string {
 		l := ""
 		if i < len(lines) {
 			l = lines[i]
-		}
-		if !focused && m.mode != "INSERT" {
-			l = fg(cFaint).Render(ansi.Strip(l))
 		}
 		out = append(out, b.Render(vt)+pad(l, inner)+b.Render(vt))
 	}
@@ -858,7 +940,7 @@ func (m model) prList(w, h int) string {
 		}
 		lines = append(lines, line)
 	}
-	off := min(m.scroll["prs"], max(0, len(lines)-h))
+	off := min(max(m.scroll["prs"], 0), max(0, len(lines)-h))
 	return strings.Join(lines[off:], "\n")
 }
 
@@ -957,7 +1039,10 @@ func (m model) probe(w, h int) string {
 func (m model) footer() string {
 	badge := map[string]color.Color{"NORMAL": cAccent, "ARRANGE": cWarn, "INSERT": cOk}[m.mode]
 	out := lipgloss.NewStyle().Background(badge).Foreground(cBg).Bold(true).Render(" "+m.mode+" ") + " "
-	hints := "hjkl focus · ⏎ open · m arrange · ^K palette · ? keys · q quit"
+	hints := "Tab/hl focus · 1–9 jump · ^K palette · ? keys · q quit"
+	if m.focus != "" {
+		hints = "Tab rows · hl widgets · m arrange · esc unfocus · ^K palette · ? keys"
+	}
 	switch {
 	case m.held["ctrl"]:
 		hints = fg(cWarn).Render("CTRL ") + "^K palette · ^C quit · ^D page down · ^U page up"
@@ -1026,10 +1111,12 @@ func (m model) View() tea.View {
 	}
 	if m.drag.kind == dragMove {
 		o := rects[m.drag.id]
-		g := rect{m.drag.px - m.drag.grabX, m.drag.py - m.drag.grabY, o.w, o.h}
+		gw, gh := min(o.w, 34), min(o.h, 6)
+		g := rect{m.drag.px - min(m.drag.grabX, gw-2), m.drag.py - min(m.drag.grabY, gh-1), gw, gh}
 		g.x = min(max(g.x, 0), m.w-g.w)
 		g.y = min(max(g.y, 0), m.h-1-g.h)
 		layers = append(layers, ghost(g)...)
+		layers = append(layers, lipgloss.NewLayer(fg(cAccent).Bold(true).Render(ansi.Truncate(" "+title(m.drag.id)+" ", g.w-4, "…"))).X(g.x+2).Y(g.y).Z(6))
 		if m.drag.targetID != "" {
 			layers = append(layers, dropBar(rects[m.drag.targetID], m.drag.side))
 		}
@@ -1053,7 +1140,14 @@ func main() {
 		fmt.Println(m.View().Content)
 		return
 	}
-	p := tea.NewProgram(initialModel())
+	m := initialModel()
+	// herdr routes right-click to its own pane menu unless the pane opts in.
+	if os.Getenv("HERDR_PANE_ID") != "" {
+		out, err := exec.Command("herdr", "pane", "input", "--current", "--right-click", "pane").CombinedOutput()
+		m.logf("herdr right-click → pane: err=%v %s", err, strings.TrimSpace(string(out)))
+		defer exec.Command("herdr", "pane", "input", "--current", "--right-click", "herdr").Run()
+	}
+	p := tea.NewProgram(m)
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
