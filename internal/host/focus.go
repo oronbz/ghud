@@ -41,6 +41,15 @@ func Bindings() []key.Binding {
 }
 
 func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	if mod, ok := loneModifier(msg.Code); ok {
+		if !msg.IsRepeat {
+			m.held = mod
+		}
+		return m, nil
+	}
+	// Any other key means the modifier is no longer held alone, and a lost
+	// release can't leave the footer stuck.
+	m.held = 0
 	if m.keyMap {
 		if key.Matches(msg, keys.Help, keys.Unfocus, keys.Quit) {
 			m.keyMap = false

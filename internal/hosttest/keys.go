@@ -21,11 +21,24 @@ var modifiers = map[string]tea.KeyMod{
 	"meta": tea.ModMeta, "hyper": tea.ModHyper, "super": tea.ModSuper,
 }
 
+// loneModifiers are the modifier keys a kitty terminal with report-all-keys
+// sends on their own, with the modifier they set.
+var loneModifiers = map[string]tea.KeyPressMsg{
+	"leftshift": {Code: tea.KeyLeftShift, Mod: tea.ModShift}, "rightshift": {Code: tea.KeyRightShift, Mod: tea.ModShift},
+	"leftctrl": {Code: tea.KeyLeftCtrl, Mod: tea.ModCtrl}, "rightctrl": {Code: tea.KeyRightCtrl, Mod: tea.ModCtrl},
+	"leftalt": {Code: tea.KeyLeftAlt, Mod: tea.ModAlt}, "rightalt": {Code: tea.KeyRightAlt, Mod: tea.ModAlt},
+	"leftsuper": {Code: tea.KeyLeftSuper, Mod: tea.ModSuper}, "rightsuper": {Code: tea.KeyRightSuper, Mod: tea.ModSuper},
+}
+
 // Key builds the press a terminal would deliver for s, written the way
-// tea.KeyPressMsg.String() prints it: "q", "Q", "enter", "ctrl+k", "shift+tab", "shift+super+g".
+// tea.KeyPressMsg.String() prints it: "q", "Q", "enter", "ctrl+k", "shift+tab", "shift+super+g",
+// or a lone modifier ("leftshift", "rightctrl").
 func Key(s string) tea.KeyPressMsg {
 	if s == "+" {
 		return tea.KeyPressMsg{Code: '+', Text: "+"}
+	}
+	if k, ok := loneModifiers[s]; ok {
+		return k
 	}
 	parts := strings.Split(s, "+")
 	var k tea.KeyPressMsg
