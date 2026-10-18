@@ -2,6 +2,7 @@ package host_test
 
 import (
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -216,6 +217,22 @@ func TestTheWheelScrollsWithoutFocusingAndAClickSelectsTheItemUnderIt(t *testing
 	h.Wheel(10, 5, -40)
 	if got, want := strings.Trim(h.Line(1), "│▐ "), "a1"; got != want {
 		t.Errorf("wheeling far up starts on %q, want %q", got, want)
+	}
+}
+
+func TestTheWheelScrollsWrappedText(t *testing.T) {
+	var lines []widget.Line
+	for i := 1; i <= 20; i++ {
+		lines = append(lines, widget.Text(theme.Fg, "line "+strconv.Itoa(i)))
+	}
+	h, _ := withInbox(t, 8, widget.Payload{Wrap: true, Lines: lines}, nil)
+	h.Wheel(10, 3, 3)
+	if got := strings.Trim(h.Line(1), "│▐ "); got != "line 4" {
+		t.Errorf("3 notches down show %q first, want line 4:\n%s", got, h.Screen())
+	}
+	h.Wheel(10, 3, -10)
+	if got := strings.Trim(h.Line(1), "│▐ "); got != "line 1" {
+		t.Errorf("wheeling back up shows %q first, want line 1", got)
 	}
 }
 

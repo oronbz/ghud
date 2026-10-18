@@ -31,6 +31,10 @@ func (m Model) footer() string {
 	if m.picking {
 		hints = "jk move · ␣ show/hide · esc close"
 	}
+	if m.editing != nil {
+		mode, modeColor = " INSERT ", theme.Ok
+		hints = "esc save"
+	}
 	if m.palette != nil {
 		hints = "type to filter · ↑↓ choose · ⏎ run · esc close"
 	}

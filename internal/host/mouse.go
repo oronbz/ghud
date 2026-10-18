@@ -39,7 +39,7 @@ type click struct {
 }
 
 func (m Model) mouseMsg(msg tea.MouseMsg) (Model, tea.Cmd) {
-	if !m.mouse || m.keyMap || m.overlay != nil || m.palette != nil || m.picking || m.arranging {
+	if !m.mouse || m.keyMap || m.overlay != nil || m.palette != nil || m.editing != nil || m.picking || m.arranging {
 		return m, nil
 	}
 	if m.menu != nil {
@@ -92,6 +92,11 @@ func (m Model) scroll(id string, lines int) {
 		return
 	}
 	p := m.payloadIn(id, r)
+	if p.Wrap && !p.IsList() {
+		m.lists[id] = listState{top: m.lists[id].top + lines}
+		m.clampList(id)
+		return
+	}
 	if len(p.Items) == 0 {
 		return
 	}
@@ -133,7 +138,7 @@ func (m Model) selectItem(id string, i int) Model {
 // view has the input.
 func (m Model) pointer() layout.Pointer {
 	var p layout.Pointer
-	if m.keyMap || m.overlay != nil || m.palette != nil || m.menu != nil || m.picking || m.arranging {
+	if m.keyMap || m.overlay != nil || m.palette != nil || m.menu != nil || m.editing != nil || m.picking || m.arranging {
 		return p
 	}
 	if d := m.drag; d != nil {

@@ -121,14 +121,10 @@ func body(th theme.Theme, p widget.Payload, l List, w, h int) []string {
 	if p.IsList() {
 		return listBody(th, p, l, w, h)
 	}
-	var lines []string
-	for _, l := range p.Lines {
-		if l.Big {
-			lines = append(lines, bigLines(th, l)...)
-			continue
-		}
-		lines = append(lines, styled(th, l.Spans))
+	if p.Wrap {
+		return textBody(th, p, l, w, h)
 	}
+	lines := liveLines(th, p.Lines, w, h)
 
 	top := 0
 	if p.Center {
@@ -145,9 +141,14 @@ func body(th theme.Theme, p widget.Payload, l List, w, h int) []string {
 	return out
 }
 
-func styled(th theme.Theme, spans []widget.Span) string {
+func styled(th theme.Theme, spans []widget.Span, w int) string {
 	var b strings.Builder
-	for _, s := range spans {
+	bars := barWidths(spans, w)
+	for i, s := range spans {
+		if s.Bar != nil {
+			b.WriteString(bar(th, s, bars[i]))
+			continue
+		}
 		st := th.Fg(s.Token)
 		if s.Bold {
 			st = st.Bold(true)

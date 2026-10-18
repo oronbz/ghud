@@ -1,0 +1,188 @@
+package host_test
+
+import (
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/oronbz/ghud/internal/hosttest"
+	"github.com/oronbz/ghud/internal/ports"
+	"github.com/oronbz/ghud/internal/theme"
+	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/ghud/internal/widgets/calendar"
+	"github.com/oronbz/ghud/internal/widgets/clock"
+	"github.com/oronbz/ghud/internal/widgets/cpu"
+)
+
+func TestLargeClockDrawsBlockDigits(t *testing.T) {
+	h := hosttest.New(t, hosttest.Options{Types: []widget.Type{clock.Type}, Width: 80, Height: 13, Now: sundayAfternoon})
+
+	// "14" in 3×5 block glyphs, each dot two cells wide: rows 0, 2 and 4.
+	x, y, ok := h.Find("  ████  ██  ██")
+	if !ok {
+		t.Fatalf("no block digits:\n%s", h.Screen())
+	}
+	if got := cells(h.Line(y+2), x, 14); got != "    ██  ██████" {
+		t.Errorf("middle row %q, want %q", got, "    ██  ██████")
+	}
+	if got := cells(h.Line(y+4), x, 14); got != "    ██      ██" {
+		t.Errorf("bottom row %q, want %q", got, "    ██      ██")
+	}
+	if strings.ContainsAny(h.Screen(), "▀▄") {
+		t.Errorf("half blocks in a large clock:\n%s", h.Screen())
+	}
+	if _, dy, ok := h.Find("Sunday 18 October"); !ok || dy <= y+4 {
+		t.Errorf("date not below the digits:\n%s", h.Screen())
+	}
+}
+
+func TestTwelveHourClockShowsPM(t *testing.T) {
+	cfg := `time_format = "12h"`
+	small := hosttest.New(t, hosttest.Options{Types: []widget.Type{clock.Type}, Config: cfg, Width: 30, Height: 6, Now: sundayAfternoon})
+	if _, _, ok := small.Find("2:05:09 PM"); !ok {
+		t.Errorf("small 12h clock:\n%s", small.Screen())
+	}
+
+	big := hosttest.New(t, hosttest.Options{Types: []widget.Type{clock.Type}, Config: cfg, Width: 50, Height: 9, Now: sundayAfternoon})
+	// P then M in half-block glyphs, top row.
+	if _, _, ok := big.Find("█▀▄ █▄ ▄█"); !ok {
+		t.Errorf("half-block 12h clock has no PM:\n%s", big.Screen())
+	}
+}
+
+func TestClockWithoutSecondsChangesOnTheMinute(t *testing.T) {
+	cfg := "[[widget]]\ntype = \"clock\"\nseconds = false\n"
+	h := hosttest.New(t, hosttest.Options{Types: []widget.Type{clock.Type}, Config: cfg, Width: 30, Height: 6, Now: sundayAfternoon})
+	h.Advance(50 * time.Second)
+	if _, _, ok := h.Find("14:05"); !ok {
+		t.Fatalf("before the minute:\n%s", h.Screen())
+	}
+	h.Advance(time.Second)
+	if _, _, ok := h.Find("14:06"); !ok {
+		t.Errorf("on the minute:\n%s", h.Screen())
+	}
+}
+
+func calendarHost(t *testing.T, cfg string, now time.Time) *hosttest.Host {
+	t.Helper()
+	return hosttest.New(t, hosttest.Options{Types: []widget.Type{calendar.Type}, Config: cfg, Width: 40, Height: 12, Now: now})
+}
+
+// highlighted is the day drawn on the accent background, "" if none.
+func highlighted(t *testing.T, h *hosttest.Host) string {
+	t.Helper()
+	for y, line := range strings.Split(h.Screen(), "\n") {
+		for x, r := range []rune(line) {
+			if r >= '0' && r <= '9' {
+				if bg, ok := h.Bg(x, y); ok && bg == theme.Accent {
+					return strings.TrimSpace(cells(line, x-1, 3))
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func TestCalendarHighlightsToday(t *testing.T) {
+	h := calendarHost(t, "", sundayAfternoon)
+	if got := highlighted(t, h); got != "18" {
+		t.Errorf("highlighted %q, want 18:\n%s", got, h.Screen())
+	}
+	x, y, _ := h.Find("18")
+	if fg, _ := h.Fg(x, y); fg != theme.Bg {
+		t.Errorf("today drawn in %v, want bg on accent", fg)
+	}
+}
+
+func TestCalendarWeekStartOrdersTheColumns(t *testing.T) {
+	sunday := calendarHost(t, `week_start = "sunday"`, sundayAfternoon)
+	for _, want := range []string{"Su Mo Tu We Th Fr Sa", " 4  5  6  7  8  9 10"} {
+		if _, _, ok := sunday.Find(want); !ok {
+			t.Errorf("sunday-first: no %q:\n%s", want, sunday.Screen())
+		}
+	}
+
+	monday := calendarHost(t, `week_start = "monday"`, sundayAfternoon)
+	for _, want := range []string{"Mo Tu We Th Fr Sa Su", " 5  6  7  8  9 10 11"} {
+		if _, _, ok := monday.Find(want); !ok {
+			t.Errorf("monday-first: no %q:\n%s", want, monday.Screen())
+		}
+	}
+	for day, tok := range map[string]theme.Token{"Fr": theme.Faint, "Sa": theme.Faint, "Su": theme.Dim, "Th": theme.Dim} {
+		x, y, _ := monday.Find(day)
+		if got, _ := monday.Fg(x, y); got != tok {
+			t.Errorf("%s drawn in %v, want %v", day, got, tok)
+		}
+	}
+}
+
+func TestCalendarNAndPChangeTheMonth(t *testing.T) {
+	h := calendarHost(t, "", sundayAfternoon)
+	h.Press("1", "n")
+	if _, _, ok := h.Find("November 2026"); !ok {
+		t.Fatalf("n did not move to November:\n%s", h.Screen())
+	}
+	if got := highlighted(t, h); got != "" {
+		t.Errorf("today %q highlighted in another month", got)
+	}
+	h.Press("p", "p")
+	if _, _, ok := h.Find("September 2026"); !ok {
+		t.Errorf("p p did not move to September:\n%s", h.Screen())
+	}
+}
+
+func TestCalendarMovesTodayAtMidnight(t *testing.T) {
+	h := calendarHost(t, "", time.Date(2026, 10, 18, 23, 59, 30, 0, time.UTC))
+	h.Advance(30 * time.Second)
+	if got := highlighted(t, h); got != "19" {
+		t.Errorf("after midnight highlighted %q, want 19:\n%s", got, h.Screen())
+	}
+}
+
+func TestCPUDrawsBrailleHistoryMemoryBarAndLoad(t *testing.T) {
+	h := hosttest.New(t, hosttest.Options{Types: []widget.Type{cpu.Type}, Width: 40, Height: 10, Now: sundayAfternoon})
+	stats := ports.Stats{CPU: 0.5, MemUsed: 35 << 30, MemTotal: 100 << 30, Load: [3]float64{2.14, 1.96, 1.71}}
+	h.Machine.Set(stats)
+	h.Advance(2 * time.Second)
+	h.Advance(2 * time.Second)
+	stats.CPU = 1
+	h.Machine.Set(stats)
+	h.Advance(2 * time.Second)
+
+	// Samples 0 (read at start), 0.5, 0.5, 1.0 over 4 chart rows, newest at the right edge, two
+	// samples per cell: the full right column of the last cell is the 1.0.
+	chart := []string{" ⢸", " ⢸", "⢸⣿", "⢸⣿"}
+	for i, want := range chart {
+		if got := cells(h.Line(2+i), 37, 2); got != want {
+			t.Errorf("chart row %d ends %q, want %q:\n%s", i, got, want, h.Screen())
+		}
+		if got := strings.TrimSpace(cells(h.Line(2+i), 1, 36)); got != "" {
+			t.Errorf("chart row %d has %q left of the samples", i, got)
+		}
+	}
+	if fg, _ := h.Fg(38, 4); fg != theme.Accent {
+		t.Errorf("chart drawn in %v, want accent", fg)
+	}
+
+	want := map[int]string{
+		1: "│cpu 100%",
+		6: "│mem ██████████▌─────────────────── 35%│",
+		7: "│load 2.14 1.96 1.71",
+	}
+	for y, w := range want {
+		if got := h.Line(y); !strings.HasPrefix(got, w) {
+			t.Errorf("line %d %q, want %q", y, got, w)
+		}
+	}
+	for x, tok := range map[int]theme.Token{5: theme.Info, 15: theme.Info, 16: theme.Line} {
+		if got, _ := h.Fg(x, 6); got != tok {
+			t.Errorf("memory bar cell %d drawn in %v, want %v", x, got, tok)
+		}
+	}
+}
+
+// cells is n cells of line from x, padded with spaces.
+func cells(line string, x, n int) string {
+	r := []rune(line + strings.Repeat(" ", x+n))
+	return string(r[x : x+n])
+}

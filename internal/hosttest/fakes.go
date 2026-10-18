@@ -82,6 +82,25 @@ func (c *Clock) fireNext(limit time.Time) (tea.Msg, bool) {
 	return t.msg(t.due), true
 }
 
+// Machine reports the Stats the test last Set, zero until then.
+type Machine struct {
+	mu    sync.Mutex
+	stats ports.Stats
+	Err   error
+}
+
+func (m *Machine) Set(s ports.Stats) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.stats = s
+}
+
+func (m *Machine) Stats() (ports.Stats, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.stats, m.Err
+}
+
 // Opener records every target handed to the system opener.
 type Opener struct {
 	Opened []string
