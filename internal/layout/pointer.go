@@ -101,6 +101,54 @@ func (l Layout) Drop(id string, d Drop) Layout {
 	return l.OpenRow(id, tr+1)
 }
 
+// Split moves seam s so its first cell (the left Widget's right border, or
+// the upper row's bottom border) lands on at, a column or a row. Only the
+// two Widgets or rows either side change, keeping their combined weight,
+// and neither gets smaller than MinTile. f is l's frame.
+func (l Layout) Split(f Frame, s Zone, at int) Layout {
+	out := l.clone()
+	vis := l.Visible()
+	if s.Row < 0 || s.Row >= len(vis.Rows) {
+		return out
+	}
+	var a, b *float64
+	var first, span, least int
+	switch s.Kind {
+	case WidgetSeam:
+		ws := vis.Rows[s.Row].Widgets
+		if s.Index < 0 || s.Index+1 >= len(ws) {
+			return out
+		}
+		ra, _ := f.Tile(ws[s.Index].ID)
+		rb, _ := f.Tile(ws[s.Index+1].ID)
+		first, span, least = ra.X, ra.W+rb.W, MinTile.W
+		ri, ci := out.Find(ws[s.Index].ID)
+		rj, cj := out.Find(ws[s.Index+1].ID)
+		a, b = &out.Rows[ri].Widgets[ci].Weight, &out.Rows[rj].Widgets[cj].Weight
+	case RowSeam:
+		if s.Row+1 >= len(vis.Rows) {
+			return out
+		}
+		upper, lower := vis.Rows[s.Row].Widgets[0].ID, vis.Rows[s.Row+1].Widgets[0].ID
+		ra, _ := f.Tile(upper)
+		rb, _ := f.Tile(lower)
+		first, span, least = ra.Y, ra.H+rb.H, MinTile.H
+		ri, _ := out.Find(upper)
+		rj, _ := out.Find(lower)
+		a, b = &out.Rows[ri].Weight, &out.Rows[rj].Weight
+	default:
+		return out
+	}
+	if span < 2*least {
+		return out
+	}
+	size := min(max(at-first+1, least), span-least)
+	total := *a + *b
+	*a = math.Round(total*float64(size)/float64(span)*1000) / 1000
+	*b = math.Round((total-*a)*1000) / 1000
+	return out
+}
+
 // tint is the border cells of seam s: a widget seam's two facing side
 // borders, or a row seam's bottom and top borders between their corners.
 func (f Frame) tint(s *Zone) []Rect {

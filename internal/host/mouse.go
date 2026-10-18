@@ -97,22 +97,35 @@ func (m Model) press(s scene, z layout.Zone, x, y int) (Model, tea.Cmd) {
 		t, _ := s.Tile(z.ID)
 		m.focus, m.last = z.ID, z.ID
 		m.drag = &drag{zone: z, dx: x - t.X, dy: y - t.Y, x: x, y: y}
+	case layout.WidgetSeam, layout.RowSeam:
+		m.drag = &drag{zone: z, dx: x - z.X, dy: y - z.Y, x: x, y: y, before: m.layout}
 	}
 	return m, nil
 }
 
-// dragTo follows the pointer: a title drag tracks where it would drop.
+// dragTo follows the pointer: a title drag tracks where it would drop, and a
+// seam drag reflows the Layout live.
 func (m Model) dragTo(f layout.Frame, x, y int) Model {
 	d := *m.drag
-	d.x, d.y = x, y
-	if d.zone.Kind == layout.Title {
-		d.moved = true
+	d.x, d.y, d.moved = x, y, true
+	m.drag = &d
+	switch d.zone.Kind {
+	case layout.Title:
 		d.drop = nil
 		if drop, ok := f.DropAt(d.zone.ID, x, y); ok {
 			d.drop = &drop
 		}
+	case layout.WidgetSeam, layout.RowSeam:
+		from := layout.Compute(d.before, m.titles(), m.w, m.h-footerHeight, layout.Pointer{})
+		at := x - d.dx
+		if d.zone.Kind == layout.RowSeam {
+			at = y - d.dy
+		}
+		m.layout = d.before.Split(from, d.zone, at)
+		for _, id := range m.ids() {
+			m.clampList(id)
+		}
 	}
-	m.drag = &d
 	return m
 }
 

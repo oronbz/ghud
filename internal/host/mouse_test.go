@@ -86,6 +86,95 @@ func TestHoveringATitleShowsTheGrabHandle(t *testing.T) {
 	}
 }
 
+func TestHoveringASeamLightsOnlyItsTwoFacingEdges(t *testing.T) {
+	type cell struct{ x, y int }
+	for _, c := range []struct {
+		name     string
+		at       cell
+		lit, not []cell
+	}{
+		{
+			name: "widget seam",
+			at:   cell{47, 7},
+			lit:  []cell{{47, 1}, {48, 1}, {47, 7}, {48, 7}, {47, 13}, {48, 13}},
+			not:  []cell{{47, 0}, {48, 0}, {47, 14}, {48, 14}, {0, 7}, {95, 7}, {20, 0}, {20, 14}, {60, 14}, {60, 15}},
+		},
+		{
+			name: "row seam",
+			at:   cell{60, 14},
+			lit:  []cell{{1, 14}, {46, 14}, {49, 14}, {94, 14}, {20, 15}, {94, 15}},
+			not:  []cell{{0, 14}, {47, 14}, {48, 14}, {95, 14}, {0, 15}, {95, 15}, {0, 7}, {47, 7}, {20, 0}, {20, 29}},
+		},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			h := abc(t, twoOverOne)
+			h.Hover(c.at.x, c.at.y)
+			for _, p := range c.lit {
+				if tok, _ := h.Fg(p.x, p.y); tok != theme.Accent {
+					t.Errorf("seam edge %d,%d drawn in %v, want accent", p.x, p.y, tok)
+				}
+			}
+			for _, p := range c.not {
+				if tok, _ := h.Fg(p.x, p.y); tok != theme.Line {
+					t.Errorf("border %d,%d drawn in %v, want line: only the seam's facing edges light up", p.x, p.y, tok)
+				}
+			}
+			if x, y, _ := h.Find("Charlie"); !isFg(h, x, y, theme.Fg) {
+				t.Errorf("Charlie's title recoloured by the seam tint")
+			}
+			h.Hover(20, 7)
+			if tok, _ := h.Fg(c.lit[0].x, c.lit[0].y); tok != theme.Line {
+				t.Errorf("seam still lit (%v) after the pointer left it", tok)
+			}
+		})
+	}
+}
+
+func TestDraggingASeamResizesLiveAndWritesTheLayoutOnRelease(t *testing.T) {
+	h := abc(t, twoOverOne)
+	h.Grab(47, 7)
+	h.DragTo(30, 7)
+	if x, _, _ := h.Find("╭─ Bravo "); x != 31 {
+		t.Errorf("dragging the seam to column 30 starts Bravo at %d, want 31:\n%s", x, h.Line(0))
+	}
+	if tok, _ := h.Fg(30, 7); tok != theme.Accent {
+		t.Errorf("dragged seam drawn in %v, want accent", tok)
+	}
+	if saved, _ := layout.Load(h.Paths.Config); saved.Rows[0].Widgets[0].Weight != 1 {
+		t.Errorf("layout.json changed mid-drag: %+v", saved.Rows[0])
+	}
+	h.DragTo(5, 7)
+	if x, _, _ := h.Find("╭─ Bravo "); x != layout.MinTile.W {
+		t.Errorf("dragging the seam past Alpha's minimum starts Bravo at %d, want %d", x, layout.MinTile.W)
+	}
+	h.DragTo(40, 7)
+	h.Drop(40, 7)
+	saved, err := layout.Load(h.Paths.Config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, b := saved.Rows[0].Widgets[0].Weight, saved.Rows[0].Widgets[1].Weight
+	if share := a / (a + b); share < 40.5/96 || share > 41.5/96 {
+		t.Errorf("saved Alpha:Bravo %v:%v, want Alpha 41 of 96 columns", a, b)
+	}
+
+	h.Grab(60, 14)
+	h.DragTo(60, 9)
+	if _, y, _ := h.Find("─ Charlie "); y != 10 {
+		t.Errorf("dragging the row seam up to row 9 puts Charlie at row %d, want 10", y)
+	}
+	h.Drop(60, 9)
+	saved, _ = layout.Load(h.Paths.Config)
+	if top, bottom := saved.Rows[0].Weight, saved.Rows[1].Weight; top >= bottom {
+		t.Errorf("saved row weights %v over %v, want the top row shorter", top, bottom)
+	}
+}
+
+func isFg(h *hosttest.Host, x, y int, want theme.Token) bool {
+	tok, ok := h.Fg(x, y)
+	return ok && tok == want
+}
+
 // abc is a 96×31 host of the blank Widgets Alpha, Bravo and Charlie, arranged by layoutJSON.
 func abc(t *testing.T, layoutJSON string) *hosttest.Host {
 	t.Helper()
