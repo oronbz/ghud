@@ -90,9 +90,11 @@ type Model struct {
 	overlay *overlay
 	// editing is INSERT mode's editor, which takes every key but insertHostKeys.
 	editing *editing
-	// palette is the open ^K Action palette; menu the open Action menu.
+	// palette is the open ^K Action palette; menu the open Action menu;
+	// menus counts the choice menus opened so far.
 	palette *palette
 	menu    *menu
+	menus   int
 	// held is the modifier (Shift or Ctrl) held on its own, which swaps the
 	// footer to that modifier's keys; only kitty-protocol terminals report it.
 	held   tea.KeyMod
@@ -254,6 +256,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.spun(msg)
 	case actedMsg:
 		return m.acted(msg)
+	case choicesMsg:
+		return m.chose(msg)
 	case editedMsg:
 		return m.edited(msg)
 	case filesChangedMsg:
