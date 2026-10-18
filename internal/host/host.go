@@ -131,7 +131,8 @@ type tickMsg struct {
 }
 
 // Builtins are the Widget types compiled into ghud, in reference order.
-var Builtins = []widget.Type{clock.Type, calendar.Type, tasks.Type, cpu.Type, notes.Type, script.Type}
+var Builtins = slices.Concat([]widget.Type{clock.Type, calendar.Type}, macTypes,
+	[]widget.Type{tasks.Type, cpu.Type, notes.Type, script.Type})
 
 func New(o Options) Model {
 	m := Model{opts: o, now: o.Ports.Clock.Now(), widgets: map[string]placed{},
@@ -435,7 +436,7 @@ func (m Model) scene() scene {
 		if tile.Payload.IsList() {
 			rows := render.Rows(tile.Payload)
 			for i := range t.H - 2 {
-				if j := tile.List.Top + i; j < len(rows) && rows[j] != render.Header {
+				if j := tile.List.Top + i; j < len(rows) && rows[j] >= 0 {
 					s.Zones = append(s.Zones, layout.Zone{Kind: layout.Item, ID: t.ID, Index: rows[j], Rect: layout.Rect{X: t.X + 1, Y: t.Y + 1 + i, W: t.W - 2, H: 1}})
 				}
 			}

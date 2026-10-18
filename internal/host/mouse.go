@@ -106,7 +106,7 @@ func (m Model) scroll(id string, lines int) {
 	st.top = min(max(st.top+lines, 0), max(0, len(rows)-h))
 	if line := slices.Index(rows, st.idx); line < st.top || line >= st.top+h {
 		for j := st.top; j < min(len(rows), st.top+h); j++ {
-			if rows[j] == render.Header {
+			if rows[j] < 0 {
 				continue
 			}
 			st.idx = rows[j]

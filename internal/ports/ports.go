@@ -99,11 +99,32 @@ const (
 	Reminders
 )
 
-// EventKit is the macOS calendar and reminders store. The Meetings and
-// Reminders Widget types grow this interface; off darwin it reports AccessUnsupported.
+// EventKit is the macOS calendar and reminders store. Off darwin it reports
+// AccessUnsupported.
 type EventKit interface {
+	// Status reads e's access without ever asking the user.
 	Status(e Entity) Access
+	// Request asks the user for full access to e when they haven't answered
+	// yet, blocking until they do; otherwise it reports the access as it is.
 	Request(ctx context.Context, e Entity) (Access, error)
+	// Events are the events from every calendar that overlap [from, to).
+	// Without granted access it fails rather than asking.
+	Events(ctx context.Context, from, to time.Time) ([]Event, error)
+}
+
+// Event is one occurrence of a calendar event.
+type Event struct {
+	// ID is the event's EventKit identifier; occurrences of a recurring
+	// event share it.
+	ID         string
+	Title      string
+	Start, End time.Time
+	AllDay     bool
+	Location   string
+	Calendar   string
+	// Declined is set when the user declined the invitation.
+	Declined bool
+	Canceled bool
 }
 
 // Endpoints holds the base URLs of every HTTP service ghud talks to, so tests

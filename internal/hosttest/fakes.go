@@ -286,14 +286,25 @@ func (c *Commands) Output(_ context.Context, name string, args ...string) ([]byt
 
 // EventKit fakes macOS calendar access. Access defaults to AccessUnsupported.
 type EventKit struct {
+	mu       sync.Mutex
 	Access   map[ports.Entity]ports.Access
 	Granted  bool // what the user answers to a Request prompt
 	Requests []ports.Entity
+	// Calendar is every event; Events returns the ones overlapping its range.
+	Calendar []ports.Event
+	// Err, when set, fails every read.
+	Err error
 }
 
-func (e *EventKit) Status(en ports.Entity) ports.Access { return e.Access[en] }
+func (e *EventKit) Status(en ports.Entity) ports.Access {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.Access[en]
+}
 
 func (e *EventKit) Request(_ context.Context, en ports.Entity) (ports.Access, error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	e.Requests = append(e.Requests, en)
 	if e.Access[en] == ports.AccessUndetermined {
 		e.Access[en] = ports.AccessDenied
@@ -302,4 +313,22 @@ func (e *EventKit) Request(_ context.Context, en ports.Entity) (ports.Access, er
 		}
 	}
 	return e.Access[en], nil
+}
+
+func (e *EventKit) Events(_ context.Context, from, to time.Time) ([]ports.Event, error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.Access[ports.Events] != ports.AccessGranted {
+		return nil, ports.ErrNoAccess
+	}
+	if e.Err != nil {
+		return nil, e.Err
+	}
+	var out []ports.Event
+	for _, ev := range e.Calendar {
+		if ev.End.After(from) && ev.Start.Before(to) {
+			out = append(out, ev)
+		}
+	}
+	return out, nil
 }

@@ -41,6 +41,9 @@ type Options struct {
 	Types []widget.Type
 	// CloseKeys are --close-key values.
 	CloseKeys []string
+	// EventKit, when set, is the EventKit fake the app starts with, so its
+	// first refresh already sees the access and events.
+	EventKit *EventKit
 }
 
 var DefaultNow = time.Date(2026, 10, 18, 14, 5, 9, 0, time.UTC)
@@ -79,6 +82,9 @@ func New(t testing.TB, o Options) *Host {
 	if o.Root == "" {
 		o.Root = t.TempDir()
 	}
+	if o.EventKit == nil {
+		o.EventKit = &EventKit{}
+	}
 	var th theme.Theme
 	if o.Theme != nil {
 		th = *o.Theme
@@ -93,7 +99,7 @@ func New(t testing.TB, o Options) *Host {
 		Editor:    &Editor{},
 		Keyring:   newKeyring(),
 		Commands:  &Commands{},
-		EventKit:  &EventKit{},
+		EventKit:  o.EventKit,
 		Machine:   &Machine{},
 		Watcher:   &Watcher{},
 	}
