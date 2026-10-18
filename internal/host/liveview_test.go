@@ -3,9 +3,12 @@ package host_test
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/oronbz/ghud/internal/hosttest"
+	"github.com/oronbz/ghud/internal/theme"
 	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/ghud/internal/widgets/calendar"
 	"github.com/oronbz/ghud/internal/widgets/clock"
 )
 
@@ -42,6 +45,95 @@ func TestTwelveHourClockShowsPM(t *testing.T) {
 	// P then M in half-block glyphs, top row.
 	if _, _, ok := big.Find("█▀▄ █▄ ▄█"); !ok {
 		t.Errorf("half-block 12h clock has no PM:\n%s", big.Screen())
+	}
+}
+
+func TestClockWithoutSecondsChangesOnTheMinute(t *testing.T) {
+	cfg := "[[widget]]\ntype = \"clock\"\nseconds = false\n"
+	h := hosttest.New(t, hosttest.Options{Types: []widget.Type{clock.Type}, Config: cfg, Width: 30, Height: 6, Now: sundayAfternoon})
+	h.Advance(50 * time.Second)
+	if _, _, ok := h.Find("14:05"); !ok {
+		t.Fatalf("before the minute:\n%s", h.Screen())
+	}
+	h.Advance(time.Second)
+	if _, _, ok := h.Find("14:06"); !ok {
+		t.Errorf("on the minute:\n%s", h.Screen())
+	}
+}
+
+func calendarHost(t *testing.T, cfg string, now time.Time) *hosttest.Host {
+	t.Helper()
+	return hosttest.New(t, hosttest.Options{Types: []widget.Type{calendar.Type}, Config: cfg, Width: 40, Height: 12, Now: now})
+}
+
+// highlighted is the day drawn on the accent background, "" if none.
+func highlighted(t *testing.T, h *hosttest.Host) string {
+	t.Helper()
+	for y, line := range strings.Split(h.Screen(), "\n") {
+		for x, r := range []rune(line) {
+			if r >= '0' && r <= '9' {
+				if bg, ok := h.Bg(x, y); ok && bg == theme.Accent {
+					return strings.TrimSpace(cells(line, x-1, 3))
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func TestCalendarHighlightsToday(t *testing.T) {
+	h := calendarHost(t, "", sundayAfternoon)
+	if got := highlighted(t, h); got != "18" {
+		t.Errorf("highlighted %q, want 18:\n%s", got, h.Screen())
+	}
+	x, y, _ := h.Find("18")
+	if fg, _ := h.Fg(x, y); fg != theme.Bg {
+		t.Errorf("today drawn in %v, want bg on accent", fg)
+	}
+}
+
+func TestCalendarWeekStartOrdersTheColumns(t *testing.T) {
+	sunday := calendarHost(t, `week_start = "sunday"`, sundayAfternoon)
+	for _, want := range []string{"Su Mo Tu We Th Fr Sa", " 4  5  6  7  8  9 10"} {
+		if _, _, ok := sunday.Find(want); !ok {
+			t.Errorf("sunday-first: no %q:\n%s", want, sunday.Screen())
+		}
+	}
+
+	monday := calendarHost(t, `week_start = "monday"`, sundayAfternoon)
+	for _, want := range []string{"Mo Tu We Th Fr Sa Su", " 5  6  7  8  9 10 11"} {
+		if _, _, ok := monday.Find(want); !ok {
+			t.Errorf("monday-first: no %q:\n%s", want, monday.Screen())
+		}
+	}
+	for day, tok := range map[string]theme.Token{"Fr": theme.Faint, "Sa": theme.Faint, "Su": theme.Dim, "Th": theme.Dim} {
+		x, y, _ := monday.Find(day)
+		if got, _ := monday.Fg(x, y); got != tok {
+			t.Errorf("%s drawn in %v, want %v", day, got, tok)
+		}
+	}
+}
+
+func TestCalendarNAndPChangeTheMonth(t *testing.T) {
+	h := calendarHost(t, "", sundayAfternoon)
+	h.Press("1", "n")
+	if _, _, ok := h.Find("November 2026"); !ok {
+		t.Fatalf("n did not move to November:\n%s", h.Screen())
+	}
+	if got := highlighted(t, h); got != "" {
+		t.Errorf("today %q highlighted in another month", got)
+	}
+	h.Press("p", "p")
+	if _, _, ok := h.Find("September 2026"); !ok {
+		t.Errorf("p p did not move to September:\n%s", h.Screen())
+	}
+}
+
+func TestCalendarMovesTodayAtMidnight(t *testing.T) {
+	h := calendarHost(t, "", time.Date(2026, 10, 18, 23, 59, 30, 0, time.UTC))
+	h.Advance(30 * time.Second)
+	if got := highlighted(t, h); got != "19" {
+		t.Errorf("after midnight highlighted %q, want 19:\n%s", got, h.Screen())
 	}
 }
 

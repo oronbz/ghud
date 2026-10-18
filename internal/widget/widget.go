@@ -18,8 +18,6 @@ type Type struct {
 	Title string
 	// Description is the one-line summary above the type's block in the config reference.
 	Description string
-	// Tick is how often a live view redraws; zero means it never ticks.
-	Tick time.Duration
 	// Settings is the schema a Widget's config.toml block is validated
 	// against and the config reference is generated from.
 	Settings []Setting
@@ -46,6 +44,12 @@ type Widget any
 // View is a live view such as the Clock: its payload depends only on the frame.
 type View interface {
 	Payload(Frame) Payload
+}
+
+// Ticker is a View that changes with time, such as the Clock every second.
+type Ticker interface {
+	// Next is when the View next changes after now; the host redraws then.
+	Next(now time.Time) time.Time
 }
 
 // Source is a Widget whose data lives outside ghud, such as in a file or

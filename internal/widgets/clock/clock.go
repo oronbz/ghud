@@ -13,7 +13,6 @@ var Type = widget.Type{
 	Name:        "clock",
 	Title:       "Clock",
 	Description: "The time in big digits, plus the date.",
-	Tick:        time.Second,
 	Settings: []widget.Setting{{
 		Name: "seconds", Kind: widget.Bool, Default: true,
 		Description: "Show seconds.",
@@ -25,6 +24,15 @@ var Type = widget.Type{
 }
 
 type clock struct{ seconds, twelve bool }
+
+// Next is the next second, or the next minute without seconds.
+func (c clock) Next(now time.Time) time.Time {
+	d := time.Minute
+	if c.seconds {
+		d = time.Second
+	}
+	return now.Truncate(d).Add(d)
+}
 
 func (c clock) Payload(f widget.Frame) widget.Payload {
 	layout := "15:04"

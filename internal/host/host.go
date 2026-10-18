@@ -170,19 +170,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// nextTick schedules one redraw at the next boundary of the fastest live view,
-// so a 1s clock flips on the wall-clock second rather than drifting.
+// nextTick schedules one redraw for the soonest change of any live view.
 func (m Model) nextTick() tea.Cmd {
-	var d time.Duration
+	var next time.Time
 	for _, w := range m.widgets {
-		if w.setup == "" && w.typ.Tick > 0 && (d == 0 || w.typ.Tick < d) {
-			d = w.typ.Tick
+		if t, ok := w.widget.(widget.Ticker); ok && w.setup == "" {
+			if n := t.Next(m.now); next.IsZero() || n.Before(next) {
+				next = n
+			}
 		}
 	}
-	if d == 0 {
+	if next.IsZero() {
 		return nil
 	}
-	next := m.now.Truncate(d).Add(d)
 	return m.opts.Ports.Clock.After(next.Sub(m.now), func(t time.Time) tea.Msg { return tickMsg{at: t} })
 }
 
