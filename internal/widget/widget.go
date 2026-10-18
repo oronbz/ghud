@@ -5,6 +5,8 @@ package widget
 
 import (
 	"context"
+	"fmt"
+	"slices"
 	"time"
 
 	"github.com/oronbz/ghud/internal/ports"
@@ -194,21 +196,21 @@ const (
 )
 
 type Line struct {
-	Spans []Span
+	Spans []Span `json:"spans,omitempty"`
 	// Digits asks the host to draw the line's text as big digits.
-	Digits Digits
+	Digits Digits `json:"digits,omitempty"`
 	// Chart, when set, draws the line as a braille area chart instead of its Spans.
-	Chart *Chart
+	Chart *Chart `json:"chart,omitempty"`
 }
 
 // Chart is a braille area chart, two samples per cell and four dots per row.
 type Chart struct {
 	// Values are samples from 0 to 1, oldest first; the newest is drawn at the
 	// right edge and the ones that don't fit are dropped.
-	Values []float64
+	Values []float64 `json:"values"`
 	// Rows is the chart's height; zero takes the rows the other lines leave.
-	Rows  int
-	Token theme.Token
+	Rows  int         `json:"rows,omitempty"`
+	Token theme.Token `json:"token"`
 }
 
 // Digits is how big the host draws a line's text. Big digits cover 0-9,
@@ -223,22 +225,40 @@ const (
 	Block
 )
 
+var digitNames = []string{"", "half-block", "block"}
+
+func (d Digits) MarshalText() ([]byte, error) {
+	if d < 0 || int(d) >= len(digitNames) {
+		return nil, fmt.Errorf("unknown digits %d", d)
+	}
+	return []byte(digitNames[d]), nil
+}
+
+func (d *Digits) UnmarshalText(b []byte) error {
+	i := slices.Index(digitNames, string(b))
+	if i < 0 {
+		return fmt.Errorf("digits %q must be \"half-block\" or \"block\"", b)
+	}
+	*d = Digits(i)
+	return nil
+}
+
 type Span struct {
-	Text  string
-	Token theme.Token
+	Text  string      `json:"text,omitempty"`
+	Token theme.Token `json:"token"`
 	// Bg fills the span's cells; the zero value, theme.Bg, leaves the background alone.
-	Bg   theme.Token
-	Bold bool
+	Bg   theme.Token `json:"bg,omitempty"`
+	Bold bool        `json:"bold,omitempty"`
 	// Bar, when set, draws the span as an eighth-block bar instead of its Text.
-	Bar *Bar
+	Bar *Bar `json:"bar,omitempty"`
 }
 
 // Bar is a horizontal bar in the span's Token over a track in the line token.
 type Bar struct {
 	// Value is the filled share, 0 to 1.
-	Value float64
+	Value float64 `json:"value"`
 	// Width is the bar's width in cells; zero takes the width the line's other spans leave.
-	Width int
+	Width int `json:"width,omitempty"`
 }
 
 func Text(tok theme.Token, s string) Line { return Line{Spans: []Span{{Text: s, Token: tok}}} }
