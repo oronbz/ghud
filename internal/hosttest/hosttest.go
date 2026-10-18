@@ -14,6 +14,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/oronbz/ghud/internal/closekey"
 	"github.com/oronbz/ghud/internal/config"
 	"github.com/oronbz/ghud/internal/host"
 	"github.com/oronbz/ghud/internal/paths"
@@ -38,6 +39,8 @@ type Options struct {
 	Config string
 	// Types replaces the built-in Widget types (see host.Options.Types).
 	Types []widget.Type
+	// CloseKeys are --close-key values.
+	CloseKeys []string
 }
 
 var DefaultNow = time.Date(2026, 10, 18, 14, 5, 9, 0, time.UTC)
@@ -100,10 +103,19 @@ func New(t testing.TB, o Options) *Host {
 			t.Fatal(err)
 		}
 	}
+	var closeKeys []closekey.Seq
+	for _, k := range o.CloseKeys {
+		seq, err := closekey.Parse(k)
+		if err != nil {
+			t.Fatal(err)
+		}
+		closeKeys = append(closeKeys, seq)
+	}
 	m := host.New(host.Options{
-		Paths: h.Paths,
-		Theme: th,
-		Types: o.Types,
+		CloseKeys: closeKeys,
+		Paths:     h.Paths,
+		Theme:     th,
+		Types:     o.Types,
 		Ports: ports.Ports{
 			Clock:     h.Clock,
 			Opener:    h.Opener,

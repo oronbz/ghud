@@ -15,6 +15,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/oronbz/ghud/internal/closekey"
 	"github.com/oronbz/ghud/internal/config"
 	"github.com/oronbz/ghud/internal/layout"
 	"github.com/oronbz/ghud/internal/paths"
@@ -43,6 +44,8 @@ type Options struct {
 	// Types replaces the built-in Widget types; with no config.toml there is
 	// one Widget of each. Tests use it to stage Layouts the built-ins can't fill.
 	Types []widget.Type
+	// CloseKeys quit ghud from any mode (--close-key).
+	CloseKeys []closekey.Seq
 }
 
 type Model struct {
@@ -89,7 +92,8 @@ type Model struct {
 	// edits is how host Actions change config.toml.
 	edits config.Editor
 	// base is what every Widget is built with, besides its settings.
-	base widget.Config
+	base    widget.Config
+	closing closekey.Matcher
 }
 
 type placed struct {
@@ -109,7 +113,8 @@ var Builtins = []widget.Type{clock.Type, calendar.Type, tasks.Type, cpu.Type, no
 
 func New(o Options) Model {
 	m := Model{opts: o, now: o.Ports.Clock.Now(), widgets: map[string]placed{},
-		fetched: map[string]widget.Payload{}, lists: map[string]listState{}, due: map[string]int{}}
+		fetched: map[string]widget.Payload{}, lists: map[string]listState{}, due: map[string]int{},
+		closing: closekey.NewMatcher(o.CloseKeys)}
 	types := o.Types
 	if types == nil {
 		types = Builtins
