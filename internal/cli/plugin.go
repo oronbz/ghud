@@ -17,6 +17,7 @@ import (
 	"github.com/gofrs/flock"
 
 	"github.com/oronbz/ghud/internal/config"
+	"github.com/oronbz/ghud/internal/github"
 	"github.com/oronbz/ghud/internal/host"
 	"github.com/oronbz/ghud/internal/paths"
 	"github.com/oronbz/ghud/internal/plugin"
@@ -77,24 +78,11 @@ func githubFetcher(getenv func(string) string, pp ports.Ports) install.GitHub {
 		c.Timeout = fetchTimeout
 		client = &c
 	}
-	return install.GitHub{HTTP: client, API: pp.Endpoints.GitHubREST, Token: githubToken(getenv, pp.Commands)}
-}
-
-// githubToken is the token gh and GitHub's tools use, if any; Plugins
-// from public repositories need none.
-func githubToken(getenv func(string) string, c ports.Commands) string {
-	for _, k := range []string{"GH_TOKEN", "GITHUB_TOKEN"} {
-		if v := getenv(k); v != "" {
-			return v
-		}
-	}
+	// Plugins from public repositories need no token.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	out, err := c.Output(ctx, "gh", "auth", "token")
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(out))
+	tok, _ := github.Token(ctx, getenv, pp.Commands)
+	return install.GitHub{HTTP: client, API: pp.Endpoints.GitHubREST, Token: tok}
 }
 
 type pluginCLI struct {

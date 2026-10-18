@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/oronbz/ghud/internal/github"
 	"github.com/oronbz/ghud/internal/ports"
 	"github.com/oronbz/ghud/internal/widget"
 )
@@ -33,18 +34,8 @@ var (
 // came from. It's read afresh each time and never kept, so a `gh auth login`
 // is picked up on the next refresh.
 func token(ctx context.Context, p ports.Ports) (tok, from string, err error) {
-	for _, k := range []string{"GH_TOKEN", "GITHUB_TOKEN"} {
-		if p.Getenv == nil {
-			break
-		}
-		if t := strings.TrimSpace(p.Getenv(k)); t != "" {
-			return t, k, nil
-		}
-	}
-	if out, err := p.Commands.Output(ctx, "gh", "auth", "token"); err == nil {
-		if t := strings.TrimSpace(string(out)); t != "" {
-			return t, "`gh auth token`", nil
-		}
+	if tok, from := github.Token(ctx, p.Getenv, p.Commands); tok != "" {
+		return tok, from, nil
 	}
 	if p.Keyring == nil {
 		return "", "", errNoKeyring

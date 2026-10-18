@@ -1,10 +1,15 @@
 package widget
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/gofrs/flock"
 )
 
 // DataFile resolves a Widget's `file` setting: empty means def in the data
@@ -51,4 +56,33 @@ func WriteFile(path string, data []byte) error {
 		return err
 	}
 	return os.Rename(tmp.Name(), path)
+}
+
+// EditLock is the lock file serialising edits of file across ghud
+// instances, named for kind. It lives in the data dir so synced folders
+// don't collect lock files.
+func (c Config) EditLock(kind, file string) string {
+	sum := sha256.Sum256([]byte(file))
+	return filepath.Join(c.DataDir, "locks", kind+"-"+hex.EncodeToString(sum[:8])+".lock")
+}
+
+// Lock blocks until it holds the lock file at path.
+func Lock(path string) (unlock func(), err error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return nil, err
+	}
+	l := flock.New(path)
+	if err := l.Lock(); err != nil {
+		return nil, err
+	}
+	return func() { _ = l.Unlock() }, nil
+}
+
+// ReadFile reads path as text; a missing file is empty.
+func ReadFile(path string) (string, error) {
+	b, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return "", nil
+	}
+	return string(b), err
 }

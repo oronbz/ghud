@@ -165,7 +165,7 @@ func New(o Options) Model {
 	}
 	m.colors = colors{pinned: !o.Theme.IsZero(), name: cfg.Theme, over: cfg.Colors, asking: o.Theme.IsZero()}
 	m = m.resolveTheme()
-	m.edits = config.Editor{Path: file, LockDir: filepath.Join(o.Paths.Data, "locks"), Types: types, Locale: o.Locale}
+	m.edits = config.NewEditor(file, o.Paths.Data, types, o.Locale)
 	m, ids, _, clamped := m.placeAll(cfg)
 	m.sticky = toastOf(append(append(problems, cfg.Problems...), clamped...))
 	// An unreadable layout.json falls back to the default rather than blocking launch.

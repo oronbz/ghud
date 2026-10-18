@@ -31,6 +31,11 @@ type Editor struct {
 	Locale  Locale
 }
 
+// NewEditor edits the config at path, locking under dataDir's locks.
+func NewEditor(path, dataDir string, types []widget.Type, loc Locale) Editor {
+	return Editor{Path: path, LockDir: filepath.Join(dataDir, "locks"), Types: types, Locale: loc}
+}
+
 // Ref names a Widget by id; N tells apart Widgets sharing that id, 0 being
 // the first in the file.
 type Ref struct {

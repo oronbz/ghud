@@ -4,18 +4,12 @@ package tasks
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"io/fs"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
-
-	"github.com/gofrs/flock"
 
 	"github.com/oronbz/ghud/internal/theme"
 	"github.com/oronbz/ghud/internal/widget"
@@ -36,8 +30,7 @@ var Type = widget.Type{
 
 func newTasks(c widget.Config) widget.Widget {
 	file := c.DataFile(c.Settings.String("file"), "tasks.md")
-	sum := sha256.Sum256([]byte(file))
-	return tasks{file: file, lock: filepath.Join(c.DataDir, "locks", "tasks-"+hex.EncodeToString(sum[:8])+".lock")}
+	return tasks{file: file, lock: c.EditLock("tasks", file)}
 }
 
 type tasks struct {
@@ -82,14 +75,11 @@ func (t tasks) Refresh(_ context.Context, now time.Time) (widget.Payload, error)
 }
 
 func (t tasks) Invoke(_ context.Context, inv widget.Invocation) (widget.Result, error) {
-	if err := os.MkdirAll(filepath.Dir(t.lock), 0o755); err != nil {
+	unlock, err := widget.Lock(t.lock)
+	if err != nil {
 		return widget.Result{}, err
 	}
-	l := flock.New(t.lock)
-	if err := l.Lock(); err != nil {
-		return widget.Result{}, err
-	}
-	defer l.Unlock()
+	defer unlock()
 
 	src, err := t.read()
 	if err != nil {
@@ -130,13 +120,7 @@ func (t tasks) Invoke(_ context.Context, inv widget.Invocation) (widget.Result, 
 	return widget.Result{Toast: toast}, t.write(doc)
 }
 
-func (t tasks) read() (string, error) {
-	b, err := os.ReadFile(t.file)
-	if errors.Is(err, fs.ErrNotExist) {
-		return "", nil
-	}
-	return string(b), err
-}
+func (t tasks) read() (string, error) { return widget.ReadFile(t.file) }
 
 func (t tasks) write(d doc) error {
 	return widget.WriteFile(t.file, []byte(strings.Join(d.lines, "")))
