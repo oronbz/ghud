@@ -24,7 +24,7 @@ func TestDefaultLayoutPlacesClockThenCalendarInOneRow(t *testing.T) {
 }
 
 func TestCalendarShowsTheMonthGridWithTodayHighlighted(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 100, Height: 20, Now: sundayAfternoon})
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Config: `week_start = "sunday"`, Width: 100, Height: 20, Now: sundayAfternoon})
 
 	want := []string{
 		"                  October 2026",

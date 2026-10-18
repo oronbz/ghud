@@ -54,6 +54,7 @@ type Host struct {
 	Keyring   *Keyring
 	Commands  *Commands
 	EventKit  *EventKit
+	Machine   *Machine
 
 	model tea.Model
 	w, h  int
@@ -89,6 +90,7 @@ func New(t testing.TB, o Options) *Host {
 		Keyring:   newKeyring(),
 		Commands:  &Commands{},
 		EventKit:  &EventKit{},
+		Machine:   &Machine{},
 	}
 	if o.Config != "" {
 		if err := os.MkdirAll(h.Paths.Config, 0o755); err != nil {
@@ -110,6 +112,7 @@ func New(t testing.TB, o Options) *Host {
 			Keyring:   h.Keyring,
 			Commands:  h.Commands,
 			EventKit:  h.EventKit,
+			Machine:   h.Machine,
 			HTTP:      &http.Client{Timeout: 5 * time.Second},
 			Endpoints: mergeEndpoints(ports.DefaultEndpoints(), o.Endpoints),
 		},

@@ -5,8 +5,11 @@ package widget
 
 import (
 	"context"
+	"fmt"
+	"slices"
 	"time"
 
+	"github.com/oronbz/ghud/internal/ports"
 	"github.com/oronbz/ghud/internal/theme"
 )
 
@@ -18,12 +21,13 @@ type Type struct {
 	Title string
 	// Description is the one-line summary above the type's block in the config reference.
 	Description string
-	// Tick is how often a live view redraws; zero means it never ticks.
-	Tick time.Duration
 	// Settings is the schema a Widget's config.toml block is validated
 	// against and the config reference is generated from.
 	Settings []Setting
-	New      func(Config) Widget
+	// Refresh is how often the host refreshes a Source; zero means only at
+	// start and after its Actions.
+	Refresh time.Duration
+	New     func(Config) Widget
 }
 
 // Config is what a Widget is built from: its validated settings, defaults
@@ -36,6 +40,8 @@ type Config struct {
 	WeekStart string
 	// DataDir is ghud's data directory, where local Widget data lives by default.
 	DataDir string
+	// Ports are the outside-world adapters, the only way a Widget reaches the world.
+	Ports ports.Ports
 }
 
 // Widget is one placed Widget. It is a View, drawn afresh for every frame,
@@ -46,6 +52,12 @@ type Widget any
 // View is a live view such as the Clock: its payload depends only on the frame.
 type View interface {
 	Payload(Frame) Payload
+}
+
+// Ticker is a View that changes with time, such as the Clock every second.
+type Ticker interface {
+	// Next is when the View next changes after now; the host redraws then.
+	Next(now time.Time) time.Time
 }
 
 // Source is a Widget whose data lives outside ghud, such as in a file or
@@ -187,17 +199,69 @@ const (
 )
 
 type Line struct {
-	Spans []Span
-	// Big asks the host to draw the line's text in 3-row half-block digits.
-	Big bool
+	Spans []Span `json:"spans,omitempty"`
+	// Digits asks the host to draw the line's text as big digits.
+	Digits Digits `json:"digits,omitempty"`
+	// Chart, when set, draws the line as a braille area chart instead of its Spans.
+	Chart *Chart `json:"chart,omitempty"`
+}
+
+// Chart is a braille area chart, two samples per cell and four dots per row.
+type Chart struct {
+	// Values are samples from 0 to 1, oldest first; the newest is drawn at the
+	// right edge and the ones that don't fit are dropped.
+	Values []float64 `json:"values"`
+	// Rows is the chart's height; zero takes the rows the other lines leave.
+	Rows  int         `json:"rows,omitempty"`
+	Token theme.Token `json:"token"`
+}
+
+// Digits is how big the host draws a line's text. Big digits cover 0-9,
+// ':', space, A, P and M; other characters are skipped.
+type Digits int
+
+const (
+	NoDigits Digits = iota
+	// HalfBlock digits are 3 rows tall.
+	HalfBlock
+	// Block digits are 5 rows tall and twice as wide as half-block ones.
+	Block
+)
+
+var digitNames = []string{"", "half-block", "block"}
+
+func (d Digits) MarshalText() ([]byte, error) {
+	if d < 0 || int(d) >= len(digitNames) {
+		return nil, fmt.Errorf("unknown digits %d", d)
+	}
+	return []byte(digitNames[d]), nil
+}
+
+func (d *Digits) UnmarshalText(b []byte) error {
+	i := slices.Index(digitNames, string(b))
+	if i < 0 {
+		return fmt.Errorf("digits %q must be \"half-block\" or \"block\"", b)
+	}
+	*d = Digits(i)
+	return nil
 }
 
 type Span struct {
-	Text  string
-	Token theme.Token
+	Text  string      `json:"text,omitempty"`
+	Token theme.Token `json:"token"`
 	// Bg fills the span's cells; the zero value, theme.Bg, leaves the background alone.
-	Bg   theme.Token
-	Bold bool
+	Bg   theme.Token `json:"bg,omitempty"`
+	Bold bool        `json:"bold,omitempty"`
+	// Bar, when set, draws the span as an eighth-block bar instead of its Text.
+	Bar *Bar `json:"bar,omitempty"`
+}
+
+// Bar is a horizontal bar in the span's Token over a track in the line token.
+type Bar struct {
+	// Value is the filled share, 0 to 1.
+	Value float64 `json:"value"`
+	// Width is the bar's width in cells; zero takes the width the line's other spans leave.
+	Width int `json:"width,omitempty"`
 }
 
 func Text(tok theme.Token, s string) Line { return Line{Spans: []Span{{Text: s, Token: tok}}} }

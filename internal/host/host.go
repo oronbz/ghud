@@ -24,6 +24,7 @@ import (
 	"github.com/oronbz/ghud/internal/widget"
 	"github.com/oronbz/ghud/internal/widgets/calendar"
 	"github.com/oronbz/ghud/internal/widgets/clock"
+	"github.com/oronbz/ghud/internal/widgets/cpu"
 	"github.com/oronbz/ghud/internal/widgets/tasks"
 )
 
@@ -65,6 +66,8 @@ type Model struct {
 	// Like every map here they're shared by Model copies, and only Update writes them.
 	fetched map[string]widget.Payload
 	lists   map[string]listState
+	// due is each scheduled Source's current refresh timer.
+	due map[string]int
 	// overlay is the open confirm or text prompt, which takes every key.
 	overlay *overlay
 	// palette is the open ^K Action palette.
@@ -86,11 +89,11 @@ type placed struct {
 type tickMsg struct{ at time.Time }
 
 // Builtins are the Widget types compiled into ghud, in reference order.
-var Builtins = []widget.Type{clock.Type, calendar.Type, tasks.Type}
+var Builtins = []widget.Type{clock.Type, calendar.Type, tasks.Type, cpu.Type}
 
 func New(o Options) Model {
 	m := Model{opts: o, now: o.Ports.Clock.Now(), widgets: map[string]placed{},
-		fetched: map[string]widget.Payload{}, lists: map[string]listState{}}
+		fetched: map[string]widget.Payload{}, lists: map[string]listState{}, due: map[string]int{}}
 	types := o.Types
 	if types == nil {
 		types = Builtins
@@ -119,7 +122,7 @@ func New(o Options) Model {
 			p.typ = types[i]
 		}
 		if p.setup == "" {
-			p.widget = p.typ.New(widget.Config{Settings: wc.Settings, TimeFormat: cfg.TimeFormat, WeekStart: cfg.WeekStart, DataDir: o.Paths.Data})
+			p.widget = p.typ.New(widget.Config{Settings: wc.Settings, TimeFormat: cfg.TimeFormat, WeekStart: cfg.WeekStart, DataDir: o.Paths.Data, Ports: o.Ports})
 		}
 		m.widgets[id] = p
 		ids = append(ids, id)
@@ -153,6 +156,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case refreshedMsg:
 		return m.refreshed(msg)
+	case refreshDueMsg:
+		return m, m.refreshDue(msg)
 	case actedMsg:
 		return m.acted(msg)
 	case toastExpiredMsg:
@@ -172,19 +177,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// nextTick schedules one redraw at the next boundary of the fastest live view,
-// so a 1s clock flips on the wall-clock second rather than drifting.
+// nextTick schedules one redraw for the soonest change of any live view.
 func (m Model) nextTick() tea.Cmd {
-	var d time.Duration
+	var next time.Time
 	for _, w := range m.widgets {
-		if w.setup == "" && w.typ.Tick > 0 && (d == 0 || w.typ.Tick < d) {
-			d = w.typ.Tick
+		if t, ok := w.widget.(widget.Ticker); ok && w.setup == "" {
+			if n := t.Next(m.now); next.IsZero() || n.Before(next) {
+				next = n
+			}
 		}
 	}
-	if d == 0 {
+	if next.IsZero() {
 		return nil
 	}
-	next := m.now.Truncate(d).Add(d)
 	return m.opts.Ports.Clock.After(next.Sub(m.now), func(t time.Time) tea.Msg { return tickMsg{at: t} })
 }
 

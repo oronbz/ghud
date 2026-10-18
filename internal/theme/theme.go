@@ -74,6 +74,19 @@ func Lookup(name string) (Token, bool) {
 	return 0, false
 }
 
+func (t Token) MarshalText() ([]byte, error) { return []byte(t.String()), nil }
+
+// UnmarshalText takes a token name only, so payloads can't carry raw colours
+// that would ignore the user's theme.
+func (t *Token) UnmarshalText(b []byte) error {
+	tok, ok := Lookup(string(b))
+	if !ok {
+		return fmt.Errorf("%q is not a theme token (use one of %s)", b, strings.Join(names[:], " "))
+	}
+	*t = tok
+	return nil
+}
+
 // ParseColor reads a "#rrggbb" or "#rgb" colour.
 func ParseColor(s string) (color.Color, bool) {
 	h, ok := strings.CutPrefix(s, "#")

@@ -24,6 +24,7 @@ func System(getenv func(string) string) Ports {
 		Keyring:   osKeyring{},
 		Commands:  execCommands{},
 		EventKit:  noEventKit{},
+		Machine:   newMachine(),
 		HTTP:      &http.Client{Timeout: 30 * time.Second},
 		Endpoints: DefaultEndpoints(),
 	}
