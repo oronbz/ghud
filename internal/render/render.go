@@ -101,8 +101,8 @@ func body(th theme.Theme, p widget.Payload, l List, w, h int) []string {
 	}
 	var lines []string
 	for _, l := range p.Lines {
-		if l.Big {
-			lines = append(lines, bigLines(th, l)...)
+		if l.Digits != widget.NoDigits {
+			lines = append(lines, digitLines(th, l)...)
 			continue
 		}
 		lines = append(lines, styled(th, l.Spans))

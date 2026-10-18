@@ -185,9 +185,21 @@ const (
 
 type Line struct {
 	Spans []Span
-	// Big asks the host to draw the line's text in 3-row half-block digits.
-	Big bool
+	// Digits asks the host to draw the line's text as big digits.
+	Digits Digits
 }
+
+// Digits is how big the host draws a line's text. Big digits cover 0-9,
+// ':', space, A, P and M; other characters are skipped.
+type Digits int
+
+const (
+	NoDigits Digits = iota
+	// HalfBlock digits are 3 rows tall.
+	HalfBlock
+	// Block digits are 5 rows tall and twice as wide as half-block ones.
+	Block
+)
 
 type Span struct {
 	Text  string
