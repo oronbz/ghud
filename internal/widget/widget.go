@@ -170,7 +170,10 @@ type Action struct {
 	// Confirm asks before running, for Actions that can't be taken back.
 	Confirm bool
 	Verb    Verb
-	Input   Input
+	// Target is the URL an Open Action opens or the text a Copy Action
+	// copies; the host performs both itself.
+	Target string
+	Input  Input
 	// Prompt titles a text input's prompt; Value is the text it starts with.
 	Prompt, Value string
 }

@@ -10,6 +10,7 @@ require (
 	github.com/charmbracelet/x/ansi v0.11.8
 	github.com/gofrs/flock v0.13.1
 	github.com/pelletier/go-toml/v2 v2.4.3
+	github.com/sahilm/fuzzy v0.1.3
 	github.com/shirou/gopsutil/v4 v4.26.9
 	github.com/zalando/go-keyring v0.2.8
 )

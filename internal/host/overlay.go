@@ -41,14 +41,14 @@ func (m Model) overlayKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 				o.action.Confirm = false
 				return m.run(o.widget, o.action)
 			}
-			return m, m.invoke(o.widget, o.action, "")
+			return m.invoke(o.widget, o.action, "")
 		}
 		return m, nil
 	}
 	switch k {
 	case "enter":
 		m.overlay = nil
-		return m, m.invoke(o.widget, o.action, string(o.value))
+		return m.invoke(o.widget, o.action, string(o.value))
 	case "left":
 		o.cursor = max(0, o.cursor-1)
 	case "right":
