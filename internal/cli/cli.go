@@ -16,6 +16,7 @@ import (
 	"github.com/oronbz/ghud/internal/paths"
 	"github.com/oronbz/ghud/internal/ports"
 	"github.com/oronbz/ghud/internal/theme"
+	"github.com/oronbz/ghud/internal/version"
 )
 
 // System is everything Run takes from the process.
@@ -31,7 +32,7 @@ type System struct {
 	ProgramOptions []tea.ProgramOption
 }
 
-const usage = `Usage: ghud
+const usage = `Usage: ghud [--version]
 
 ghud draws a full-screen dashboard of your day. Press q to quit.
 `
@@ -41,6 +42,7 @@ func Run(s System) int {
 	fs := flag.NewFlagSet("ghud", flag.ContinueOnError)
 	fs.SetOutput(s.Stderr)
 	fs.Usage = func() { fmt.Fprint(s.Stderr, usage) }
+	showVersion := fs.Bool("version", false, "print the version and exit")
 	if err := fs.Parse(s.Args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return 0
@@ -50,6 +52,10 @@ func Run(s System) int {
 	if fs.NArg() > 0 {
 		fmt.Fprintf(s.Stderr, "ghud: unknown command %q\n\n%s", fs.Arg(0), usage)
 		return 2
+	}
+	if *showVersion {
+		fmt.Fprintln(s.Stdout, "ghud", version.Version)
+		return 0
 	}
 
 	p, err := paths.Resolve(s.Getenv, runtime.GOOS)
