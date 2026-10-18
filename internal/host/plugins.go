@@ -45,30 +45,28 @@ func (m Model) loadConfig(file string, base []widget.Type) (config.Config, error
 	for _, p := range cfg.Plugins {
 		paths = append(paths, m.pluginPath(file, p.Path))
 	}
-	taken := make([]string, 0, len(base))
-	for _, t := range base {
-		taken = append(taken, t.Name)
-	}
-	found, problems := m.plugins.Discover(plugin.Dirs(m.pluginsDir(), paths), taken)
-	for _, t := range found {
-		taken = append(taken, t.Name)
-	}
-	found = append(found, m.plugins.Bundled(m.bundled(), taken)...)
+	found, problems := m.plugins.Discover(plugin.Dirs(m.pluginsDir(), paths), names(base))
+	found = append(found, m.plugins.Bundled(m.bundled(), names(base, found))...)
 	gone := m.plugins.Gone()
-	for _, t := range found {
-		taken = append(taken, t.Name)
-	}
-	for _, t := range gone {
-		taken = append(taken, t.Name)
-	}
-	gone = append(gone, plugin.Buried(m.pluginsDir(), taken)...)
+	gone = append(gone, plugin.Buried(m.pluginsDir(), names(base, found, gone))...)
+	gone = append(gone, unavailable(names(base, found, gone))...)
 	if len(found) == 0 && len(gone) == 0 {
 		return cfg, err, base, problems
 	}
 	types := append(append([]widget.Type{}, base...), found...)
-	// The stand-ins for uninstalled Plugins' types only tell config what their Widgets need.
+	// The stand-ins for missing types only tell config what their Widgets need.
 	cfg, err = config.Load(file, append(slices.Clip(types), gone...), m.opts.Locale)
 	return cfg, err, types, problems
+}
+
+func names(lists ...[]widget.Type) []string {
+	var out []string
+	for _, l := range lists {
+		for _, t := range l {
+			out = append(out, t.Name)
+		}
+	}
+	return out
 }
 
 // Types are the built-in Widget types plus those of the Plugins installed in

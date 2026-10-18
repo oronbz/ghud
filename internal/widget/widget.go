@@ -45,11 +45,6 @@ type Type struct {
 	New     func(Config) Widget
 }
 
-// MacOnly names the Widget types built only on macOS. Elsewhere a config
-// naming one gets needs setup rather than an unknown-type problem, so one
-// config.toml works on every machine.
-var MacOnly = []string{"meetings", "reminders"}
-
 // Config is what a Widget is built from: its validated settings, defaults
 // filled in, and the global options that affect it.
 type Config struct {

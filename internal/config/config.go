@@ -232,8 +232,6 @@ func (p *parser) widget(i int, v any) (Widget, bool) {
 	switch {
 	case missing != "":
 		setup = append(setup, missing)
-	case ti < 0 && slices.Contains(widget.MacOnly, typeName):
-		setup = append(setup, fmt.Sprintf("`%s` is not available on this platform", typeName))
 	case ti < 0:
 		setup = append(setup, p.problem(at+".type", "unknown Widget type `%s`", typeName))
 	}
