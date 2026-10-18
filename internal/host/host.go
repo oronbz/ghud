@@ -234,7 +234,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.sizeEditor()
 	case tea.PasteMsg:
-		if m.editing != nil && m.overlay == nil && m.palette == nil {
+		if m.overlay != nil {
+			return m.overlayPaste(msg), nil
+		}
+		if m.editing != nil && m.palette == nil {
 			return m.editKey(msg)
 		}
 	case refreshedMsg:
