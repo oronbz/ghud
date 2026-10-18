@@ -61,8 +61,8 @@ type editedMsg struct {
 type actedMsg struct {
 	id, item string
 	action   widget.Action
-	result widget.Result
-	err    error
+	result   widget.Result
+	err      error
 	// byHost marks an Action the host performed, which leaves the Widget as it was.
 	byHost bool
 }

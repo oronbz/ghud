@@ -79,6 +79,15 @@ type Model struct {
 	// footer to that modifier's keys; only kitty-protocol terminals report it.
 	held   tea.KeyMod
 	colors colors
+	// types are the Widget types config.toml can place; cfg is the last
+	// config.toml that parsed, read from configFile.
+	types      []widget.Type
+	cfg        config.Config
+	configFile string
+	// sticky is the config.toml problem shown whenever no toast is, until the file is fixed.
+	sticky string
+	// ticks tells the current redraw timer from ones a config reload replaced.
+	ticks int
 }
 
 type placed struct {
@@ -87,9 +96,14 @@ type placed struct {
 	widget widget.Widget
 	// setup, when set, is the needs-setup hint drawn instead of the Widget.
 	setup string
+	// block is the [[widget]] block the Widget was built from.
+	block config.Widget
 }
 
-type tickMsg struct{ at time.Time }
+type tickMsg struct {
+	at  time.Time
+	seq int
+}
 
 // Builtins are the Widget types compiled into ghud, in reference order.
 var Builtins = []widget.Type{clock.Type, calendar.Type, tasks.Type, cpu.Type, notes.Type}
@@ -105,31 +119,16 @@ func New(o Options) Model {
 	if file == "" {
 		file = filepath.Join(o.Paths.Config, config.FileName)
 	}
+	m.types, m.configFile = types, file
 	cfg, err := config.Load(file, types, o.Locale)
 	var problems []string
 	if err != nil {
 		problems = append(problems, err.Error())
 	}
-	m.toast = toast{text: toastOf(append(problems, cfg.Problems...)), tok: theme.Warn}
+	m.sticky = toastOf(append(problems, cfg.Problems...))
 	m.colors = colors{pinned: !o.Theme.IsZero(), name: cfg.Theme, over: cfg.Colors, asking: o.Theme.IsZero()}
 	m = m.resolveTheme()
-	var ids []string
-	for _, wc := range cfg.Widgets {
-		id := wc.ID
-		// Widgets sharing an id are all in needs setup; suffixes keep them apart on screen only.
-		for n := 2; m.widgets[id].title != ""; n++ {
-			id = fmt.Sprintf("%s~%d", wc.ID, n)
-		}
-		p := placed{title: wc.Title, setup: wc.Setup}
-		if i := slices.IndexFunc(types, func(t widget.Type) bool { return t.Name == wc.Type }); i >= 0 {
-			p.typ = types[i]
-		}
-		if p.setup == "" {
-			p.widget = p.typ.New(widget.Config{Settings: wc.Settings, TimeFormat: cfg.TimeFormat, WeekStart: cfg.WeekStart, DataDir: o.Paths.Data, Ports: o.Ports})
-		}
-		m.widgets[id] = p
-		ids = append(ids, id)
-	}
+	m, ids, _ := m.place(cfg)
 	// An unreadable layout.json falls back to the default rather than blocking launch.
 	saved, err := layout.Load(o.Paths.Config)
 	if err != nil {
@@ -137,6 +136,38 @@ func New(o Options) Model {
 	}
 	m.layout = saved.Join(ids)
 	return m.watch()
+}
+
+// place builds cfg's Widgets and returns their ids in config order, and
+// the ids of those it built afresh. A Widget whose block, and the globals
+// Widgets are built from, haven't changed is kept as it was, state and all.
+func (m Model) place(cfg config.Config) (Model, []string, []string) {
+	old := m.widgets
+	sameGlobals := cfg.TimeFormat == m.cfg.TimeFormat && cfg.WeekStart == m.cfg.WeekStart
+	m.widgets, m.cfg = make(map[string]placed, len(cfg.Widgets)), cfg
+	var ids, fresh []string
+	for _, wc := range cfg.Widgets {
+		id := wc.ID
+		// Widgets sharing an id are all in needs setup; suffixes keep them apart on screen only.
+		for n := 2; m.widgets[id].title != ""; n++ {
+			id = fmt.Sprintf("%s~%d", wc.ID, n)
+		}
+		ids = append(ids, id)
+		if p, ok := old[id]; ok && sameGlobals && p.block.Equal(wc) {
+			m.widgets[id] = p
+			continue
+		}
+		p := placed{title: wc.Title, setup: wc.Setup, block: wc}
+		if i := slices.IndexFunc(m.types, func(t widget.Type) bool { return t.Name == wc.Type }); i >= 0 {
+			p.typ = m.types[i]
+		}
+		if p.setup == "" {
+			p.widget = p.typ.New(widget.Config{Settings: wc.Settings, TimeFormat: cfg.TimeFormat, WeekStart: cfg.WeekStart, DataDir: m.opts.Paths.Data, Ports: m.opts.Ports})
+		}
+		m.widgets[id] = p
+		fresh = append(fresh, id)
+	}
+	return m, ids, fresh
 }
 
 func (m Model) Init() tea.Cmd {
@@ -177,6 +208,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.toast = toast{}
 		}
 	case tickMsg:
+		if msg.seq != m.ticks {
+			return m, nil
+		}
 		m.now = msg.at
 		return m, m.nextTick()
 	case tea.KeyPressMsg:
@@ -202,7 +236,8 @@ func (m Model) nextTick() tea.Cmd {
 	if next.IsZero() {
 		return nil
 	}
-	return m.opts.Ports.Clock.After(next.Sub(m.now), func(t time.Time) tea.Msg { return tickMsg{at: t} })
+	seq := m.ticks
+	return m.opts.Ports.Clock.After(next.Sub(m.now), func(t time.Time) tea.Msg { return tickMsg{at: t, seq: seq} })
 }
 
 func (m Model) View() tea.View {

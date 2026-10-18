@@ -116,7 +116,7 @@ func New(t testing.TB, o Options) *Host {
 			EventKit:  h.EventKit,
 			Machine:   h.Machine,
 			Watcher:   h.Watcher,
-			HTTP:     &http.Client{Timeout: 5 * time.Second},
+			HTTP:      &http.Client{Timeout: 5 * time.Second},
 			Endpoints: mergeEndpoints(ports.DefaultEndpoints(), o.Endpoints),
 		},
 	})

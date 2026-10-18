@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"time"
@@ -47,6 +48,13 @@ type Widget struct {
 	// Setup, when set, is the needs-setup hint; the Widget isn't built.
 	Setup string
 	line  int
+}
+
+// Equal reports whether two blocks configure the same Widget, wherever in
+// the file they are.
+func (w Widget) Equal(o Widget) bool {
+	w.line, o.line = 0, 0
+	return reflect.DeepEqual(w, o)
 }
 
 // Plugin is a [[plugin]] entry: a local Plugin under development.
