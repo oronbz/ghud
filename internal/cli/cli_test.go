@@ -2,6 +2,10 @@ package cli_test
 
 import (
 	"bytes"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -14,22 +18,47 @@ import (
 	"github.com/oronbz/ghud/internal/ports"
 )
 
-func system(t *testing.T, stdin string, args ...string) (cli.System, *bytes.Buffer, *bytes.Buffer) {
-	home := t.TempDir()
-	var stdout, stderr bytes.Buffer
-	getenv := func(k string) string { return map[string]string{"HOME": home}[k] }
+// hermetic are the real ports with every way out of the machine faked:
+// other CLIs (such as gh) aren't installed, the keyring is empty, and every
+// HTTP endpoint is a server that fails the test if anything reaches it.
+func hermetic(t *testing.T, getenv func(string) string) (*ports.Ports, *hosttest.Commands) {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("ghud reached the network: %s %s", r.Method, r.URL)
+		http.Error(w, "offline", http.StatusServiceUnavailable)
+	}))
+	t.Cleanup(srv.Close)
 	pp := ports.System(getenv)
-	// The real EventKit never asks for access unprompted, but tests stay off the Mac's calendars anyway.
+	cmds := &hosttest.Commands{}
+	pp.Commands = cmds
 	pp.EventKit = &hosttest.EventKit{}
+	pp.Keyring = &hosttest.Keyring{}
+	e := reflect.ValueOf(&pp.Endpoints).Elem()
+	for i := range e.NumField() {
+		e.Field(i).SetString(srv.URL)
+	}
+	return &pp, cmds
+}
+
+func system(t *testing.T, stdin string, args ...string) (cli.System, *bytes.Buffer, *bytes.Buffer) {
+	home, err := os.MkdirTemp("", "ghud-cli")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A fetch still in flight at exit may write its cache entry after the test ends.
+	t.Cleanup(func() { _ = os.RemoveAll(home) })
+	getenv := func(k string) string { return map[string]string{"HOME": home}[k] }
+	pp, _ := hermetic(t, getenv)
+	var stdout, stderr bytes.Buffer
 	return cli.System{
 		Args:   args,
 		Getenv: getenv,
-		Ports:  &pp,
+		Ports:  pp,
 		Stdin:  strings.NewReader(stdin),
 		Stdout: &stdout,
 		Stderr: &stderr,
 		ProgramOptions: []tea.ProgramOption{
-			tea.WithWindowSize(60, 12),
+			tea.WithWindowSize(60, 16),
 			tea.WithoutSignals(),
 		},
 	}, &stdout, &stderr

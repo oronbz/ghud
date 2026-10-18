@@ -29,6 +29,7 @@ import (
 	"github.com/oronbz/ghud/internal/widgets/clock"
 	"github.com/oronbz/ghud/internal/widgets/cpu"
 	"github.com/oronbz/ghud/internal/widgets/notes"
+	"github.com/oronbz/ghud/internal/widgets/prs"
 	"github.com/oronbz/ghud/internal/widgets/script"
 	"github.com/oronbz/ghud/internal/widgets/tasks"
 )
@@ -132,7 +133,7 @@ type tickMsg struct {
 
 // Builtins are the Widget types compiled into ghud, in reference order.
 var Builtins = slices.Concat([]widget.Type{clock.Type, calendar.Type}, macTypes,
-	[]widget.Type{tasks.Type, cpu.Type, notes.Type, script.Type})
+	[]widget.Type{tasks.Type, cpu.Type, notes.Type, prs.Type, script.Type})
 
 func New(o Options) Model {
 	m := Model{opts: o, now: o.Ports.Clock.Now(), widgets: map[string]placed{},

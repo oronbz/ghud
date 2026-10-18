@@ -32,8 +32,9 @@ type Type struct {
 	// Midnight also refreshes a Source at local midnight, for payloads that
 	// depend on the date.
 	Midnight bool
-	// Fetches marks a Source that reaches beyond the machine, such as an API
-	// or a command; its schedules are jittered so instances spread out.
+	// Fetches marks a Source whose payload is cached on disk and refreshed
+	// with jitter so instances share and spread out their fetches: remote
+	// APIs, EventKit, scripts.
 	Fetches bool
 	// OptIn leaves the type out of the Widgets shown when config.toml places none.
 	OptIn bool

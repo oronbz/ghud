@@ -29,6 +29,7 @@ var Type = widget.Type{
 		Why:         "A taller Widget fills its spare rows with the following days, up to this many.",
 	}},
 	Refresh: time.Minute,
+	Fetches: true,
 	New: func(c widget.Config) widget.Widget {
 		return &meetings{ek: c.Ports.EventKit, days: max(1, int(c.Settings.Int("days"))), twelve: c.TimeFormat == "12h"}
 	},

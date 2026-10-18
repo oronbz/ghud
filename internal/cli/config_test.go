@@ -23,10 +23,13 @@ func sandbox(t *testing.T, env map[string]string, stdin string, args ...string) 
 	for k, v := range env {
 		full[k] = strings.ReplaceAll(v, "$HOME", home)
 	}
+	getenv := func(k string) string { return full[k] }
+	pp, _ := hermetic(t, getenv)
 	var stdout, stderr bytes.Buffer
 	return cli.System{
 		Args:   args,
-		Getenv: func(k string) string { return full[k] },
+		Getenv: getenv,
+		Ports:  pp,
 		Stdin:  strings.NewReader(stdin),
 		Stdout: &stdout,
 		Stderr: &stderr,

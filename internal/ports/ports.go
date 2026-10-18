@@ -23,6 +23,8 @@ type Ports struct {
 	Watcher   Watcher
 	HTTP      *http.Client
 	Endpoints Endpoints
+	// Getenv reads the process environment, such as GH_TOKEN.
+	Getenv func(key string) string
 }
 
 // Clock is the only source of time. Timers go through After so that a fake
