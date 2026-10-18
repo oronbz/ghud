@@ -80,6 +80,9 @@ func TestAChoiceActionOpensASpinnerMenuAtOnceThenItsChoicesAndRunsThePickedOne(t
 	if !strings.Contains(during, "Move to") || !spinnerGlyph.MatchString(during) {
 		t.Errorf("while the choices load, want a Move to menu with a spinner:\n%s", during)
 	}
+	if lines := strings.Split(during, "\n"); !strings.Contains(lines[len(lines)-1], "loading") {
+		t.Errorf("while the choices load, the footer reads %q, want it to say so", lines[len(lines)-1])
+	}
 	if strings.Contains(during, "In Progress") {
 		t.Errorf("choices shown before they loaded:\n%s", during)
 	}
