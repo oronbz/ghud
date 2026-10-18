@@ -21,7 +21,7 @@ var pickerKeys = struct{ Down, Up, Toggle, Close key.Binding }{
 }
 
 // pickerKey handles a key in the w list. Every toggle is written at once.
-func (m Model) pickerKey(msg tea.KeyPressMsg) Model {
+func (m Model) pickerKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	ids := m.pickerIDs()
 	switch {
 	case key.Matches(msg, pickerKeys.Close):
@@ -33,8 +33,11 @@ func (m Model) pickerKey(msg tea.KeyPressMsg) Model {
 	case key.Matches(msg, pickerKeys.Toggle) && len(ids) > 0:
 		id := ids[m.cursor]
 		m = m.setHidden(id, !m.layout.IsHidden(id))
+		if !m.layout.IsHidden(id) {
+			return m.shown(id)
+		}
 	}
-	return m
+	return m, nil
 }
 
 // setHidden shows or hides Widget id and writes the Layout at once. Hiding

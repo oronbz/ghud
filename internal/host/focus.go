@@ -99,7 +99,7 @@ func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m.editKey(msg)
 	}
 	if m.picking {
-		return m.pickerKey(msg), nil
+		return m.pickerKey(msg)
 	}
 	if m.arranging {
 		return m.arrangeKey(msg), nil
