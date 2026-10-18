@@ -354,9 +354,13 @@ func (m Model) View() tea.View {
 	}
 	var layers []*lipgloss.Layer
 	s := m.scene()
-	if s.TooSmall {
-		layers = append(layers, lipgloss.NewLayer(m.tooSmall(s.Need)))
-	} else {
+	switch {
+	case s.TooSmall:
+		layers = append(layers, lipgloss.NewLayer(m.centred(fmt.Sprintf("too small (needs %d×%d)", s.Need.W, s.Need.H), theme.Warn)))
+	case len(s.Tiles) == 0:
+		layers = append(layers, lipgloss.NewLayer(m.centred("all Widgets hidden · w to show", theme.Dim)),
+			lipgloss.NewLayer(m.footer()).Y(m.h-footerHeight))
+	default:
 		for i, t := range s.Tiles {
 			if m.editing != nil && t.ID == m.editing.widget {
 				layers = append(layers, m.editorLayer(t.X, t.Y))
@@ -424,11 +428,11 @@ func toastOf(msgs []string) string {
 	return fmt.Sprintf("%s (+%d more)", msgs[0], len(msgs)-1)
 }
 
-func (m Model) tooSmall(need layout.Size) string {
-	text := ansi.Truncate(fmt.Sprintf("too small (needs %d×%d)", need.W, need.H), m.w, "…")
+func (m Model) centred(text string, tok theme.Token) string {
+	text = ansi.Truncate(text, m.w, "…")
 	pad := (m.w - ansi.StringWidth(text)) / 2
 	lines := make([]string, m.h)
-	lines[(m.h-1)/2] = strings.Repeat(" ", pad) + m.opts.Theme.Fg(theme.Warn).Render(text)
+	lines[(m.h-1)/2] = strings.Repeat(" ", pad) + m.opts.Theme.Fg(tok).Render(text)
 	return strings.Join(lines, "\n")
 }
 

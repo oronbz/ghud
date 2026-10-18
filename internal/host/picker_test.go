@@ -66,6 +66,31 @@ func TestHidingTheFocusedWidgetUnfocusesIt(t *testing.T) {
 	}
 }
 
+func TestHidingEveryWidgetShowsAHintAndSurvivesARestart(t *testing.T) {
+	root := savedLayout(t, threeAcross)
+	h := phoneticAt(t, root)
+
+	h.Press("w")
+	for range phoneticTitles {
+		h.Press("space", "j")
+	}
+	h.Press("esc")
+	if _, _, ok := h.Find("all Widgets hidden · w to show"); !ok {
+		t.Fatalf("no hint once every Widget is hidden:\n%s", h.Screen())
+	}
+	h.Press("tab", "h", "1", "m", "H", "?", "?")
+
+	restarted := phoneticAt(t, root)
+	restarted.Press("tab", "j", "l")
+	if _, _, ok := restarted.Find("all Widgets hidden · w to show"); !ok {
+		t.Fatalf("a restart over an all-hidden layout.json lacks the hint:\n%s", restarted.Screen())
+	}
+	restarted.Press("w", "enter", "esc")
+	if _, _, ok := restarted.Find("─ Alpha "); !ok {
+		t.Errorf("showing Alpha again doesn't draw it:\n%s", restarted.Screen())
+	}
+}
+
 func TestTheWidgetListSwallowsOtherKeys(t *testing.T) {
 	h := hosttest.New(t, hosttest.Options{Width: 100, Height: 21})
 	h.Press("w", "tab", "m", "k", "k", "q")
