@@ -4,6 +4,7 @@ package theme
 
 import (
 	"image/color"
+	"math"
 
 	"charm.land/lipgloss/v2"
 )
@@ -46,7 +47,8 @@ func Tokens() []Token {
 }
 
 type Theme struct {
-	colors [tokenCount]color.Color
+	colors       [tokenCount]color.Color
+	fromTerminal bool
 }
 
 // New builds a theme from a colour per token; tokens left out fall back to the ghud dark palette.
@@ -84,18 +86,68 @@ func palette(hex [tokenCount]string) Theme {
 	return t
 }
 
+// Names of the themes config.toml's `theme` picks from.
+const (
+	Ghud          = "ghud"
+	TerminalTheme = "terminal"
+)
+
 // Terminal holds the terminal's answers to the colour queries; a nil colour went unanswered.
 type Terminal struct {
 	Bg, Fg color.Color
+	// ANSI holds palette colours by number; the terminal theme uses 1–6.
+	ANSI [8]color.Color
 }
 
-// Resolve builds the theme named in config.toml for what the terminal answered.
+// ansiTokens maps palette colour numbers (red, green, yellow, blue, magenta, cyan) to tokens.
+var ansiTokens = map[int]Token{1: Bad, 2: Ok, 3: Warn, 4: Accent, 5: Info, 6: Alt}
+
+// Resolve builds the named theme for what the terminal answered. ghud
+// picks its light or dark palette from the background, dark when there's
+// none. terminal derives tokens from the terminal's colours, and is ghud
+// until both foreground and background are known.
 func Resolve(name string, term Terminal) Theme {
-	if term.Bg != nil && !IsDark(term.Bg) {
-		return Light()
+	dark := term.Bg == nil || IsDark(term.Bg)
+	t := Dark()
+	if !dark {
+		t = Light()
 	}
-	return Dark()
+	if name != TerminalTheme || term.Bg == nil || term.Fg == nil {
+		return t
+	}
+	t.fromTerminal = true
+	bg, fg := term.Bg, term.Fg
+	t.colors[Bg], t.colors[Fg] = bg, fg
+	t.colors[Sel] = mix(fg, bg, 0.08)
+	t.colors[Line] = mix(fg, bg, 0.22)
+	t.colors[Faint] = mix(fg, bg, 0.32)
+	t.colors[Dim] = mix(fg, bg, 0.55)
+	extreme := color.Color(color.White)
+	if !dark {
+		extreme = color.Black
+	}
+	t.colors[Bright] = mix(extreme, fg, 0.5)
+	for n, tok := range ansiTokens {
+		if c := term.ANSI[n]; c != nil {
+			t.colors[tok] = c
+		}
+	}
+	return t
 }
+
+// mix is p of a over 1-p of b, per sRGB channel.
+func mix(a, b color.Color, p float64) color.Color {
+	ar, ag, ab, _ := a.RGBA()
+	br, bg, bb, _ := b.RGBA()
+	ch := func(x, y uint32) uint8 {
+		return uint8(math.Round((float64(x>>8)*p + float64(y>>8)*(1-p))))
+	}
+	return color.RGBA{ch(ar, br), ch(ag, bg), ch(ab, bb), 0xff}
+}
+
+// FromTerminal reports whether t was derived from the terminal's colours,
+// so ghud leaves the terminal's background alone.
+func (t Theme) FromTerminal() bool { return t.fromTerminal }
 
 // IsDark reports whether c has an HSL lightness under one half.
 func IsDark(c color.Color) bool {

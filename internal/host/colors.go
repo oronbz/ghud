@@ -1,6 +1,9 @@
 package host
 
 import (
+	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -31,14 +34,23 @@ type colorWaitMsg struct{}
 // Theme is the palette in use.
 func (m Model) Theme() theme.Theme { return m.opts.Theme }
 
-// queryColors asks for the terminal background, then for device attributes,
+// queryColors asks for the terminal's colours, then for device attributes,
 // whose answer comes after every colour answer the terminal will give.
 func (m Model) queryColors() tea.Cmd {
 	if m.colors.pinned {
 		return nil
 	}
+	queries := []tea.Cmd{tea.RequestBackgroundColor}
+	if m.colors.name == theme.TerminalTheme {
+		var osc4 strings.Builder
+		for n := 1; n <= 6; n++ {
+			fmt.Fprintf(&osc4, "\x1b]4;%d;?\x07", n)
+		}
+		queries = append(queries, tea.RequestForegroundColor, tea.Raw(osc4.String()))
+	}
+	queries = append(queries, tea.Raw(ansi.RequestPrimaryDeviceAttributes))
 	return tea.Batch(
-		tea.Sequence(tea.RequestBackgroundColor, tea.Raw(ansi.RequestPrimaryDeviceAttributes)),
+		tea.Sequence(queries...),
 		m.opts.Ports.Clock.After(colorWait, func(time.Time) tea.Msg { return colorWaitMsg{} }),
 	)
 }
@@ -48,6 +60,12 @@ func (m Model) colorAnswer(msg tea.Msg) (Model, bool) {
 	switch msg := msg.(type) {
 	case tea.BackgroundColorMsg:
 		m.colors.term.Bg = msg.Color
+	case tea.ForegroundColorMsg:
+		m.colors.term.Fg = msg.Color
+	case uv.UnknownOscEvent:
+		if !paletteAnswer(string(msg), &m.colors.term) {
+			return m, false
+		}
 	case uv.PrimaryDeviceAttributesEvent, colorWaitMsg:
 		m.colors.asking = false
 		return m, true
@@ -58,4 +76,25 @@ func (m Model) colorAnswer(msg tea.Msg) (Model, bool) {
 		m.opts.Theme = theme.Resolve(m.colors.name, m.colors.term)
 	}
 	return m, true
+}
+
+// paletteAnswer reads an OSC 4 answer ("ESC ]4;1;rgb:cccc/0000/0000 ST"),
+// which may carry several number;colour pairs, into term.
+func paletteAnswer(s string, term *theme.Terminal) bool {
+	body, ok := strings.CutPrefix(s, "\x1b]4;")
+	if !ok {
+		return false
+	}
+	body = strings.TrimSuffix(strings.TrimSuffix(body, "\x07"), "\x1b\\")
+	parts := strings.Split(body, ";")
+	for i := 0; i+1 < len(parts); i += 2 {
+		n, err := strconv.Atoi(parts[i])
+		if err != nil || n < 0 || n >= len(term.ANSI) {
+			continue
+		}
+		if c := ansi.XParseColor(parts[i+1]); c != nil {
+			term.ANSI[n] = c
+		}
+	}
+	return true
 }

@@ -160,7 +160,7 @@ func (m Model) nextTick() tea.Cmd {
 func (m Model) View() tea.View {
 	v := tea.NewView("")
 	v.AltScreen = true
-	if !m.colors.asking {
+	if !m.colors.asking && !m.opts.Theme.FromTerminal() {
 		v.BackgroundColor = m.opts.Theme.Color(theme.Bg)
 	}
 	// Report-all-keys and event types make lone modifier presses and releases

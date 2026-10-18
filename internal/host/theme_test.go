@@ -66,6 +66,52 @@ func TestADarkTerminalBackgroundKeepsTheDarkPalette(t *testing.T) {
 	}
 }
 
+// osc4 is a terminal's answer to an OSC 4 palette query.
+func osc4(index int, spec string) uv.UnknownOscEvent {
+	return uv.UnknownOscEvent(fmt.Sprintf("\x1b]4;%d;%s\x1b\\", index, spec))
+}
+
+func TestTerminalThemeDerivesTokensFromTheTerminalsColours(t *testing.T) {
+	h := hosttest.New(t, hosttest.Options{Width: 40, Height: 9, Config: `theme = "terminal"`})
+
+	h.Send(tea.BackgroundColorMsg{Color: lipgloss.Color("#000000")})
+	h.Send(tea.ForegroundColorMsg{Color: lipgloss.Color("#ffffff")})
+	h.Send(osc4(1, "rgb:cccc/0000/0000"))
+	h.Send(osc4(4, "rgb:1111/2222/eeee"))
+	h.Send(answered)
+
+	if got := fgHex(t, h, "Clock"); got != "#ffffff" {
+		t.Errorf("title %s, want the terminal foreground #ffffff", got)
+	}
+	if got := fgHex(t, h, "╭"); got != "#383838" {
+		t.Errorf("border %s, want line blended 22%% from fg over bg, #383838", got)
+	}
+	if got := fgHex(t, h, "Sun 18"); got != "#8c8c8c" {
+		t.Errorf("date %s, want dim blended 55%% from fg over bg, #8c8c8c", got)
+	}
+	if got := hexOf(h.View().BackgroundColor); got != "none" {
+		t.Errorf("terminal background set to %s, want the terminal's own left alone", got)
+	}
+
+	h.Press("tab")
+	if got := fgHex(t, h, "╭"); got != "#1122ee" {
+		t.Errorf("focused border %s, want accent from palette colour 4 (blue), #1122ee", got)
+	}
+}
+
+func TestTerminalThemeFallsBackToGhudWithoutAnswers(t *testing.T) {
+	h := hosttest.New(t, hosttest.Options{Width: 40, Height: 9, Config: `theme = "terminal"`})
+
+	h.Send(answered)
+
+	if got := fgHex(t, h, "╭"); got != "#3d4757" {
+		t.Errorf("border %s, want the ghud dark palette's line #3d4757", got)
+	}
+	if got := hexOf(h.View().BackgroundColor); got != "#13171d" {
+		t.Errorf("terminal background %s, want the ghud dark palette's bg #13171d", got)
+	}
+}
+
 func TestWithNoAnswerTheDarkPaletteIsUsed(t *testing.T) {
 	h := hosttest.New(t, hosttest.Options{Width: 40, Height: 9})
 
