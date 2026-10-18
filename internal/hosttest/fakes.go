@@ -126,12 +126,15 @@ func (c *Clipboard) Copy(text string) tea.Cmd {
 // edit of the file before the TUI resumes.
 type Editor struct {
 	Edited []string
+	// Lines are the line each Edited file was opened at, 0 for none.
+	Lines  []int
 	OnEdit func(path string) error
 }
 
-func (e *Editor) Edit(path string, done func(error) tea.Msg) tea.Cmd {
+func (e *Editor) Edit(path string, line int, done func(error) tea.Msg) tea.Cmd {
 	return func() tea.Msg {
 		e.Edited = append(e.Edited, path)
+		e.Lines = append(e.Lines, line)
 		var err error
 		if e.OnEdit != nil {
 			err = e.OnEdit(path)

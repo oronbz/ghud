@@ -318,7 +318,7 @@ func (m Model) acted(msg actedMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	if f := msg.result.Edit; f != "" {
-		return m, m.opts.Ports.Editor.Edit(f, func(err error) tea.Msg { return editedMsg{id: msg.id, err: err} })
+		return m, m.opts.Ports.Editor.Edit(f, 0, func(err error) tea.Msg { return editedMsg{id: msg.id, err: err} })
 	}
 	return m.after(msg.id, msg.result.Toast)
 }
