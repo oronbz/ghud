@@ -292,7 +292,12 @@ func (m Model) next(id string, now time.Time) time.Time {
 			at = mid
 		}
 	}
-	if p := m.pausedUntil(id); !at.IsZero() && p.After(at) {
+	p := m.pausedUntil(id)
+	var limited *widget.RateLimitError
+	if errors.As(s.err, &limited) && limited.Until.After(p) {
+		p = limited.Until
+	}
+	if !at.IsZero() && p.After(at) {
 		at = p
 	}
 	return at
