@@ -52,6 +52,9 @@ type Options struct {
 	Types []widget.Type
 	// CloseKeys quit ghud from any mode (--close-key).
 	CloseKeys []closekey.Seq
+	// Version is the ghud version agent skills are stamped with; "" means
+	// the version this binary was built as.
+	Version string
 }
 
 type Model struct {
@@ -224,7 +227,7 @@ func (m Model) place(wc config.Widget, ref config.Ref) placed {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.nextTick(), m.queryColors(), m.nextChange(), m.nextPush(), m.listen(m.ids()), func() tea.Msg { return startMsg{} }, m.cleanCache())
+	return tea.Batch(m.nextTick(), m.queryColors(), m.nextChange(), m.nextPush(), m.listen(m.ids()), func() tea.Msg { return startMsg{} }, m.cleanCache(), m.refreshSkills())
 }
 
 // baseTypes are the Widget types compiled in, or the ones a test stages.
@@ -283,6 +286,8 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.edited(msg)
 	case filesChangedMsg:
 		return m.filesChanged(msg)
+	case skillsMsg:
+		return m.skillsDone(msg)
 	case configEditedMsg:
 		return m.configEdited(msg)
 	case toastExpiredMsg:

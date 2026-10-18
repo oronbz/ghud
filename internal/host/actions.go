@@ -147,6 +147,7 @@ const (
 	addWidget
 	// saveSettings writes the settings an Action's Result gave into its Widget's block.
 	saveSettings
+	installSkills
 )
 
 // actions are Widget id's Actions as they apply now: the selected Item's,
@@ -281,6 +282,8 @@ func (m Model) invoke(id string, a bound, text string) (Model, tea.Cmd) {
 		return m.setHidden(id, true), nil
 	case a.by == editSettings, a.by == removeWidget, a.by == addWidget:
 		return m, m.editConfig(id, a)
+	case a.by == installSkills:
+		return m, m.installSkills()
 	case a.Verb == widget.Open:
 		opener, target := m.opts.Ports.Opener, a.Target
 		return m, func() tea.Msg {

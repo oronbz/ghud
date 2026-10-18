@@ -49,6 +49,8 @@ type Options struct {
 	Keyring *Keyring
 	// Env is the process environment the app sees; it's empty by default.
 	Env map[string]string
+	// Version is the ghud version the app runs as (see host.Options.Version).
+	Version string
 }
 
 var DefaultNow = time.Date(2026, 10, 18, 14, 5, 9, 0, time.UTC)
@@ -134,6 +136,7 @@ func New(t testing.TB, o Options) *Host {
 		Paths:     h.Paths,
 		Theme:     th,
 		Types:     o.Types,
+		Version:   o.Version,
 		Ports: ports.Ports{
 			Clock:     h.Clock,
 			Opener:    h.Opener,
