@@ -286,6 +286,7 @@ function tick(){ cpuV = clamp(cpuV + (Math.random() * 12 - 6) + (Math.random() <
 // ---------- widgets ----------
 const A = (k, label, run, primary) => ({k, label, run, primary});
 const ref = p => `${p.repo.split('/')[1]}#${p.n}`;
+const branch = p => `${p.author}/${p.n}-${p.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 32).replace(/-$/, '')}`;
 const CI = {pass:['✓','ok'], fail:['✗','bad'], run:['◌','warn']};
 const WHY = {you:['@you','warn','asked you directly'], team:['team','team','asked your team'], owner:['owner','info','you own these files']};
 const STATUS = {'To Do':'dim','In Progress':'accent','In Review':'info','Blocked':'bad','Done':'ok'};
@@ -314,7 +315,7 @@ W.prs = {
   items(){
     const act = DATA.prs.filter(p => !p.gone && !p.handled), h = DATA.prs.filter(p => !p.gone && p.handled), out = [...act];
     if (!act.length) out.push({sep:'Nothing is waiting on you'});
-    if (h.length){ out.push({sep: UI.handled ? 'Handled by a teammate' : `${h.length} more handled by a teammate (t)`}); if (UI.handled) out.push(...h); }
+    if (h.length) out.push({sep:'Handled by a teammate', day:true}, ...h);
     return out;
   },
   count(){ return DATA.prs.filter(p => !p.gone && !p.handled).length; },
@@ -333,16 +334,13 @@ W.prs = {
     rowLR(s, r, L, R);
   },
   actions(p){
-    if (p.handled) return [A('⏎', 'open', () => toast(`Opened ${ref(p)} in the browser`), true)];
     return [
       A('⏎', 'open', () => toast(`Opened ${ref(p)} in the browser`), true),
       A('a', 'approve', () => { p.gone = true; toast(`Approved ${ref(p)}`, () => { p.gone = false; }); }),
-      A('c', 'comment', () => ask(`Comment on ${ref(p)}`, 'comment', v => toast(`Commented on ${ref(p)}: “${v}”`))),
-      A('x', 'request changes', () => ask(`Request changes on ${ref(p)}`, 'send', v => { p.gone = true; toast(`Requested changes on ${ref(p)}`, () => { p.gone = false; }); })),
-      A('C', 'checkout', () => toast(`Checked out ${ref(p)} to ~/wt/${p.repo.split('/')[1]}-${p.n}`)),
+      A('r', 'remove me', () => { p.gone = true; toast(`Removed you from the reviewers of ${ref(p)}`, () => { p.gone = false; }); }),
+      A('y', 'copy branch', () => toast(`Copied ${branch(p)}`)),
     ];
   },
-  extra:[A('t', 'teammates', () => { UI.handled = !UI.handled; })],
   summary(){ const a = DATA.prs.filter(p => !p.gone && !p.handled), f = a.filter(p => p.ci === 'fail').length, y = a.filter(p => p.why === 'you').length;
     return [[`@you ${y}`, {fg:'warn'}], ['   '], [f ? `✗ ${f} failing` : '✓ all green', {fg: f ? 'bad' : 'ok'}]]; },
   detail(s, r, p){
