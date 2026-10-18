@@ -118,12 +118,17 @@ type status struct {
 
 // read is what an update says in Widget-contract terms: its payload, when
 // it has one, and its Status as Refresh would return it. A payload that
-// doesn't decode, such as one with a raw colour, is an error naming why.
+// doesn't decode or that the schema rejects, such as one with a raw colour
+// or an unknown field, is an error naming why.
 func (u update) read() (*widget.Payload, error) {
 	var p *widget.Payload
 	if len(u.Payload) > 0 && string(u.Payload) != "null" {
 		p = new(widget.Payload)
-		if err := json.Unmarshal(u.Payload, p); err != nil {
+		err := json.Unmarshal(u.Payload, p)
+		if err == nil {
+			err = validateJSON("protocol.json#/$defs/payload", u.Payload)
+		}
+		if err != nil {
 			return nil, fmt.Errorf("sent a payload ghud can't show: %w", err)
 		}
 	}

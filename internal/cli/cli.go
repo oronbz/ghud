@@ -43,6 +43,10 @@ const usage = `Usage: ghud [--config <path>] [--close-key <keys>]... [--version]
        ghud config init      write the reference to the config path, once
        ghud auth jira        set up Jira: site, email and an API token,
                              which goes only to the keyring
+       ghud plugin schema    print the JSON Schema of Plugin manifests and
+                             the protocol
+       ghud plugin check [--timeout 10s] <dir>
+                             test the Plugin in <dir> against the protocol
 
 ghud draws a full-screen dashboard of your day. Press q to quit.
 The config is $XDG_CONFIG_HOME/ghud/config.toml (default ~/.config/ghud),
@@ -105,6 +109,9 @@ func Run(s System) int {
 			fmt.Fprintln(s.Stderr, "ghud:", problem)
 		}
 		return config.Reference(types, locale)
+	}
+	if args := fs.Args(); len(args) > 0 && args[0] == "plugin" {
+		return pluginCommand(s, pp, args[1:])
 	}
 	switch strings.Join(fs.Args(), " ") {
 	case "":
