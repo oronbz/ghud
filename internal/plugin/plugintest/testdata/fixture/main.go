@@ -106,6 +106,7 @@ func (f *fixture) handle(msg message) {
 		Action string `json:"action"`
 		Item   string `json:"item"`
 		Text   string `json:"text"`
+		Choice string `json:"choice"`
 	}
 	json.Unmarshal(msg.Params, &p)
 	f.mu.Lock()
@@ -146,12 +147,13 @@ func (f *fixture) handle(msg message) {
 		}
 		f.refresh(msg.ID, w)
 	case "action/invoke":
-		f.invoke(msg.ID, w, p.Action, p.Item, p.Text)
+		f.invoke(msg.ID, w, p.Action, p.Item, p.Text, p.Choice)
 	case "action/choices":
 		time.Sleep(200 * time.Millisecond)
 		f.reply(msg.ID, map[string]any{"choices": []any{
 			map[string]string{"id": "todo", "label": "To do"},
 			map[string]string{"id": "done", "label": "Done"},
+			map[string]string{"id": "web", "label": "Elsewhere", "target": "https://example.com/move"},
 		}})
 	default:
 		if msg.ID != nil {
@@ -203,6 +205,7 @@ func (f *fixture) refresh(id json.RawMessage, w *widget) {
 				"actions": []any{
 					map[string]any{"id": "done", "key": "d", "label": "done"},
 					map[string]any{"id": "open", "key": "o", "label": "open", "primary": true, "verb": "open", "target": "https://example.com/" + id},
+					map[string]any{"id": "move", "key": "c", "label": "move", "input": "choice", "prompt": "Move " + id},
 				},
 			}
 		}
@@ -215,10 +218,20 @@ func (f *fixture) refresh(id json.RawMessage, w *widget) {
 	}
 }
 
-func (f *fixture) invoke(id json.RawMessage, w *widget, action, item, text string) {
+func (f *fixture) invoke(id json.RawMessage, w *widget, action, item, text, choice string) {
 	switch action {
 	case "done":
 		f.reply(id, map[string]any{"toast": "done " + item})
+	case "move":
+		f.reply(id, map[string]any{"toast": "moved " + item + " to " + choice})
+	case "greet":
+		f.reply(id, map[string]any{"toast": "greeting set", "settings": map[string]any{"greeting": text}})
+	case "bad-settings":
+		f.reply(id, map[string]any{"settings": map[string]any{"volume": 11}})
+	case "bad-mode":
+		f.reply(id, map[string]any{"settings": map[string]any{"mode": "loud"}})
+	case "chain":
+		f.reply(id, map[string]any{"then": map[string]any{"id": "note", "label": "note", "input": "text", "prompt": "Note"}})
 	case "note":
 		f.reply(id, map[string]any{"toast": "noted " + text})
 	case "token", "sign-in":
@@ -236,6 +249,8 @@ var widgetActions = []any{
 	map[string]any{"id": "note", "key": "t", "label": "note", "input": "text", "prompt": "Note"},
 	map[string]any{"id": "token", "key": "s", "label": "token", "input": "secret", "prompt": "Token"},
 	map[string]any{"id": "crash", "key": "x", "label": "crash"},
+	map[string]any{"id": "greet", "key": "e", "label": "greet", "input": "text", "prompt": "Greeting"},
+	map[string]any{"id": "chain", "key": "n", "label": "chain"},
 }
 
 func line(token, text string) map[string]any {

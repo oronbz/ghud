@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/oronbz/ghud/internal/plugin"
 	"github.com/oronbz/ghud/internal/plugin/plugintest"
 	"github.com/oronbz/ghud/internal/widget"
 )
@@ -44,17 +43,45 @@ func TestActionsRoundTripWithTheirInput(t *testing.T) {
 func TestChoicesAreFetchedWhenAsked(t *testing.T) {
 	_, typ := fixture(t, plugintest.Options{})
 	w := open(t, typ, "fx", &clock{now: t0}, nil)
-	chooser := w.(interface {
-		Choices(context.Context, widget.Invocation) ([]plugin.Choice, error)
-	})
+	chooser := w.(widget.Chooser)
 	got, err := chooser.Choices(context.Background(), widget.Invocation{Action: "move", Item: "alpha"})
-	if err != nil || len(got) != 2 || got[1] != (plugin.Choice{ID: "done", Label: "Done"}) {
+	if err != nil || len(got) != 3 || got[1] != (widget.Choice{ID: "done", Label: "Done"}) || got[2].Target != "https://example.com/move" {
 		t.Fatalf("choices = %v, %v", got, err)
+	}
+	if res, err := invoke(t, w, widget.Invocation{Action: "move", Item: "alpha", Choice: "done"}); err != nil || res.Toast != "moved alpha to done" {
+		t.Errorf("picking a choice: %q, %v", res.Toast, err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
 	if _, err := chooser.Choices(ctx, widget.Invocation{Action: "move"}); err == nil || !strings.Contains(err.Error(), "didn't answer action/choices") {
 		t.Errorf("slow choices past the deadline: %v", err)
+	}
+}
+
+func TestResultsCanChainAnActionAndSaveSettings(t *testing.T) {
+	_, typ := fixture(t, plugintest.Options{})
+	w := open(t, typ, "fx", &clock{now: t0}, nil)
+	res, err := invoke(t, w, widget.Invocation{Action: "chain"})
+	if err != nil || res.Then == nil || res.Then.ID != "note" || res.Then.Input != widget.TextInput {
+		t.Errorf("chain: %+v, %v", res, err)
+	}
+	res, err = invoke(t, w, widget.Invocation{Action: "greet", Text: "howdy"})
+	if err != nil || res.Settings.String("greeting") != "howdy" || res.Toast != "greeting set" {
+		t.Errorf("greet: %+v, %v", res, err)
+	}
+	if _, err := invoke(t, w, widget.Invocation{Action: "greet", Text: "x"}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSettingsAPluginSendsAreCheckedAgainstItsSchema(t *testing.T) {
+	_, typ := fixture(t, plugintest.Options{})
+	w := open(t, typ, "fx", &clock{now: t0}, nil)
+	if _, err := invoke(t, w, widget.Invocation{Action: "bad-settings"}); err == nil || err.Error() != "Plugin `fixture` sent an unknown setting `volume`" {
+		t.Errorf("unknown setting: %v", err)
+	}
+	if _, err := invoke(t, w, widget.Invocation{Action: "bad-mode"}); err == nil || !strings.HasPrefix(err.Error(), "Plugin `fixture` sent setting `mode` that must be one of") {
+		t.Errorf("bad value: %v", err)
 	}
 }
 

@@ -98,7 +98,7 @@ func (r *Registry) Discover(dirs []string, taken []string) ([]widget.Type, []str
 			}
 			taken = append(taken, wt.Type)
 			t, _ := wt.widgetType()
-			t.New = func(c widget.Config) widget.Widget { return p.widget(t.Name, c) }
+			t.New = func(c widget.Config) widget.Widget { return p.widget(t.Name, t.Settings, c) }
 			types = append(types, t)
 		}
 	}
@@ -145,8 +145,8 @@ type process struct {
 	exited   chan struct{}
 }
 
-func (p *Plugin) widget(typ string, c widget.Config) *pluginWidget {
-	w := &pluginWidget{p: p, id: c.ID, typ: typ, settings: settingsJSON(c.Settings)}
+func (p *Plugin) widget(typ string, schema []widget.Setting, c widget.Config) *pluginWidget {
+	w := &pluginWidget{p: p, id: c.ID, typ: typ, schema: schema, settings: settingsJSON(c.Settings)}
 	p.mu.Lock()
 	if p.clock == nil {
 		p.clock = c.Ports.Clock
@@ -417,6 +417,7 @@ func (t *tail) with(err any) error {
 type pluginWidget struct {
 	p        *Plugin
 	id, typ  string
+	schema   []widget.Setting
 	settings map[string]any
 
 	mu     sync.Mutex
@@ -456,16 +457,20 @@ func (w *pluginWidget) Invoke(ctx context.Context, inv widget.Invocation) (widge
 	if err != nil {
 		return widget.Result{}, err
 	}
-	var res widget.Result
-	err = proc.conn.Call(ctx, "action/invoke", invokeParams{Widget: w.id, Action: inv.Action, Item: inv.Item, Text: inv.Text, Base: inv.Base}, &res)
+	var res invokeResult
+	err = proc.conn.Call(ctx, "action/invoke", invokeParams{Widget: w.id, Action: inv.Action, Item: inv.Item, Text: inv.Text, Choice: inv.Choice, Base: inv.Base}, &res)
 	if err != nil {
 		return widget.Result{}, w.p.callErr(err)
 	}
-	return res, nil
+	settings, err := res.settings(w.schema)
+	if err != nil {
+		return widget.Result{}, w.p.named(err)
+	}
+	res.Result.Settings = settings
+	return res.Result, nil
 }
 
-// Choices fetches the choices of a choice Action, when the user runs it.
-func (w *pluginWidget) Choices(ctx context.Context, inv widget.Invocation) ([]Choice, error) {
+func (w *pluginWidget) Choices(ctx context.Context, inv widget.Invocation) ([]widget.Choice, error) {
 	proc, err := w.p.connect(ctx, w)
 	if err != nil {
 		return nil, err
@@ -474,7 +479,11 @@ func (w *pluginWidget) Choices(ctx context.Context, inv widget.Invocation) ([]Ch
 	if err := proc.conn.Call(ctx, "action/choices", choicesParams{Widget: w.id, Action: inv.Action, Item: inv.Item}, &res); err != nil {
 		return nil, w.p.callErr(err)
 	}
-	return res.Choices, nil
+	choices := make([]widget.Choice, len(res.Choices))
+	for i, c := range res.Choices {
+		choices[i] = widget.Choice{ID: c.ID, Label: c.Label, Target: c.Target}
+	}
+	return choices, nil
 }
 
 func (w *pluginWidget) Listen(push func(widget.Push)) {

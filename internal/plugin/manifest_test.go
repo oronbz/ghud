@@ -100,12 +100,10 @@ func TestTheProtocolSchemaDescribesARealSession(t *testing.T) {
 	refresh(t, w)
 	w.(widget.Observer).Observe(widget.Shown{Size: widget.Size{W: 30, H: 5}, Focused: true, Visible: true})
 	got.next(t)
-	for _, inv := range []widget.Invocation{{Action: "done", Item: "alpha"}, {Action: "note", Text: "x", Base: "y"}, {Action: "nope"}} {
+	for _, inv := range []widget.Invocation{{Action: "done", Item: "alpha"}, {Action: "note", Text: "x", Base: "y"}, {Action: "nope"}, {Action: "move", Item: "alpha", Choice: "done"}, {Action: "greet", Text: "yo"}, {Action: "chain"}} {
 		invoke(t, w, inv)
 	}
-	w.(interface {
-		Choices(context.Context, widget.Invocation) ([]plugin.Choice, error)
-	}).Choices(context.Background(), widget.Invocation{Action: "move", Item: "alpha"})
+	w.(widget.Chooser).Choices(context.Background(), widget.Invocation{Action: "move", Item: "alpha"})
 	lines := open(t, typ, "lines", c, widget.Settings{"mode": "lines"})
 	refresh(t, lines)
 	refresh(t, open(t, typ, "setup", c, widget.Settings{"mode": "setup"}))
@@ -137,7 +135,7 @@ func TestTheProtocolSchemaDescribesARealSession(t *testing.T) {
 				def = "initializeResult"
 			case res["choices"] != nil:
 				def = "choicesResult"
-			case res["toast"] != nil:
+			case res["toast"] != nil, res["then"] != nil:
 				def = "invokeResult"
 			}
 			if err := plugin.Validate("protocol.json#/$defs/"+def, res); err != nil {

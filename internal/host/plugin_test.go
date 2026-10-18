@@ -94,6 +94,33 @@ func TestPluginActionsRoundTripTheirInput(t *testing.T) {
 	hides(t, h, "hunter2")
 }
 
+func TestAPluginChoiceActionLoadsItsChoicesAndRunsThePickedOne(t *testing.T) {
+	h := withPlugin(t, plugintest.Options{}, fixtureWidget)
+	h.Press("1", "c")
+	shows(t, h, "Move alpha", "To do", "Done", "Elsewhere")
+	h.Press("j", "enter")
+	shows(t, h, "moved alpha to done")
+}
+
+func TestAPluginActionCanSaveItsWidgetsSettings(t *testing.T) {
+	h := withPlugin(t, plugintest.Options{}, fixtureWidget)
+	h.Press("1", "e")
+	h.Type("howdy\n")
+	shows(t, h, "howdy alpha")
+	b, err := os.ReadFile(filepath.Join(h.Paths.Config, "config.toml"))
+	if err != nil || !strings.Contains(string(b), `greeting = "howdy"`) {
+		t.Errorf("config.toml = %s, %v", b, err)
+	}
+}
+
+func TestAPluginActionCanLeadIntoAnother(t *testing.T) {
+	h := withPlugin(t, plugintest.Options{}, fixtureWidget)
+	h.Press("1", "n")
+	shows(t, h, "Note")
+	h.Type("chained\n")
+	shows(t, h, "noted chained")
+}
+
 func TestARawColourPayloadIsAnErrorNamingIt(t *testing.T) {
 	h := withPlugin(t, plugintest.Options{}, fixtureWidget+"mode = \"raw-colour\"\n")
 	shows(t, h, "Plugin `fixture` sent a payload ghud can't", `"#ff0000" is not a theme token`)

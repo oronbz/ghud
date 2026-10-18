@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ghud.dev/schema/protocol.json",
   "title": "ghud plugin protocol, version 1",
-  "description": "JSON-RPC 2.0 between ghud (the host) and a Plugin's process, one message per line (newline-delimited JSON) on the process's stdin and stdout; stderr is ignored. The host starts one process per Plugin and addresses every Widget-specific message by its Widget id. Sequence: the host sends `initialize` and waits for its result; it then sends `widget/open` for each placed Widget, `widget/frame` when a Widget's size, focus or visibility changes, `widget/refresh` on its schedule, `action/choices` and `action/invoke` when the user runs an Action, and `widget/close` when a Widget goes away. The Plugin may send `widget/update` at any time. Closing stdin means quit. A result is checked against the matching $defs entry: initializeResult, refreshResult, choicesResult or invokeResult; this top-level schema checks the envelope and every request's and notification's params.",
+  "description": "JSON-RPC 2.0 between ghud (the host) and a Plugin's process, one message per line (newline-delimited JSON) on the process's stdin and stdout. stderr isn't part of the protocol; its last line is shown when the process stops. The host starts one process per Plugin and addresses every Widget-specific message by its Widget id. Sequence: the host sends `initialize` and waits for its result; it then sends `widget/open` for each placed Widget, `widget/frame` when a Widget's size, focus or visibility changes, `widget/refresh` on its schedule, `action/choices` and `action/invoke` when the user runs an Action, and `widget/close` when a Widget goes away. The Plugin may send `widget/update` at any time. Closing stdin means quit. A result is checked against the matching $defs entry: initializeResult, refreshResult, choicesResult or invokeResult; this top-level schema checks the envelope and every request's and notification's params.",
   "type": "object",
   "required": ["jsonrpc"],
   "properties": {
@@ -235,7 +235,7 @@
         },
         "target": { "type": "string" },
         "input": {
-          "description": "What the host asks for first: text (a one-line prompt), inline (the multi-line editor over the Widget, prefilled with value), secret (a masked prompt whose value reaches only the Plugin: never drawn, toasted or logged), or choice (a menu of action/choices). The answer arrives as action/invoke's text. With text or secret input, target is a page the host opens as the prompt appears.",
+          "description": "What the host asks for first: text (a one-line prompt), inline (the multi-line editor over the Widget, prefilled with value), secret (a masked prompt whose value reaches only the Plugin: never drawn, toasted or logged), or choice (a menu filled by action/choices when the Action runs). The typed text or secret arrives as action/invoke's text, the picked choice as its choice. With text or secret input, target is a page the host opens as the prompt appears.",
           "enum": ["none", "text", "inline", "secret", "choice"]
         },
         "prompt": { "type": "string" },
@@ -262,8 +262,9 @@
             "type": "object",
             "required": ["id", "label"],
             "properties": {
-              "id": { "description": "Comes back as action/invoke's text.", "type": "string" },
-              "label": { "type": "string" }
+              "id": { "description": "Comes back as action/invoke's choice.", "type": "string" },
+              "label": { "type": "string" },
+              "target": { "description": "A page the host opens instead of invoking the Action, for a choice ghud can't complete itself.", "type": "string" }
             }
           }
         }
@@ -277,7 +278,8 @@
         "widget": { "$ref": "#/$defs/widgetId" },
         "action": { "type": "string" },
         "item": { "description": "The selected item's id; absent for a Widget Action.", "type": "string" },
-        "text": { "description": "The text typed, the secret entered, or the id of the choice picked.", "type": "string" },
+        "text": { "description": "The text typed or the secret entered.", "type": "string" },
+        "choice": { "description": "The id of the choice picked, for a choice Action.", "type": "string" },
         "base": { "description": "The Action's value: the text an input started from.", "type": "string" }
       }
     },
@@ -287,7 +289,8 @@
       "properties": {
         "toast": { "description": "Shown in the footer.", "type": "string" },
         "edit": { "description": "A file the host opens in $EDITOR; the Widget refreshes when the editor exits.", "type": "string" },
-        "then": { "description": "With edit, the Action the host runs once the editor exits cleanly, with text = the edit file.", "$ref": "#/$defs/action" }
+        "then": { "description": "The Action the host runs next, asking for its input first, so one Action leads into another (a setup flow's prompts). With edit, it runs once the editor exits cleanly, with text = the edit file.", "$ref": "#/$defs/action" },
+        "settings": { "description": "Settings the host writes into the Widget's [[widget]] block in config.toml (the old block commented out), checked against the manifest's settings; the Widget is then rebuilt with them.", "type": "object" }
       }
     }
   }

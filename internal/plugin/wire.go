@@ -3,6 +3,8 @@ package plugin
 import (
 	"encoding/json"
 	"fmt"
+	"math"
+	"slices"
 	"time"
 
 	"github.com/oronbz/ghud/internal/widget"
@@ -50,6 +52,7 @@ type invokeParams struct {
 	Action string `json:"action"`
 	Item   string `json:"item,omitempty"`
 	Text   string `json:"text,omitempty"`
+	Choice string `json:"choice,omitempty"`
 	Base   string `json:"base,omitempty"`
 }
 
@@ -59,14 +62,42 @@ type choicesParams struct {
 	Item   string `json:"item,omitempty"`
 }
 
-// Choice is one entry of a choice Action's menu.
-type Choice struct {
-	ID    string `json:"id"`
-	Label string `json:"label"`
+type choicesResult struct {
+	Choices []struct {
+		ID     string `json:"id"`
+		Label  string `json:"label"`
+		Target string `json:"target"`
+	} `json:"choices"`
 }
 
-type choicesResult struct {
-	Choices []Choice `json:"choices"`
+// invokeResult is widget.Result as JSON carries it: settings arrive as
+// JSON values, to be read against the Widget type's schema.
+type invokeResult struct {
+	widget.Result
+	Settings map[string]any `json:"settings"`
+}
+
+// settings reads a Plugin's settings against schema, the way config.toml's are.
+func (r invokeResult) settings(schema []widget.Setting) (widget.Settings, error) {
+	if len(r.Settings) == 0 {
+		return nil, nil
+	}
+	out := make(widget.Settings, len(r.Settings))
+	for k, v := range r.Settings {
+		i := slices.IndexFunc(schema, func(s widget.Setting) bool { return s.Name == k })
+		if i < 0 {
+			return nil, fmt.Errorf("sent an unknown setting `%s`", k)
+		}
+		if f, ok := v.(float64); ok && schema[i].Kind == widget.Int && f == math.Trunc(f) {
+			v = int64(f)
+		}
+		val, err := schema[i].Check(v)
+		if err != nil {
+			return nil, fmt.Errorf("sent setting `%s` that %w", k, err)
+		}
+		out[k] = val
+	}
+	return out, nil
 }
 
 // update is a refresh's result and, with Widget, a pushed widget/update.
