@@ -92,6 +92,11 @@ func (m Model) clampList(id string) {
 	}
 	p := m.payloadIn(id, r)
 	st := m.lists[id]
+	h := max(1, r.H-2)
+	if p.Wrap && !p.IsList() {
+		m.lists[id] = listState{top: min(max(st.top, 0), max(0, render.TextRows(p, r.W-2)-h))}
+		return
+	}
 	if len(p.Items) == 0 {
 		m.lists[id] = listState{}
 		return
@@ -99,7 +104,6 @@ func (m Model) clampList(id string) {
 	st.idx = min(max(st.idx, 0), len(p.Items)-1)
 	st.sel = p.Items[st.idx].ID
 	rows := render.Rows(p)
-	h := max(1, r.H-2)
 	line := slices.Index(rows, st.idx)
 	want := line
 	if line > 0 && rows[line-1] == render.Header && h > 1 {
@@ -115,7 +119,8 @@ func (m Model) clampList(id string) {
 	m.lists[id] = st
 }
 
-// moveSelection moves the focused list's selection to index i, clamped.
+// moveSelection moves the focused list's selection to index i, clamped. A
+// wrapped text Widget scrolls instead, i being its top line out of n.
 func (m Model) moveSelection(i func(st listState, n int) int) {
 	id := m.focus
 	r, ok := m.rects()[id]
@@ -123,6 +128,11 @@ func (m Model) moveSelection(i func(st listState, n int) int) {
 		return
 	}
 	p := m.payloadIn(id, r)
+	if p.Wrap && !p.IsList() {
+		m.lists[id] = listState{top: i(listState{idx: m.lists[id].top}, render.TextRows(p, r.W-2))}
+		m.clampList(id)
+		return
+	}
 	if len(p.Items) == 0 {
 		return
 	}

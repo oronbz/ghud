@@ -99,6 +99,9 @@ func body(th theme.Theme, p widget.Payload, l List, w, h int) []string {
 	if p.IsList() {
 		return listBody(th, p, l, w, h)
 	}
+	if p.Wrap {
+		return textBody(th, p, l, w, h)
+	}
 	var lines []string
 	for _, l := range p.Lines {
 		if l.Big {

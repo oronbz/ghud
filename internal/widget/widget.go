@@ -100,6 +100,9 @@ type Payload struct {
 	Lines []Line
 	// Center centres the block vertically and each line horizontally.
 	Center bool
+	// Wrap word-wraps Lines to the Widget's width instead of truncating
+	// them, and lets the user scroll them with j/k.
+	Wrap bool
 
 	// Columns make the Payload a list: every Item has one Field per Column.
 	Columns []Column
