@@ -20,7 +20,9 @@ type configEditedMsg struct {
 	added  config.Widget
 	// line is the block an edit settings Action opens the editor at.
 	line int
-	err  error
+	// toast is the Action's own, shown once its settings are saved.
+	toast string
+	err   error
 }
 
 // addEntries are the palette's Add Widget Actions, one per Widget type.
@@ -50,18 +52,47 @@ func (m Model) editConfig(id string, a bound) tea.Cmd {
 	}
 }
 
+// saveSettings writes settings an Action of Widget id returned into its block.
+func (m Model) saveSettings(id string, a widget.Action, settings widget.Settings, toast string) tea.Cmd {
+	edits, p := m.edits, m.widgets[id]
+	return func() tea.Msg {
+		_, err := edits.SetSettings(p.typ.Name, p.ref, settings)
+		return configEditedMsg{id: id, action: bound{Action: a, by: saveSettings}, toast: toast, err: err}
+	}
+}
+
 // configEdited brings the dashboard in line with an edit to config.toml.
 func (m Model) configEdited(msg configEditedMsg) (Model, tea.Cmd) {
 	if msg.err != nil {
 		return m.say(capitalise(msg.action.Label)+" failed: "+msg.err.Error(), theme.Bad)
 	}
 	switch msg.action.by {
+	case saveSettings:
+		return m.settingsSaved(msg.id, msg.toast)
 	case editSettings:
 		return m, m.opts.Ports.Editor.Edit(m.edits.Path, msg.line, func(err error) tea.Msg { return editedMsg{id: msg.id, err: err} })
 	case removeWidget:
 		return m.removed(msg.id)
 	}
 	return m.added(msg.added)
+}
+
+// settingsSaved rebuilds the Widgets whose blocks changed and refreshes
+// Widget id, whose Action may have changed more than its settings, such as
+// a token in the keyring.
+func (m Model) settingsSaved(id, toast string) (Model, tea.Cmd) {
+	m, fresh, reload := m.reloadConfig()
+	cmds := []tea.Cmd{reload}
+	for _, other := range fresh {
+		if other != id {
+			var cmd tea.Cmd
+			m, cmd = m.whenDue(other)
+			cmds = append(cmds, cmd)
+		}
+	}
+	m, cmd := m.after(id, toast)
+	m, beat := m.beat()
+	return m, tea.Batch(append(cmds, cmd, beat)...)
 }
 
 func (m Model) added(wc config.Widget) (Model, tea.Cmd) {

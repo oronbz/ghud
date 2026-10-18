@@ -195,7 +195,13 @@ type Result struct {
 	Edit string `json:"edit,omitempty"`
 	// Then, with Edit, is the Action the host runs once the editor exits
 	// cleanly, with Text set to the Edit file and Base to Then's Value.
+	// Without Edit the host runs it at once, asking for its input, so one
+	// Action can lead into the next, as a setup flow's prompts do.
 	Then *Action `json:"then,omitempty"`
+	// Settings are written into the Widget's [[widget]] block in
+	// config.toml, the old block commented out, and the Widget is rebuilt
+	// with them.
+	Settings Settings `json:"settings,omitempty"`
 }
 
 type Size struct{ W, H int }
@@ -328,7 +334,7 @@ const (
 	ChoiceInput
 )
 
-var inputNames = []string{"", "text", "inline", "secret"}
+var inputNames = []string{"", "text", "inline", "secret", "choice"}
 
 func (i Input) MarshalText() ([]byte, error) {
 	if i < 0 || int(i) >= len(inputNames) {
@@ -344,7 +350,7 @@ func (i *Input) UnmarshalText(b []byte) error {
 	}
 	n := slices.Index(inputNames, string(b))
 	if n < 0 {
-		return fmt.Errorf("input %q must be \"none\", \"text\", \"inline\" or \"secret\"", b)
+		return fmt.Errorf("input %q must be \"none\", \"text\", \"inline\", \"secret\" or \"choice\"", b)
 	}
 	*i = Input(n)
 	return nil

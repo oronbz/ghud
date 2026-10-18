@@ -19,8 +19,9 @@ import (
 )
 
 // hermetic are the real ports with every way out of the machine faked:
-// other CLIs (such as gh) aren't installed, the keyring is empty, and every
-// HTTP endpoint is a server that fails the test if anything reaches it.
+// other CLIs (such as gh) aren't installed, the keyring is empty, the system
+// opener only records, and every HTTP endpoint is a server that fails the
+// test if anything reaches it.
 func hermetic(t *testing.T, getenv func(string) string) (*ports.Ports, *hosttest.Commands) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -33,6 +34,7 @@ func hermetic(t *testing.T, getenv func(string) string) (*ports.Ports, *hosttest
 	pp.Commands = cmds
 	pp.EventKit = &hosttest.EventKit{}
 	pp.Keyring = &hosttest.Keyring{}
+	pp.Opener = &hosttest.Opener{}
 	e := reflect.ValueOf(&pp.Endpoints).Elem()
 	for i := range e.NumField() {
 		e.Field(i).SetString(srv.URL)

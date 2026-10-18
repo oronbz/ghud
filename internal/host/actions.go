@@ -145,6 +145,8 @@ const (
 	editSettings
 	removeWidget
 	addWidget
+	// saveSettings writes the settings an Action's Result gave into its Widget's block.
+	saveSettings
 )
 
 // actions are Widget id's Actions as they apply now: the selected Item's,
@@ -335,6 +337,17 @@ func (m Model) acted(msg actedMsg) (Model, tea.Cmd) {
 		return m, m.opts.Ports.Editor.Edit(f, 0, func(err error) tea.Msg {
 			return editedMsg{id: msg.id, file: f, err: err, then: then, item: item}
 		})
+	}
+	if s := msg.result.Settings; len(s) > 0 {
+		return m, m.saveSettings(msg.id, msg.action, s, msg.result.Toast)
+	}
+	if then := msg.result.Then; then != nil {
+		var toast tea.Cmd
+		if msg.result.Toast != "" {
+			m, toast = m.say(msg.result.Toast, theme.Fg)
+		}
+		m, next := m.run(msg.id, bound{Action: *then, item: msg.item})
+		return m, tea.Batch(toast, next)
 	}
 	return m.after(msg.id, msg.result.Toast)
 }
