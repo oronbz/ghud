@@ -13,7 +13,7 @@ import (
 )
 
 func TestDefaultLayoutPlacesClockThenCalendarInOneRow(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 100, Height: 20})
+	h := hosttest.New(t, hosttest.Options{Width: 100, Height: 21})
 
 	if got, want := h.Line(0), "╭─ Clock ────────────────────────────────────────╮╭─ Calendar ─────────────────────────────────────╮"; got != want {
 		t.Errorf("top row:\n%s\nwant:\n%s", got, want)
@@ -109,7 +109,7 @@ func TestRowWeightsHoldTheirProportionsAsTheTerminalGrows(t *testing.T) {
 	]}}`)
 	h := hosttest.New(t, hosttest.Options{Root: root})
 	for _, c := range []struct{ h, calendar int }{{42, 14}, {18, 6}, {27, 9}} {
-		h.Resize(60, c.h)
+		h.Resize(60, c.h+1)
 		if _, y, _ := h.Find("╭─ Calendar"); y != 0 {
 			t.Errorf("at height %d Calendar starts on row %d, want 0", c.h, y)
 		}

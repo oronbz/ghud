@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -28,6 +27,9 @@ type Options struct {
 	Paths paths.Paths
 	Ports ports.Ports
 	Theme theme.Theme
+	// Types replaces the built-in Widget types, one Widget each; tests use it
+	// to stage Layouts the built-ins can't fill.
+	Types []widget.Type
 }
 
 type Model struct {
@@ -36,6 +38,10 @@ type Model struct {
 	now     time.Time
 	widgets map[string]placed
 	layout  layout.Layout
+	// focus is the focused Widget's id, "" when ghud is unfocused; last
+	// survives unfocusing so focus can return to it.
+	focus, last string
+	keyMap      bool
 }
 
 type placed struct {
@@ -45,15 +51,17 @@ type placed struct {
 
 type tickMsg struct{ at time.Time }
 
-var quitKey = key.NewBinding(key.WithKeys("q"), key.WithHelp("q", "quit"))
-
 // builtins are the Widget types compiled into ghud, in config order.
 var builtins = []widget.Type{clock.Type, calendar.Type}
 
 func New(o Options) Model {
 	m := Model{opts: o, now: o.Ports.Clock.Now(), widgets: map[string]placed{}}
+	types := o.Types
+	if types == nil {
+		types = builtins
+	}
 	var ids []string
-	for _, t := range builtins {
+	for _, t := range types {
 		m.widgets[t.Name] = placed{typ: t, widget: t.New()}
 		ids = append(ids, t.Name)
 	}
@@ -76,9 +84,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.now = msg.at
 		return m, m.nextTick()
 	case tea.KeyPressMsg:
-		if key.Matches(msg, quitKey) {
-			return m, tea.Quit
-		}
+		return m.key(msg)
 	}
 	return m, nil
 }
@@ -106,23 +112,28 @@ func (m Model) View() tea.View {
 	if m.w == 0 || m.h == 0 {
 		return v
 	}
-	f := m.frame()
-	if f.TooSmall {
-		v.SetContent(m.tooSmall(f.Need))
-		return v
+	var layers []*lipgloss.Layer
+	if f := m.frame(); f.TooSmall {
+		layers = append(layers, lipgloss.NewLayer(m.tooSmall(f.Need)))
+	} else {
+		for _, t := range f.Tiles {
+			w := m.widgets[t.ID]
+			layers = append(layers, lipgloss.NewLayer(render.Draw(m.opts.Theme, render.Tile{
+				Title:   t.Title,
+				W:       t.W,
+				H:       t.H,
+				Focused: t.ID == m.focus,
+				Payload: w.widget.Payload(widget.Frame{
+					Now:     m.now,
+					Size:    widget.Size{W: t.W - 2, H: t.H - 2},
+					Focused: t.ID == m.focus,
+				}),
+			})).X(t.X).Y(t.Y))
+		}
+		layers = append(layers, lipgloss.NewLayer(m.footer()).Y(m.h-footerHeight))
 	}
-	layers := make([]*lipgloss.Layer, 0, len(f.Tiles))
-	for _, t := range f.Tiles {
-		w := m.widgets[t.ID]
-		layers = append(layers, lipgloss.NewLayer(render.Draw(m.opts.Theme, render.Tile{
-			Title: t.Title,
-			W:     t.W,
-			H:     t.H,
-			Payload: w.widget.Payload(widget.Frame{
-				Now:  m.now,
-				Size: widget.Size{W: t.W - 2, H: t.H - 2},
-			}),
-		})).X(t.X).Y(t.Y))
+	if m.keyMap {
+		layers = append(layers, m.keyMapLayer())
 	}
 	canvas := lipgloss.NewCanvas(m.w, m.h)
 	lipgloss.NewCompositor(layers...).Draw(canvas, image.Rect(0, 0, m.w, m.h))
@@ -142,9 +153,15 @@ func (m Model) tooSmall(need layout.Size) string {
 func (m Model) Zones() []layout.Zone { return m.frame().Zones }
 
 func (m Model) frame() layout.Frame {
+	f := layout.Compute(m.layout, m.titles(), m.w, m.h-footerHeight)
+	f.Need.H += footerHeight
+	return f
+}
+
+func (m Model) titles() map[string]string {
 	titles := make(map[string]string, len(m.widgets))
 	for id, w := range m.widgets {
 		titles[id] = w.typ.Title
 	}
-	return layout.Compute(m.layout, titles, m.w, m.h)
+	return titles
 }
