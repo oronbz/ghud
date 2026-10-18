@@ -153,6 +153,8 @@ type Plugin struct {
 	// stopped is why the last process crashed.
 	stopped error
 	closed  bool
+	// tap, when set, sees every message in (out false) and out, as sent.
+	tap func(out bool, raw []byte)
 
 	wmu     sync.Mutex
 	widgets map[string]*pluginWidget
@@ -217,6 +219,18 @@ func (p *Plugin) connect(ctx context.Context, w *pluginWidget) (*process, error)
 
 // start runs the Plugin's command and shakes hands with it.
 func (p *Plugin) start(ctx context.Context) (*process, error) {
+	proc, err := p.spawn()
+	if err != nil {
+		return nil, err
+	}
+	if err := p.handshake(ctx, proc); err != nil {
+		return nil, err
+	}
+	return proc, nil
+}
+
+// spawn runs the Plugin's command with a session on its stdio.
+func (p *Plugin) spawn() (*process, error) {
 	name := p.m.Command[0]
 	if strings.ContainsAny(name, `/\`) && !filepath.IsAbs(name) {
 		name = filepath.Join(p.m.Dir, name)
@@ -241,20 +255,25 @@ func (p *Plugin) start(ctx context.Context) (*process, error) {
 		return nil, p.named(fmt.Errorf("didn't start: %w", err))
 	}
 	proc.stdin = stdin
-	proc.conn = newConn(stdout, stdin, p.notified, func(err error) { p.ended(proc, err) })
+	proc.conn = newConn(stdout, stdin, p.tap, p.notified, func(err error) { p.ended(proc, err) })
+	return proc, nil
+}
+
+// handshake sends initialize; a Plugin that fails it is stopped.
+func (p *Plugin) handshake(ctx context.Context, proc *process) error {
 	ctx, cancel := context.WithTimeout(ctx, handshakeTimeout)
 	defer cancel()
 	var res initializeResult
 	if err := proc.conn.Call(ctx, "initialize", initializeParams{Protocol: Protocol, Ghud: version.Version}, &res); err != nil {
 		proc.stop()
 		<-proc.exited
-		return nil, p.named(fmt.Errorf("failed its handshake: %w", proc.why(err)))
+		return p.named(fmt.Errorf("failed its handshake: %w", proc.why(err)))
 	}
 	if res.Protocol != Protocol {
 		proc.stop()
-		return nil, p.versionErr("speaks", res.Protocol)
+		return p.versionErr("speaks", res.Protocol)
 	}
-	return proc, nil
+	return nil
 }
 
 func (p *Plugin) versionErr(verb string, v int) error {
