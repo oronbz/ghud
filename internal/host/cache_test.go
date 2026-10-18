@@ -18,6 +18,7 @@ import (
 	"github.com/oronbz/ghud/internal/widget"
 	"github.com/oronbz/ghud/internal/widgets/meetings"
 	"github.com/oronbz/ghud/internal/widgets/prs"
+	"github.com/oronbz/ghud/internal/widgets/reminders"
 )
 
 // upstream is an API that several hosts' News Widgets fetch from; every
@@ -290,8 +291,8 @@ func TestAnInstanceSkipsTheFetchAnotherIsMakingAndShowsItsResult(t *testing.T) {
 	}
 }
 
-func TestPRsAndMeetingsAreCachedWidgets(t *testing.T) {
-	for _, typ := range []widget.Type{prs.Type, meetings.Type} {
+func TestPRsMeetingsAndRemindersAreCachedWidgets(t *testing.T) {
+	for _, typ := range []widget.Type{prs.Type, meetings.Type, reminders.Type} {
 		t.Run(typ.Name, func(t *testing.T) {
 			h := hosttest.New(t, hosttest.Options{Width: 60, Height: 10, Types: []widget.Type{typ},
 				Config: "[[widget]]\ntype = \"" + typ.Name + "\"\n"})
