@@ -30,6 +30,7 @@ func System(getenv func(string) string) Ports {
 		EventKit:  newEventKit(),
 		Machine:   newMachine(),
 		Watcher:   newFSWatcher(),
+		Inbox:     channelInbox{},
 		HTTP:      &http.Client{Timeout: 30 * time.Second},
 		Endpoints: DefaultEndpoints(),
 		Getenv:    getenv,
@@ -113,4 +114,10 @@ type execCommands struct{}
 
 func (execCommands) Output(ctx context.Context, name string, args ...string) ([]byte, error) {
 	return exec.CommandContext(ctx, name, args...).Output()
+}
+
+type channelInbox struct{}
+
+func (channelInbox) Next(ch <-chan tea.Msg) tea.Cmd {
+	return func() tea.Msg { return <-ch }
 }

@@ -99,15 +99,23 @@ func Run(s System) int {
 		pp = *s.Ports
 	}
 
+	reference := func() string {
+		types, problems := host.Types(p, configFile, locale, s.Getenv)
+		for _, problem := range problems {
+			fmt.Fprintln(s.Stderr, "ghud:", problem)
+		}
+		return config.Reference(types, locale)
+	}
 	switch strings.Join(fs.Args(), " ") {
 	case "":
 	case "config default":
-		fmt.Fprint(s.Stdout, config.Reference(host.Builtins, locale))
+		fmt.Fprint(s.Stdout, reference())
 		return 0
 	case "config init":
-		return configInit(s, configFile, config.Reference(host.Builtins, locale))
+		return configInit(s, configFile, reference())
 	case "auth jira":
-		return authJira(s, pp, config.Editor{Path: configFile, LockDir: filepath.Join(p.Data, "locks"), Types: host.Builtins, Locale: locale})
+		types, _ := host.Types(p, configFile, locale, s.Getenv)
+		return authJira(s, pp, config.Editor{Path: configFile, LockDir: filepath.Join(p.Data, "locks"), Types: types, Locale: locale})
 	default:
 		fmt.Fprintf(s.Stderr, "ghud: unknown command %q\n\n%s", strings.Join(fs.Args(), " "), usage)
 		return 2
@@ -131,6 +139,8 @@ func Run(s System) int {
 	if c, ok := pp.Watcher.(io.Closer); ok {
 		defer c.Close()
 	}
+	// Every copy of the model shares its Plugins, so this stops them however the program ends.
+	defer m.Close()
 	if _, err := tea.NewProgram(m, opts...).Run(); err != nil {
 		fmt.Fprintln(s.Stderr, "ghud:", err)
 		return 1

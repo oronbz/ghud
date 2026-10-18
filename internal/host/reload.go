@@ -6,7 +6,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/oronbz/ghud/internal/config"
 	"github.com/oronbz/ghud/internal/layout"
 	"github.com/oronbz/ghud/internal/theme"
 )
@@ -70,11 +69,12 @@ func (m Model) filesChanged(msg filesChangedMsg) (Model, tea.Cmd) {
 // built afresh, which need a refresh. A config that doesn't parse leaves
 // everything as it was and says why until it parses again.
 func (m Model) reloadConfig() (Model, []string, tea.Cmd) {
-	cfg, err := config.Load(m.edits.Path, m.edits.Types, m.opts.Locale)
+	cfg, err, types, problems := m.loadConfig(m.edits.Path, m.baseTypes())
 	if err != nil {
 		m.sticky = err.Error()
 		return m, nil, nil
 	}
+	m.edits.Types = types
 	var cmds []tea.Cmd
 	if cfg.Theme != m.colors.name && !m.colors.pinned {
 		m.colors.asking = true
@@ -84,7 +84,7 @@ func (m Model) reloadConfig() (Model, []string, tea.Cmd) {
 	m = m.resolveTheme()
 
 	m, ids, fresh, clamped := m.placeAll(cfg)
-	m.sticky = toastOf(append(cfg.Problems, clamped...))
+	m.sticky = toastOf(slices.Concat(cfg.Problems, problems, clamped))
 	m.layout = m.layout.Join(ids)
 	if m.arranging {
 		m.before = m.before.Join(ids)
@@ -116,7 +116,7 @@ func (m Model) reloadConfig() (Model, []string, tea.Cmd) {
 	m.sizeEditor()
 	m = m.watch()
 	m.ticks++
-	return m, fresh, tea.Batch(append(cmds, m.nextTick())...)
+	return m, fresh, tea.Batch(append(cmds, m.nextTick(), m.listen(fresh))...)
 }
 
 func (m Model) layoutFile() string { return filepath.Join(m.opts.Paths.Config, layout.FileName) }
