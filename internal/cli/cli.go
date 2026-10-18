@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -12,9 +13,11 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/oronbz/ghud/internal/closekey"
 	"github.com/oronbz/ghud/internal/config"
 	"github.com/oronbz/ghud/internal/host"
 	"github.com/oronbz/ghud/internal/paths"
@@ -35,13 +38,16 @@ type System struct {
 	ProgramOptions []tea.ProgramOption
 }
 
-const usage = `Usage: ghud [--config <path>] [--version]
+const usage = `Usage: ghud [--config <path>] [--close-key <keys>]... [--version]
        ghud config default   print the full commented config reference
        ghud config init      write the reference to the config path, once
 
 ghud draws a full-screen dashboard of your day. Press q to quit.
 The config is $XDG_CONFIG_HOME/ghud/config.toml (default ~/.config/ghud),
 or GHUD_CONFIG, or --config.
+
+--close-key quits ghud on a key in herdr's syntax, a chord or a sequence
+of two: --close-key cmd+shift+g --close-key 'ctrl+b d'.
 `
 
 // Run runs ghud and returns its exit code.
@@ -51,11 +57,22 @@ func Run(s System) int {
 	fs.Usage = func() { fmt.Fprint(s.Stderr, usage) }
 	showVersion := fs.Bool("version", false, "print the version and exit")
 	configFlag := fs.String("config", "", "path to config.toml")
+	var closeKeyFlags repeated
+	fs.Var(&closeKeyFlags, "close-key", "a key that quits ghud, in herdr's key syntax")
 	if err := fs.Parse(s.Args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return 0
 		}
 		return 2
+	}
+	var closeKeys []closekey.Seq
+	for _, k := range closeKeyFlags {
+		seq, err := closekey.Parse(k)
+		if err != nil {
+			fmt.Fprintf(s.Stderr, "ghud: --close-key %q: %v\n", k, err)
+			return 2
+		}
+		closeKeys = append(closeKeys, seq)
 	}
 	if *showVersion {
 		fmt.Fprintln(s.Stdout, "ghud", version.Version)
@@ -91,7 +108,13 @@ func Run(s System) int {
 	if s.Ports != nil {
 		pp = *s.Ports
 	}
-	m := host.New(host.Options{Paths: p, ConfigFile: configFile, Locale: locale, Ports: pp})
+	// Popups have no HERDR_PANE_ID, and right-click can't reach them anyway.
+	if s.Getenv("HERDR_PANE_ID") != "" {
+		herdrRightClick(s.Getenv, pp.Commands, "pane")
+		// Deferred, so a crash or a signal that ends the program restores herdr's menu too.
+		defer herdrRightClick(s.Getenv, pp.Commands, "herdr")
+	}
+	m := host.New(host.Options{Paths: p, ConfigFile: configFile, Locale: locale, Ports: pp, CloseKeys: closeKeys})
 	var opts []tea.ProgramOption
 	// Real files get Bubble Tea's defaults, which open /dev/tty when stdin is piped.
 	if _, isFile := s.Stdin.(*os.File); !isFile {
@@ -109,6 +132,29 @@ func Run(s System) int {
 		return 1
 	}
 	return 0
+}
+
+// repeated collects every value of a repeatable flag.
+type repeated []string
+
+func (r *repeated) String() string { return strings.Join(*r, " ") }
+
+func (r *repeated) Set(v string) error {
+	*r = append(*r, v)
+	return nil
+}
+
+// herdrRightClick routes right-clicks in ghud's herdr pane to target: "pane"
+// for ghud, "herdr" for herdr's own menu. Failing leaves herdr as it was, so
+// errors are ignored.
+func herdrRightClick(getenv func(string) string, c ports.Commands, target string) {
+	bin := getenv("HERDR_BIN_PATH")
+	if bin == "" {
+		bin = "herdr"
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	_, _ = c.Output(ctx, bin, "pane", "input", "--current", "--right-click", target)
 }
 
 // configInit writes the reference to path, refusing to touch an existing file.

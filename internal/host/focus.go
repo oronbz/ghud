@@ -7,6 +7,7 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/oronbz/ghud/internal/closekey"
 	"github.com/oronbz/ghud/internal/layout"
 )
 
@@ -86,6 +87,17 @@ func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	// Any other key means the modifier is no longer held alone, and a lost
 	// release can't leave the footer stuck.
 	m.held = 0
+	var close closekey.Outcome
+	switch m.closing, close = m.closing.Press(msg, m.opts.Ports.Clock.Now()); close {
+	case closekey.Close:
+		if m.editing != nil {
+			m, save := m.saveEdit()
+			return m, tea.Sequence(save, tea.Quit)
+		}
+		return m, tea.Quit
+	case closekey.Swallow:
+		return m, nil
+	}
 	if m.keyMap {
 		if key.Matches(msg, keys.Help, keys.Unfocus, keys.Quit) {
 			m.keyMap = false

@@ -100,6 +100,22 @@ func TestIEditsTheNoteInInsertModeAndEscSavesIt(t *testing.T) {
 	}
 }
 
+func TestACloseKeyInInsertModeSavesTheEditThenQuits(t *testing.T) {
+	for _, keys := range [][]string{{"shift+super+g"}, {"ctrl+b", "d"}, {"ctrl+k", "ctrl+b", "d"}} {
+		h := withNotes(t, "Buy milk\n", hosttest.Options{Width: 40, Height: 9, CloseKeys: []string{"cmd+shift+g", "ctrl+b d"}})
+		h.Press("1", "i")
+		h.Type("Call mum")
+
+		h.Press(keys...)
+		if !h.Quit() {
+			t.Errorf("%q in INSERT mode did not quit", keys)
+		}
+		if got := readNote(t, notesFile(h.Root, "notes.md")); got != "Buy milk\nCall mum\n" {
+			t.Errorf("%q in INSERT mode left notes.md = %q", keys, got)
+		}
+	}
+}
+
 func TestCtrlKOpensThePaletteFromInsertModeAndColonTypes(t *testing.T) {
 	h := withNotes(t, "", hosttest.Options{Width: 60, Height: 16})
 	h.Press("1", "i")
