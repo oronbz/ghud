@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"maps"
 	"os"
 	"os/exec"
@@ -47,9 +48,15 @@ const (
 type Registry struct {
 	mu      sync.Mutex
 	plugins map[string]*Plugin
+	// gone are stand-ins for the types of Plugins whose directories vanished.
+	gone map[string]widget.Type
+	// restarted are the types of Plugins the last Discover restarted.
+	restarted []string
 }
 
-func NewRegistry() *Registry { return &Registry{plugins: map[string]*Plugin{}} }
+func NewRegistry() *Registry {
+	return &Registry{plugins: map[string]*Plugin{}, gone: map[string]widget.Type{}}
+}
 
 // Dirs are the Plugin directories to read: each directory under
 // pluginsDir holding a manifest, then paths as listed.
@@ -57,6 +64,10 @@ func Dirs(pluginsDir string, paths []string) []string {
 	var dirs []string
 	entries, _ := os.ReadDir(pluginsDir)
 	for _, e := range entries {
+		// Hidden entries are the installer's staging area.
+		if strings.HasPrefix(e.Name(), ".") {
+			continue
+		}
 		dir := filepath.Join(pluginsDir, e.Name())
 		if _, err := os.Stat(filepath.Join(dir, ManifestFile)); err == nil {
 			dirs = append(dirs, dir)
@@ -74,21 +85,36 @@ func (r *Registry) Discover(dirs []string, taken []string) ([]widget.Type, []str
 	var types []widget.Type
 	var problems, names []string
 	taken = slices.Clone(taken)
+	r.restarted = nil
+	read := map[string]bool{}
 	for _, dir := range dirs {
 		m, err := ReadManifest(dir)
 		if err != nil {
 			problems = append(problems, err.Error())
 			continue
 		}
+		read[dir] = true
 		file := filepath.Join(dir, ManifestFile)
 		if slices.Contains(names, m.Name) {
 			problems = append(problems, fmt.Sprintf("%s: another Plugin is already called `%s`", file, m.Name))
 			continue
 		}
 		names = append(names, m.Name)
-		types = append(types, r.provide(dir, m, &taken, func(typ string) {
+		rec, _ := ReadRecord(dir)
+		types = append(types, r.provide(dir, m, rec, &taken, func(typ string) {
 			problems = append(problems, fmt.Sprintf("%s: Widget type `%s` is taken; it's left out", file, typ))
 		})...)
+	}
+	for dir, p := range r.plugins {
+		if _, err := os.Stat(dir); read[dir] || !errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		delete(r.plugins, dir)
+		for _, wt := range p.m.Widgets {
+			if !slices.Contains(taken, wt.Type) {
+				r.gone[wt.Type] = widget.Type{Name: wt.Type, Title: wt.Title, OptIn: true, Missing: p.missing()}
+			}
+		}
 	}
 	return types, problems
 }
@@ -102,18 +128,25 @@ func (r *Registry) Bundled(ms []Manifest, taken []string) []widget.Type {
 	taken = slices.Clone(taken)
 	var types []widget.Type
 	for _, m := range ms {
-		types = append(types, r.provide("bundled:"+m.Name, m, &taken, func(string) {})...)
+		types = append(types, r.provide("bundled:"+m.Name, m, Record{}, &taken, func(string) {})...)
 	}
 	return types
 }
 
-// provide registers m's Plugin under key, keeping the one already there
-// while its manifest is unchanged, and returns its Widget types not in taken.
-func (r *Registry) provide(key string, m Manifest, taken *[]string, isTaken func(typ string)) []widget.Type {
+// provide registers m's Plugin under key, restarting the one already there
+// when its manifest or record changed, and returns its Widget types not in taken.
+func (r *Registry) provide(key string, m Manifest, rec Record, taken *[]string, isTaken func(typ string)) []widget.Type {
 	p := r.plugins[key]
-	if p == nil || !reflect.DeepEqual(p.m, m) {
-		p = &Plugin{m: m, widgets: map[string]*pluginWidget{}}
+	switch {
+	case p == nil || p.name != m.Name:
+		p = &Plugin{name: m.Name, m: m, record: rec, widgets: map[string]*pluginWidget{}}
 		r.plugins[key] = p
+	case !reflect.DeepEqual(p.m, m) || p.record != rec:
+		// Widgets keep their Plugin across a reload, so an update restarts it in place.
+		p.restart(m, rec)
+		for _, wt := range m.Widgets {
+			r.restarted = append(r.restarted, wt.Type)
+		}
 	}
 	var types []widget.Type
 	for _, wt := range m.Widgets {
@@ -122,11 +155,28 @@ func (r *Registry) provide(key string, m Manifest, taken *[]string, isTaken func
 			continue
 		}
 		*taken = append(*taken, wt.Type)
+		delete(r.gone, wt.Type)
 		t, _ := wt.widgetType()
 		t.New = func(c widget.Config) widget.Widget { return p.widget(t.Name, t.Settings, c) }
 		types = append(types, t)
 	}
 	return types
+}
+
+// Gone are stand-ins for the Widget types of Plugins that were found once
+// and whose directories have since vanished, such as uninstalled ones.
+func (r *Registry) Gone() []widget.Type {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.SortedFunc(maps.Values(r.gone), func(a, b widget.Type) int { return strings.Compare(a.Name, b.Name) })
+}
+
+// Restarted are the Widget types of the Plugins the last Discover
+// restarted because they changed on disk.
+func (r *Registry) Restarted() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.restarted)
 }
 
 // Close stops every Plugin's process and waits a moment for them to exit.
@@ -142,7 +192,11 @@ func (r *Registry) Close() {
 // Plugin is one Plugin and its process, started when a Widget first needs
 // it and restarted with backoff after a crash.
 type Plugin struct {
-	m Manifest
+	name string
+
+	// m and record change only under mu, when the Plugin is restarted.
+	m      Manifest
+	record Record
 
 	mu    sync.Mutex
 	clock ports.Clock
@@ -277,7 +331,29 @@ func (p *Plugin) handshake(ctx context.Context, proc *process) error {
 }
 
 func (p *Plugin) versionErr(verb string, v int) error {
-	return &widget.SetupError{Hint: fmt.Sprintf("Plugin `%s` %s protocol %d, but this ghud speaks %d. Update ghud or the Plugin.", p.m.Name, verb, v, Protocol)}
+	return &widget.SetupError{Hint: fmt.Sprintf("Plugin `%s` %s protocol %d, but this ghud speaks %d. Update ghud or the Plugin.", p.name, verb, v, Protocol)}
+}
+
+// restart takes the Plugin as it now is on disk: the running process stops,
+// and the next call starts the new one, reopening each Widget on it.
+func (p *Plugin) restart(m Manifest, rec Record) {
+	p.mu.Lock()
+	p.m, p.record = m, rec
+	proc := p.proc
+	p.proc, p.fails, p.retry = nil, 0, time.Time{}
+	p.mu.Unlock()
+	if proc != nil {
+		proc.stop()
+	}
+}
+
+// missing is the needs-setup hint for the Plugin's Widgets once it's gone.
+func (p *Plugin) missing() string {
+	hint := fmt.Sprintf("Plugin `%s` isn't installed", p.name)
+	if p.record.Source != "" {
+		hint += "; run `" + p.record.InstallCommand() + "`"
+	}
+	return hint
 }
 
 // ended handles the end of proc's session: a crash fails its Widgets and
@@ -325,7 +401,7 @@ func restartDelay(fails int) time.Duration {
 // down is the error a stopped Plugin's Widgets show until it restarts.
 func (p *Plugin) down(now time.Time) error {
 	hint := "Restarting it in " + widget.ShortDuration(p.retry.Sub(now).Round(time.Second))
-	return failure{msg: fmt.Sprintf("Plugin `%s` stopped: %v", p.m.Name, p.stopped), reason: "plugin stopped", hint: hint}
+	return failure{msg: fmt.Sprintf("Plugin `%s` stopped: %v", p.name, p.stopped), reason: "plugin stopped", hint: hint}
 }
 
 func (p *Plugin) listed() []*pluginWidget {
@@ -367,7 +443,7 @@ func (p *Plugin) named(err error) error {
 	if err == nil || errors.As(err, &f) || errors.As(err, &setup) || errors.As(err, &limited) || errors.As(err, &rpc) {
 		return err
 	}
-	return fmt.Errorf("Plugin `%s` %w", p.m.Name, err)
+	return fmt.Errorf("Plugin `%s` %w", p.name, err)
 }
 
 // callErr is a failed call's error: a stopped process says so.

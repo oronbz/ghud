@@ -14,9 +14,9 @@ import (
 type filesChangedMsg struct{ files []string }
 
 // watch points the file watcher at every file ghud reads: config.toml,
-// layout.json and each Watcher Widget's files.
+// layout.json, the plugins directory and each Watcher Widget's files.
 func (m Model) watch() Model {
-	files := []string{m.edits.Path, m.layoutFile()}
+	files := []string{m.edits.Path, m.layoutFile(), m.pluginsDir()}
 	for _, id := range m.ids() {
 		if key := m.sched[id].key; key != "" {
 			files = append(files, m.cache.File(key))
@@ -40,11 +40,13 @@ func (m Model) nextChange() tea.Cmd {
 // filesChanged reloads what the changed files hold.
 func (m Model) filesChanged(msg filesChangedMsg) (Model, tea.Cmd) {
 	cmds := []tea.Cmd{m.nextChange()}
-	var fresh []string
-	if slices.Contains(msg.files, m.edits.Path) {
+	var fresh, restarted []string
+	// Installing, updating or uninstalling a Plugin changes which Widget types exist.
+	if slices.Contains(msg.files, m.edits.Path) || slices.Contains(msg.files, m.pluginsDir()) {
 		var cmd tea.Cmd
 		m, fresh, cmd = m.reloadConfig()
 		cmds = append(cmds, cmd)
+		restarted = m.plugins.Restarted()
 	}
 	if slices.Contains(msg.files, m.layoutFile()) {
 		m = m.reloadLayout()
@@ -56,6 +58,8 @@ func (m Model) filesChanged(msg filesChangedMsg) (Model, tea.Cmd) {
 			m, cmd = m.start(id)
 		case slices.Contains(fresh, id):
 			m, cmd = m.whenDue(id)
+		case slices.Contains(restarted, m.widgets[id].typ.Name) && !m.layout.IsHidden(id):
+			m, cmd = m.start(id)
 		}
 		cmds = append(cmds, cmd)
 	}
@@ -120,6 +124,8 @@ func (m Model) reloadConfig() (Model, []string, tea.Cmd) {
 }
 
 func (m Model) layoutFile() string { return filepath.Join(m.opts.Paths.Config, layout.FileName) }
+
+func (m Model) pluginsDir() string { return filepath.Join(m.opts.Paths.Data, "plugins") }
 
 // reloadLayout adopts the Layout another instance saved: the last writer
 // wins. Mid-arrangement it becomes what esc reverts to; a Layout that

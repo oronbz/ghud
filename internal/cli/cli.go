@@ -46,10 +46,21 @@ const usage = `Usage: ghud [--config <path>] [--close-key <keys>]... [--version]
        ghud config init      write the reference to the config path, once
        ghud auth jira        set up Jira: site, email and an API token,
                              which goes only to the keyring
+       ghud plugin install <owner/repo[/subdir]> [--ref <ref>] [-y]
+                             fetch a Plugin from GitHub, show what it
+                             runs, ask for trust, then build it
+       ghud plugin update [name...] [-y]
+                             rebuild installed Plugins that have new commits
+       ghud plugin uninstall <name>
+       ghud plugin list      installed and [[plugin]] path Plugins
        ghud plugin schema    print the JSON Schema of Plugin manifests and
                              the protocol
        ghud plugin check [--timeout 10s] <dir>
                              test the Plugin in <dir> against the protocol
+       ghud skills install   install the ghud-configure and ghud-make-plugin
+                             agent skills to ~/.agents/skills, linked into
+                             Claude Code's skills when it's set up
+       ghud skills uninstall remove the skills ghud installed
 
 ghud draws a full-screen dashboard of your day. Press q to quit.
 The config is $XDG_CONFIG_HOME/ghud/config.toml (default ~/.config/ghud),
@@ -115,7 +126,10 @@ func Run(s System) int {
 		return config.Reference(types, locale)
 	}
 	if args := fs.Args(); len(args) > 0 && args[0] == "plugin" {
-		return pluginCommand(s, pp, args[1:])
+		return pluginCommand(s, pp, p, configFile, locale, args[1:])
+	}
+	if args := fs.Args(); len(args) > 0 && args[0] == "skills" {
+		return skillsCommand(s, args[1:])
 	}
 	switch strings.Join(fs.Args(), " ") {
 	case "":

@@ -49,6 +49,8 @@ type Options struct {
 	Keyring *Keyring
 	// Env is the process environment the app sees; it's empty by default.
 	Env map[string]string
+	// Version is the ghud version the app runs as (see host.Options.Version).
+	Version string
 	// BundleDir stands in for the directory ghud is installed in, where it
 	// finds the Plugins it ships with; empty ships none.
 	BundleDir string
@@ -137,6 +139,7 @@ func New(t testing.TB, o Options) *Host {
 		Paths:     h.Paths,
 		Theme:     th,
 		Types:     o.Types,
+		Version:   o.Version,
 		BundleDir: o.BundleDir,
 		Ports: ports.Ports{
 			Clock:     h.Clock,

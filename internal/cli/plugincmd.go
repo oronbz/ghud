@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/oronbz/ghud/internal/config"
+	"github.com/oronbz/ghud/internal/paths"
 	"github.com/oronbz/ghud/internal/plugin"
 	"github.com/oronbz/ghud/internal/ports"
 )
 
 // pluginCommand runs `ghud plugin <args>`.
-func pluginCommand(s System, pp ports.Ports, args []string) int {
+func pluginCommand(s System, pp ports.Ports, p paths.Paths, configFile string, locale config.Locale, args []string) int {
 	if len(args) == 0 {
 		fmt.Fprint(s.Stderr, "ghud: plugin needs a command\n\n", usage)
 		return 2
@@ -22,6 +24,8 @@ func pluginCommand(s System, pp ports.Ports, args []string) int {
 		return 0
 	case "check":
 		return pluginCheck(s, pp, args[1:])
+	case "install", "update", "uninstall", "list":
+		return pluginManage(s, pp, p, configFile, locale, args)
 	}
 	fmt.Fprintf(s.Stderr, "ghud: unknown command \"plugin %s\"\n\n%s", args[0], usage)
 	return 2

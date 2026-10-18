@@ -2,6 +2,7 @@ package host
 
 import (
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -48,16 +49,18 @@ func (m Model) loadConfig(file string, base []widget.Type) (config.Config, error
 	for _, t := range base {
 		taken = append(taken, t.Name)
 	}
-	found, problems := m.plugins.Discover(plugin.Dirs(filepath.Join(m.opts.Paths.Data, "plugins"), paths), taken)
+	found, problems := m.plugins.Discover(plugin.Dirs(m.pluginsDir(), paths), taken)
 	for _, t := range found {
 		taken = append(taken, t.Name)
 	}
 	found = append(found, m.plugins.Bundled(m.bundled(), taken)...)
-	if len(found) == 0 {
+	gone := m.plugins.Gone()
+	if len(found) == 0 && len(gone) == 0 {
 		return cfg, err, base, problems
 	}
 	types := append(append([]widget.Type{}, base...), found...)
-	cfg, err = config.Load(file, types, m.opts.Locale)
+	// The stand-ins for uninstalled Plugins' types only tell config what their Widgets need.
+	cfg, err = config.Load(file, append(slices.Clip(types), gone...), m.opts.Locale)
 	return cfg, err, types, problems
 }
 
@@ -68,6 +71,17 @@ func Types(p paths.Paths, configFile, bundleDir string, loc config.Locale, geten
 	m := Model{opts: Options{Paths: p, Locale: loc, BundleDir: bundleDir, Ports: ports.Ports{Getenv: getenv}}, plugins: plugin.NewRegistry()}
 	_, _, types, problems := m.loadConfig(configFile, Builtins)
 	return types, problems
+}
+
+// PluginPaths are the Plugin directories configFile lists with [[plugin]] path.
+func PluginPaths(configFile string, loc config.Locale, getenv func(string) string) []string {
+	m := Model{opts: Options{Locale: loc, Ports: ports.Ports{Getenv: getenv}}}
+	cfg, _ := config.Load(configFile, Builtins, loc)
+	var dirs []string
+	for _, p := range cfg.Plugins {
+		dirs = append(dirs, m.pluginPath(configFile, p.Path))
+	}
+	return dirs
 }
 
 // pluginPath resolves a [[plugin]] path: ~/ is the home directory and a

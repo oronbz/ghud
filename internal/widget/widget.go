@@ -38,7 +38,11 @@ type Type struct {
 	Fetches bool
 	// OptIn leaves the type out of the Widgets shown when config.toml places none.
 	OptIn bool
-	New   func(Config) Widget
+	// Missing marks a stand-in for a type that's gone, such as an
+	// uninstalled Plugin's: it's the needs-setup hint of the Widgets that
+	// name it, and config builds nothing from it.
+	Missing string
+	New     func(Config) Widget
 }
 
 // MacOnly names the Widget types built only on macOS. Elsewhere a config
