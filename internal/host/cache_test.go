@@ -320,7 +320,9 @@ func (n liveNews) Listen(push func(widget.Push)) {
 func TestAPushIsWrittenToTheCacheForOtherInstances(t *testing.T) {
 	root, u, w := t.TempDir(), &upstream{}, &wire{}
 	typ := newsType(u)
-	typ.New = func(c widget.Config) widget.Widget { return liveNews{news{up: u, topic: c.Settings.String("topic")}, w} }
+	typ.New = func(c widget.Config) widget.Widget {
+		return liveNews{news{up: u, topic: c.Settings.String("topic")}, w}
+	}
 	at := func(now time.Time) *hosttest.Host {
 		return hosttest.New(t, hosttest.Options{Root: root, Now: now, Width: 60, Height: 8, Types: []widget.Type{typ}})
 	}
