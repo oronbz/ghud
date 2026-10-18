@@ -225,7 +225,10 @@ func (p *parser) widget(i int, v any) (Widget, bool) {
 			setup = append(setup, p.problem(at+".id", "`id` must be a non-empty string"))
 		}
 	}
-	if ti < 0 {
+	switch {
+	case ti < 0 && slices.Contains(widget.MacOnly, typeName):
+		setup = append(setup, fmt.Sprintf("`%s` is not available on this platform", typeName))
+	case ti < 0:
 		setup = append(setup, p.problem(at+".type", "unknown Widget type `%s`", typeName))
 	}
 	for _, k := range p.sorted(block, at+".") {

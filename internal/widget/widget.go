@@ -40,6 +40,11 @@ type Type struct {
 	New   func(Config) Widget
 }
 
+// MacOnly names the Widget types built only on macOS. Elsewhere a config
+// naming one gets needs setup rather than an unknown-type problem, so one
+// config.toml works on every machine.
+var MacOnly = []string{"meetings", "reminders"}
+
 // Config is what a Widget is built from: its validated settings, defaults
 // filled in, and the global options that affect it.
 type Config struct {
@@ -155,6 +160,8 @@ type Payload struct {
 	Count int
 	// Empty is shown when the list has no Items.
 	Empty string
+	// Rule, when set, draws a line across the list, such as a timeline's now-line.
+	Rule *Rule
 
 	// Actions apply to the whole Widget rather than to an Item.
 	Actions []Action
@@ -184,6 +191,16 @@ type Item struct {
 	Group   string
 	Fields  []Field
 	Actions []Action
+}
+
+// Rule is a line across a list that can't be selected: its Text, then a
+// rule to the right edge, both in Token.
+type Rule struct {
+	// Before is the Item it's drawn above, ahead of that Item's group
+	// header; len(Items) draws it after the last Item.
+	Before int
+	Text   string
+	Token  theme.Token
 }
 
 // Field is one cell of an Item, in its Column.

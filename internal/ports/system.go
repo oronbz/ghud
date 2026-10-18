@@ -27,7 +27,7 @@ func System(getenv func(string) string) Ports {
 		Editor:    execEditor{getenv: getenv},
 		Keyring:   osKeyring{},
 		Commands:  execCommands{},
-		EventKit:  noEventKit{},
+		EventKit:  newEventKit(),
 		Machine:   newMachine(),
 		Watcher:   newFSWatcher(),
 		HTTP:      &http.Client{Timeout: 30 * time.Second},
@@ -113,9 +113,3 @@ type execCommands struct{}
 func (execCommands) Output(ctx context.Context, name string, args ...string) ([]byte, error) {
 	return exec.CommandContext(ctx, name, args...).Output()
 }
-
-type noEventKit struct{}
-
-func (noEventKit) Status(Entity) Access { return AccessUnsupported }
-
-func (noEventKit) Request(context.Context, Entity) (Access, error) { return AccessUnsupported, nil }

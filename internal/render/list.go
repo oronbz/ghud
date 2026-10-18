@@ -10,20 +10,30 @@ import (
 	"github.com/oronbz/ghud/internal/widget"
 )
 
-// Header marks a group header in Rows.
-const Header = -1
+// Lines in Rows that draw no Item; every such mark is negative.
+const (
+	Header = -1
+	Ruled  = -2
+)
 
 // Rows is a list's rendered line list: for each line, the index of the Item
-// it draws, or Header. Selection, scrolling and clicks all map through it.
+// it draws, or a negative mark (Header, Ruled). Selection, scrolling and
+// clicks all map through it.
 func Rows(p widget.Payload) []int {
 	var rows []int
 	group := ""
 	for i, it := range p.Items {
+		if p.Rule != nil && p.Rule.Before == i {
+			rows = append(rows, Ruled)
+		}
 		if it.Group != group && it.Group != "" {
 			rows = append(rows, Header)
 		}
 		group = it.Group
 		rows = append(rows, i)
+	}
+	if p.Rule != nil && p.Rule.Before >= len(p.Items) {
+		rows = append(rows, Ruled)
 	}
 	return rows
 }
@@ -62,9 +72,12 @@ func listBody(th theme.Theme, p widget.Payload, l List, w, h int) []string {
 	for i := range out {
 		line := strings.Repeat(" ", cw)
 		if j := l.Top + i; j >= 0 && j < len(rows) {
-			if rows[j] == Header {
+			switch rows[j] {
+			case Header:
 				line = header(th, p.Items[rows[j+1]].Group, cw)
-			} else {
+			case Ruled:
+				line = rule(th, *p.Rule, cw)
+			default:
 				line = row(th, p, rows[j], widths, cw, l.Focused && rows[j] == l.Selected)
 			}
 		}
@@ -84,6 +97,14 @@ func header(th theme.Theme, group string, w int) string {
 		return fit(th.Fg(theme.Dim).Bold(true).Render(text), w, false)
 	}
 	return th.Fg(theme.Dim).Bold(true).Render(text) + " " + th.Fg(theme.Line).Render(strings.Repeat("─", rule))
+}
+
+func rule(th theme.Theme, r widget.Rule, w int) string {
+	line := strings.Repeat("─", w)
+	if r.Text != "" {
+		line = r.Text + " " + line
+	}
+	return th.Fg(r.Token).Render(ansi.Truncate(line, w, ""))
 }
 
 func row(th theme.Theme, p widget.Payload, item int, widths []int, w int, selected bool) string {

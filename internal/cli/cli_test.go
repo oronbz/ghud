@@ -10,14 +10,21 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/oronbz/ghud/internal/cli"
+	"github.com/oronbz/ghud/internal/hosttest"
+	"github.com/oronbz/ghud/internal/ports"
 )
 
 func system(t *testing.T, stdin string, args ...string) (cli.System, *bytes.Buffer, *bytes.Buffer) {
 	home := t.TempDir()
 	var stdout, stderr bytes.Buffer
+	getenv := func(k string) string { return map[string]string{"HOME": home}[k] }
+	pp := ports.System(getenv)
+	// The real EventKit never asks for access unprompted, but tests stay off the Mac's calendars anyway.
+	pp.EventKit = &hosttest.EventKit{}
 	return cli.System{
 		Args:   args,
-		Getenv: func(k string) string { return map[string]string{"HOME": home}[k] },
+		Getenv: getenv,
+		Ports:  &pp,
 		Stdin:  strings.NewReader(stdin),
 		Stdout: &stdout,
 		Stderr: &stderr,

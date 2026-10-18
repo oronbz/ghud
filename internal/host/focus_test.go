@@ -128,7 +128,7 @@ func TestHLAndMBringFocusBackWithoutMoving(t *testing.T) {
 }
 
 func TestFocusShowsOnlyAsAnAccentBorderAndBoldTitle(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 100, Height: 21})
+	h := hosttest.New(t, hosttest.Options{Width: 100, Height: 21, Types: liveViews})
 	h.Press("2")
 
 	at := func(text string) (int, int) {

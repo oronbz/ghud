@@ -24,6 +24,7 @@ func inHerdr(t *testing.T, stdin string, env map[string]string, args ...string) 
 		return env[k]
 	}
 	pp := ports.System(s.Getenv)
+	pp.EventKit = &hosttest.EventKit{}
 	cmds := &hosttest.Commands{}
 	pp.Commands = cmds
 	s.Ports = &pp

@@ -162,7 +162,7 @@ type = "clock"
 }
 
 func TestSyntaxErrorAtLaunchStartsOnTheDefaultWithAToast(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 100, Height: 12, Config: `
+	h := hosttest.New(t, hosttest.Options{Width: 100, Height: 12, Types: liveViews, Config: `
 [[widget]]
 type = "clock"
 title = "Broken
