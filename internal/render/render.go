@@ -31,7 +31,8 @@ type Tile struct {
 	Status Status
 }
 
-// Status is a Widget's health as its top border shows it.
+// Status is how a tile's top border decorates its Widget's Status: the
+// spinner while refreshing, the stale marker, or the age of cached data.
 type Status struct {
 	// Spinner is the spinner frame while the Widget refreshes, or "".
 	Spinner string

@@ -12,39 +12,36 @@ import (
 	"github.com/oronbz/ghud/internal/widget"
 )
 
-// health is a Widget's Status, drawn the same way for every Widget.
-type health int
+// status is a Widget's Status (GLOSSARY.md), drawn the same way for every Widget.
+type status int
 
 const (
-	healthy health = iota
-	// loading has no data yet.
-	loading
-	// stale shows data older than twice the interval, or kept after a failed refresh.
-	stale
-	// failed has no data to show, only why.
-	failed
-	needsSetup
+	statusOK status = iota
+	statusLoading
+	// statusStale shows data older than twice the interval, or kept after a failed refresh.
+	statusStale
+	statusError
+	statusNeedsSetup
 )
 
-// health is Widget id's Status now.
-func (m Model) health(id string) health {
+func (m Model) status(id string) status {
 	if m.widgets[id].setup != "" {
-		return needsSetup
+		return statusNeedsSetup
 	}
 	s, ok := m.sched[id]
 	switch {
 	case !ok:
-		return healthy
+		return statusOK
 	case s.setup != nil:
-		return needsSetup
+		return statusNeedsSetup
 	case s.fetched.IsZero() && s.err != nil:
-		return failed
+		return statusError
 	case s.fetched.IsZero():
-		return loading
+		return statusLoading
 	case s.err != nil || s.interval > 0 && m.now.Sub(s.fetched) > 2*s.interval:
-		return stale
+		return statusStale
 	}
-	return healthy
+	return statusOK
 }
 
 // chrome is the Status drawn in Widget id's top border: a spinner while it
@@ -57,7 +54,7 @@ func (m Model) chrome(id string) render.Status {
 		st.Spinner = m.spinner()
 	}
 	switch {
-	case m.health(id) == stale:
+	case m.status(id) == statusStale:
 		reason := "stale"
 		if s.err != nil {
 			reason = reasonOf(s.err)
@@ -73,8 +70,8 @@ func (m Model) chrome(id string) render.Status {
 // setup with its hint and fix, an error with its hint, or a loading spinner.
 func (m Model) statusPayload(id string) (widget.Payload, bool) {
 	s := m.sched[id]
-	switch m.health(id) {
-	case needsSetup:
+	switch m.status(id) {
+	case statusNeedsSetup:
 		hint := m.widgets[id].setup
 		lines := []widget.Line{widget.Text(theme.Warn, "needs setup")}
 		if s.setup != nil {
@@ -87,13 +84,13 @@ func (m Model) statusPayload(id string) (widget.Payload, bool) {
 			}})
 		}
 		return widget.Payload{Center: true, Lines: lines}, true
-	case failed:
+	case statusError:
 		lines := []widget.Line{widget.Text(theme.Bad, s.err.Error())}
 		if h := hintOf(s.err); h != "" {
 			lines = append(lines, widget.Text(theme.Dim, h))
 		}
 		return widget.Payload{Wrap: true, Lines: lines}, true
-	case loading:
+	case statusLoading:
 		return widget.Payload{Center: true, Lines: []widget.Line{widget.Text(theme.Accent, m.spinner())}}, true
 	}
 	return widget.Payload{}, false
@@ -101,7 +98,7 @@ func (m Model) statusPayload(id string) (widget.Payload, bool) {
 
 // staleError is the full error behind focused Widget id's stale marker, or "".
 func (m Model) staleError(id string) string {
-	if s := m.sched[id]; m.health(id) == stale && s.err != nil {
+	if s := m.sched[id]; m.status(id) == statusStale && s.err != nil {
 		return m.widgets[id].title + ": " + s.err.Error()
 	}
 	return ""
