@@ -15,9 +15,24 @@ type Type struct {
 	Name string
 	// Title is the default title drawn in the Widget's top border.
 	Title string
+	// Description is the one-line summary above the type's block in the config reference.
+	Description string
 	// Tick is how often a live view redraws; zero means it never ticks.
 	Tick time.Duration
-	New  func() Widget
+	// Settings is the schema a Widget's config.toml block is validated
+	// against and the config reference is generated from.
+	Settings []Setting
+	New      func(Config) Widget
+}
+
+// Config is what a Widget is built from: its validated settings, defaults
+// filled in, and the global options that affect it.
+type Config struct {
+	Settings Settings
+	// TimeFormat is "12h" or "24h".
+	TimeFormat string
+	// WeekStart is a lower-case English weekday, such as "sunday".
+	WeekStart string
 }
 
 type Widget interface {

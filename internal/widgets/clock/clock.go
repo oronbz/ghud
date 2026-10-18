@@ -9,10 +9,11 @@ import (
 )
 
 var Type = widget.Type{
-	Name:  "clock",
-	Title: "Clock",
-	Tick:  time.Second,
-	New:   func() widget.Widget { return clock{} },
+	Name:        "clock",
+	Title:       "Clock",
+	Description: "The time in big digits, plus the date.",
+	Tick:        time.Second,
+	New:         func(widget.Config) widget.Widget { return clock{} },
 }
 
 // bigWidth is the width of HH:MM:SS in half-block digits.

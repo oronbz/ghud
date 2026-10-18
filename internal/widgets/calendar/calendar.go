@@ -11,9 +11,10 @@ import (
 )
 
 var Type = widget.Type{
-	Name:  "calendar",
-	Title: "Calendar",
-	New:   func() widget.Widget { return calendar{} },
+	Name:        "calendar",
+	Title:       "Calendar",
+	Description: "This month's grid with today highlighted.",
+	New:         func(widget.Config) widget.Widget { return calendar{} },
 }
 
 // gridWidth is seven 2-cell days with a space between each.
