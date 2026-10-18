@@ -164,6 +164,33 @@ func (w *Watcher) fire(files []string) (msg tea.Msg, watched, ok bool) {
 	return next(hit), true, true
 }
 
+// Inbox is a fake inbox. Next arms a waiter on its channel when its Cmd
+// runs, instead of blocking; the test delivers with Host.Receive.
+type Inbox struct {
+	mu      sync.Mutex
+	waiting []<-chan tea.Msg
+}
+
+func (i *Inbox) Next(ch <-chan tea.Msg) tea.Cmd {
+	return func() tea.Msg {
+		i.mu.Lock()
+		defer i.mu.Unlock()
+		i.waiting = append(i.waiting, ch)
+		return nil
+	}
+}
+
+func (i *Inbox) take() (<-chan tea.Msg, bool) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	if len(i.waiting) == 0 {
+		return nil, false
+	}
+	ch := i.waiting[0]
+	i.waiting = i.waiting[1:]
+	return ch, true
+}
+
 // Opener records every target handed to the system opener.
 type Opener struct {
 	Opened []string

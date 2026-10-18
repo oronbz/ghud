@@ -67,6 +67,7 @@ type Host struct {
 	EventKit  *EventKit
 	Machine   *Machine
 	Watcher   *Watcher
+	Inbox     *Inbox
 
 	model tea.Model
 	w, h  int
@@ -110,6 +111,7 @@ func New(t testing.TB, o Options) *Host {
 		EventKit:  o.EventKit,
 		Machine:   &Machine{},
 		Watcher:   &Watcher{},
+		Inbox:     &Inbox{},
 	}
 	if o.Config != "" {
 		if err := os.MkdirAll(h.Paths.Config, 0o755); err != nil {
@@ -142,12 +144,18 @@ func New(t testing.TB, o Options) *Host {
 			EventKit:  h.EventKit,
 			Machine:   h.Machine,
 			Watcher:   h.Watcher,
+			Inbox:     h.Inbox,
 			HTTP:      &http.Client{Timeout: 5 * time.Second},
 			Endpoints: mergeEndpoints(ports.DefaultEndpoints(), o.Endpoints),
 			Getenv:    func(k string) string { return o.Env[k] },
 		},
 	})
 	h.model = m
+	t.Cleanup(func() {
+		if c, ok := h.model.(interface{ Close() }); ok {
+			c.Close()
+		}
+	})
 	h.run(m.Init())
 	h.Resize(o.Width, o.Height)
 	return h
@@ -233,6 +241,33 @@ func (h *Host) Changed(files ...string) {
 		h.t.Fatalf("hosttest: %v changed but the app isn't waiting for file changes", files)
 	}
 	h.Send(msg)
+}
+
+// receiveWait is how long Receive waits for a message from outside the app.
+const receiveWait = 10 * time.Second
+
+// Receive waits for the next message that arrives on its own from outside
+// the app, such as a Plugin's push, and delivers it.
+func (h *Host) Receive() {
+	h.t.Helper()
+	ch, ok := h.Inbox.take()
+	if !ok {
+		h.t.Fatal("hosttest: Receive, but the app isn't waiting for messages")
+	}
+	select {
+	case msg := <-ch:
+		h.Send(msg)
+	case <-time.After(receiveWait):
+		h.t.Fatalf("hosttest: no message arrived within %v", receiveWait)
+	}
+}
+
+// ReceiveUntil delivers messages that arrive on their own until done holds.
+func (h *Host) ReceiveUntil(done func() bool) {
+	h.t.Helper()
+	for !done() {
+		h.Receive()
+	}
 }
 
 // Quit reports whether the app has asked Bubble Tea to quit.

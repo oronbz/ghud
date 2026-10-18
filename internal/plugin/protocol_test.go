@@ -90,8 +90,8 @@ func TestAWrongProtocolVersionNeedsSetupNamingBoth(t *testing.T) {
 		o    plugintest.Options
 		want string
 	}{
-		"handshake": {plugintest.Options{Args: []string{"-protocol", "2"}}, "speaks protocol 2 (it speaks)"},
-		"manifest":  {plugintest.Options{Protocol: 3}, "speaks protocol 3 (its manifest declares)"},
+		"handshake": {plugintest.Options{Args: []string{"-protocol", "2"}}, "speaks protocol 2"},
+		"manifest":  {plugintest.Options{Protocol: 3}, "declares protocol 3"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, typ := fixture(t, c.o)
@@ -100,7 +100,7 @@ func TestAWrongProtocolVersionNeedsSetupNamingBoth(t *testing.T) {
 			if !errors.As(err, &setup) {
 				t.Fatalf("err = %v, want needs setup", err)
 			}
-			if want := fmt.Sprintf("Plugin `fixture` %s; this ghud speaks protocol 1.", c.want); !strings.HasPrefix(setup.Hint, want) {
+			if want := fmt.Sprintf("Plugin `fixture` %s, but this ghud speaks 1.", c.want); !strings.HasPrefix(setup.Hint, want) {
 				t.Errorf("hint = %q, want %q…", setup.Hint, want)
 			}
 		})

@@ -136,7 +136,7 @@ func (f *fixture) handle(msg message) {
 				"widget": w.ID,
 				"payload": map[string]any{"lines": []any{
 					line("accent", fmt.Sprintf("pushed: focused at %d×%d after %d refreshes", p.Size.Width, p.Size.Height, f.count(w.ID))),
-				}},
+				}, "actions": widgetActions},
 			})})
 		}
 	case "widget/refresh":
@@ -210,11 +210,7 @@ func (f *fixture) refresh(id json.RawMessage, w *widget) {
 			"columns": []any{map[string]any{"flex": true}, map[string]any{"priority": 1, "right": true}},
 			"items":   []any{item("alpha", "alpha"), item("bravo", "bravo")},
 			"count":   2,
-			"actions": []any{
-				map[string]any{"id": "note", "key": "t", "label": "note", "input": "text", "prompt": "Note"},
-				map[string]any{"id": "token", "key": "s", "label": "token", "input": "secret", "prompt": "Token"},
-				map[string]any{"id": "crash", "key": "x", "label": "crash"},
-			},
+			"actions": widgetActions,
 		}})
 	}
 }
@@ -234,6 +230,12 @@ func (f *fixture) invoke(id json.RawMessage, w *widget, action, item, text strin
 	default:
 		f.fail(id, 1, "no action "+action)
 	}
+}
+
+var widgetActions = []any{
+	map[string]any{"id": "note", "key": "t", "label": "note", "input": "text", "prompt": "Note"},
+	map[string]any{"id": "token", "key": "s", "label": "token", "input": "secret", "prompt": "Token"},
+	map[string]any{"id": "crash", "key": "x", "label": "crash"},
 }
 
 func line(token, text string) map[string]any {

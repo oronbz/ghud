@@ -21,6 +21,7 @@ import (
 	"github.com/oronbz/ghud/internal/config"
 	"github.com/oronbz/ghud/internal/layout"
 	"github.com/oronbz/ghud/internal/paths"
+	"github.com/oronbz/ghud/internal/plugin"
 	"github.com/oronbz/ghud/internal/ports"
 	"github.com/oronbz/ghud/internal/render"
 	"github.com/oronbz/ghud/internal/theme"
@@ -112,6 +113,11 @@ type Model struct {
 	// ticks tells the current redraw timer from ones a config reload replaced.
 	ticks   int
 	closing closekey.Matcher
+	// plugins runs the external Plugins; pushes carries what their Widgets
+	// send unasked; observed is what each Observer was last told.
+	plugins  *plugin.Registry
+	pushes   chan tea.Msg
+	observed map[string]observation
 }
 
 type placed struct {
@@ -139,19 +145,14 @@ func New(o Options) Model {
 	m := Model{opts: o, now: o.Ports.Clock.Now(), widgets: map[string]placed{},
 		fetched: map[string]widget.Payload{}, lists: map[string]listState{},
 		sched: map[string]sched{}, paused: map[string]time.Time{}, cache: cacheStore(o), rng: newRand(o.Ports.Clock.Now()), timers: new(int),
-		closing: closekey.NewMatcher(o.CloseKeys)}
-	types := o.Types
-	if types == nil {
-		types = Builtins
-	}
+		closing: closekey.NewMatcher(o.CloseKeys), plugins: plugin.NewRegistry(), pushes: make(chan tea.Msg, 64), observed: map[string]observation{}}
 	file := o.ConfigFile
 	if file == "" {
 		file = filepath.Join(o.Paths.Config, config.FileName)
 	}
-	cfg, err := config.Load(file, types, o.Locale)
-	var problems []string
+	cfg, err, types, problems := m.loadConfig(file, m.baseTypes())
 	if err != nil {
-		problems = append(problems, err.Error())
+		problems = append([]string{err.Error()}, problems...)
 	}
 	m.colors = colors{pinned: !o.Theme.IsZero(), name: cfg.Theme, over: cfg.Colors, asking: o.Theme.IsZero()}
 	m = m.resolveTheme()
@@ -201,6 +202,7 @@ func (m Model) placeAll(cfg config.Config) (Model, []string, []string, []string)
 			delete(m.sched, id)
 		}
 	}
+	m.closeDropped(old)
 	return m, ids, fresh, clamped
 }
 
@@ -212,17 +214,31 @@ func (m Model) place(wc config.Widget, ref config.Ref) placed {
 	}
 	if p.setup == "" {
 		c := m.base
-		c.Settings = wc.Settings
+		c.ID, c.Settings = wc.ID, wc.Settings
 		p.widget = p.typ.New(c)
 	}
 	return p
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.nextTick(), m.queryColors(), m.nextChange(), func() tea.Msg { return startMsg{} }, m.cleanCache())
+	return tea.Batch(m.nextTick(), m.queryColors(), m.nextChange(), m.nextPush(), m.listen(m.ids()), func() tea.Msg { return startMsg{} }, m.cleanCache())
+}
+
+// baseTypes are the Widget types compiled in, or the ones a test stages.
+func (m Model) baseTypes() []widget.Type {
+	if m.opts.Types != nil {
+		return m.opts.Types
+	}
+	return Builtins
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	next, cmd := m.update(msg)
+	next.(Model).observe()
+	return next, cmd
+}
+
+func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m, ok := m.colorAnswer(msg); ok {
 		return m, nil
 	}
@@ -242,6 +258,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case refreshedMsg:
 		return m.refreshed(msg)
+	case pushedMsg:
+		return m.pushed(msg)
+	case retryMsg:
+		return m.retried(msg)
 	case startMsg:
 		m, fetch := m.startAll(false)
 		m, beat := m.beat()

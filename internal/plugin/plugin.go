@@ -10,10 +10,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"maps"
 	"reflect"
 	"slices"
 	"strings"
@@ -164,7 +164,7 @@ func (p *Plugin) connect(ctx context.Context, w *pluginWidget) (*process, error)
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.m.Protocol != Protocol {
-		return nil, p.versionErr("its manifest declares", p.m.Protocol)
+		return nil, p.versionErr("declares", p.m.Protocol)
 	}
 	if p.proc == nil {
 		if p.closed {
@@ -225,13 +225,13 @@ func (p *Plugin) start(ctx context.Context) (*process, error) {
 	}
 	if res.Protocol != Protocol {
 		proc.stop()
-		return nil, p.versionErr("it speaks", res.Protocol)
+		return nil, p.versionErr("speaks", res.Protocol)
 	}
 	return proc, nil
 }
 
-func (p *Plugin) versionErr(says string, v int) error {
-	return &widget.SetupError{Hint: fmt.Sprintf("Plugin `%s` speaks protocol %d (%s); this ghud speaks protocol %d. Update ghud or the Plugin.", p.m.Name, v, says, Protocol)}
+func (p *Plugin) versionErr(verb string, v int) error {
+	return &widget.SetupError{Hint: fmt.Sprintf("Plugin `%s` %s protocol %d, but this ghud speaks %d. Update ghud or the Plugin.", p.m.Name, verb, v, Protocol)}
 }
 
 // ended handles the end of proc's session: a crash fails its Widgets and

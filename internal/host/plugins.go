@@ -1,0 +1,162 @@
+package host
+
+import (
+	"path/filepath"
+	"strings"
+	"time"
+
+	tea "charm.land/bubbletea/v2"
+
+	"github.com/oronbz/ghud/internal/config"
+	"github.com/oronbz/ghud/internal/layout"
+	"github.com/oronbz/ghud/internal/plugin"
+	"github.com/oronbz/ghud/internal/widget"
+)
+
+// pushedMsg is an update Widget from sent unasked; from tells it from a
+// Widget since rebuilt under the same id.
+type pushedMsg struct {
+	id   string
+	from widget.Widget
+	push widget.Push
+}
+
+// retryMsg is the time a Widget asked to be refreshed again arriving.
+type retryMsg struct {
+	id   string
+	from widget.Widget
+}
+
+// observation is the Shown an Observer was last told.
+type observation struct {
+	w     widget.Widget
+	shown widget.Shown
+}
+
+// loadConfig reads config.toml against the Widget types base plus those of
+// the Plugins it finds, which may be listed in config.toml itself. It
+// returns the config, why it didn't parse, every type and the Plugins' problems.
+func (m Model) loadConfig(file string, base []widget.Type) (config.Config, error, []widget.Type, []string) {
+	cfg, err := config.Load(file, base, m.opts.Locale)
+	var paths []string
+	for _, p := range cfg.Plugins {
+		paths = append(paths, m.pluginPath(file, p.Path))
+	}
+	taken := make([]string, 0, len(base))
+	for _, t := range base {
+		taken = append(taken, t.Name)
+	}
+	found, problems := m.plugins.Discover(plugin.Dirs(filepath.Join(m.opts.Paths.Data, "plugins"), paths), taken)
+	if len(found) == 0 {
+		return cfg, err, base, problems
+	}
+	types := append(append([]widget.Type{}, base...), found...)
+	cfg, err = config.Load(file, types, m.opts.Locale)
+	return cfg, err, types, problems
+}
+
+// pluginPath resolves a [[plugin]] path: ~/ is the home directory and a
+// relative path is relative to config.toml.
+func (m Model) pluginPath(configFile, p string) string {
+	if rest, ok := strings.CutPrefix(p, "~/"); ok {
+		if home := m.opts.Ports.Getenv("HOME"); home != "" {
+			return filepath.Join(home, rest)
+		}
+	}
+	if filepath.IsAbs(p) {
+		return p
+	}
+	return filepath.Join(filepath.Dir(configFile), p)
+}
+
+// Close stops every Plugin's process.
+func (m Model) Close() { m.plugins.Close() }
+
+// listen starts the deliveries of the Pushers among ids.
+func (m Model) listen(ids []string) tea.Cmd {
+	var cmds []tea.Cmd
+	for _, id := range ids {
+		w := m.widgets[id].widget
+		p, ok := w.(widget.Pusher)
+		if !ok {
+			continue
+		}
+		ch := m.pushes
+		cmds = append(cmds, func() tea.Msg {
+			p.Listen(func(push widget.Push) { ch <- pushedMsg{id: id, from: w, push: push} })
+			return nil
+		})
+	}
+	return tea.Batch(cmds...)
+}
+
+func (m Model) nextPush() tea.Cmd { return m.opts.Ports.Inbox.Next(m.pushes) }
+
+// pushed takes an update a Widget sent unasked as if a refresh had fetched it.
+func (m Model) pushed(msg pushedMsg) (Model, tea.Cmd) {
+	cmds := []tea.Cmd{m.nextPush()}
+	s, ok := m.sched[msg.id]
+	if !ok || m.widgets[msg.id].widget != msg.from {
+		return m, cmds[0]
+	}
+	now := m.opts.Ports.Clock.Now()
+	m.now = now
+	if msg.push.Lost {
+		delete(m.fetched, msg.id)
+		s.fetched, s.cached = time.Time{}, false
+	}
+	var fetched time.Time
+	var p widget.Payload
+	if msg.push.Payload != nil && msg.push.Err == nil {
+		fetched, p = now, *msg.push.Payload
+	}
+	s, _ = m.settle(msg.id, s, p, fetched, msg.push.Err)
+	m.sched[msg.id] = s
+	m.clampList(msg.id)
+	if at := msg.push.Retry; !at.IsZero() {
+		id, from := msg.id, msg.from
+		cmds = append(cmds, m.opts.Ports.Clock.After(at.Sub(now), func(time.Time) tea.Msg { return retryMsg{id: id, from: from} }))
+	}
+	return m, tea.Batch(cmds...)
+}
+
+func (m Model) retried(msg retryMsg) (Model, tea.Cmd) {
+	if m.widgets[msg.id].widget != msg.from || m.layout.IsHidden(msg.id) {
+		return m, nil
+	}
+	return m.start(msg.id)
+}
+
+// observe tells every Observer how it's shown now, when that changed.
+func (m Model) observe() {
+	var rects map[string]layout.Rect
+	for _, id := range m.ids() {
+		w := m.widgets[id].widget
+		o, ok := w.(widget.Observer)
+		if !ok {
+			continue
+		}
+		if rects == nil {
+			rects = m.rects()
+		}
+		var s widget.Shown
+		if r, visible := rects[id]; visible {
+			s = widget.Shown{Size: widget.Size{W: r.W - 2, H: r.H - 2}, Focused: id == m.focus, Visible: true}
+		}
+		if last, ok := m.observed[id]; ok && last.w == w && last.shown == s {
+			continue
+		}
+		m.observed[id] = observation{w: w, shown: s}
+		o.Observe(s)
+	}
+}
+
+// closeDropped closes the Widgets in old that m no longer holds.
+func (m Model) closeDropped(old map[string]placed) {
+	for id, p := range old {
+		if c, ok := p.widget.(widget.Closer); ok && m.widgets[id].widget != p.widget {
+			c.Close()
+			delete(m.observed, id)
+		}
+	}
+}
