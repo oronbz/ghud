@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"slices"
-	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -341,19 +340,7 @@ func interval(p placed, refresh time.Duration) (d time.Duration, problem string)
 		d = refresh
 	}
 	if d > 0 && d < p.typ.Floor {
-		return p.typ.Floor, fmt.Sprintf("%s: refresh %s is below the %s minimum; using %s", p.title, short(d), p.typ.Name, short(p.typ.Floor))
+		return p.typ.Floor, fmt.Sprintf("%s: refresh %s is below the %s minimum; using %s", p.title, widget.ShortDuration(d), p.typ.Name, widget.ShortDuration(p.typ.Floor))
 	}
 	return d, ""
-}
-
-// short writes a duration the way config.toml does, such as "30s" or "1h30m".
-func short(d time.Duration) string {
-	s := d.String()
-	if strings.HasSuffix(s, "m0s") {
-		s = s[:len(s)-2]
-	}
-	if strings.HasSuffix(s, "h0m") {
-		s = s[:len(s)-2]
-	}
-	return s
 }

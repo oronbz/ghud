@@ -105,6 +105,57 @@ func TestScriptWithoutACommandNeedsSetup(t *testing.T) {
 	}
 }
 
+func TestTemplatedActionRunsWithTheSelectedItemsFieldsQuotedThenRefreshes(t *testing.T) {
+	dir := t.TempDir()
+	block := fmt.Sprintf(`actions = [
+  { key = "u", label = "upgrade", run = "cd %s && printf '%%s %%s\n' {{name}} {{current}} >> upgraded" },
+  { label = "upgrade all", run = "cd %s && echo all >> upgraded", confirm = true },
+]`, dir, dir)
+	f := withScript(t, block, `printf '[{"name":"git","current":"2.47"},{"name":"x; touch pwned","current":"1"}]'`)
+
+	f.Press("tab", "j")
+	if bottom := f.Line(8); !strings.Contains(bottom, "u upgrade") {
+		t.Errorf("bottom border %q, want the u upgrade hint", bottom)
+	}
+	f.Press("u")
+	f.Press("k", "u")
+	got, _ := os.ReadFile(filepath.Join(dir, "upgraded"))
+	if want := "x; touch pwned 1\ngit 2.47\n"; string(got) != want {
+		t.Errorf("the Action wrote %q, want %q", got, want)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "pwned")); err == nil {
+		t.Error("an Item field ran as shell code")
+	}
+	if f.runs() != 3 {
+		t.Errorf("command ran %d times, want 3 (start, then a refresh after each Action)", f.runs())
+	}
+
+	f.Press("ctrl+k", "a", "l", "l", "enter")
+	if _, _, ok := f.Find("Upgrade all?"); !ok {
+		t.Fatalf("a confirm Action didn't ask:\n%s", f.Screen())
+	}
+	f.Press("y")
+	got, _ = os.ReadFile(filepath.Join(dir, "upgraded"))
+	if !strings.HasSuffix(string(got), "all\n") {
+		t.Errorf("the Widget Action wrote %q, want it to end in all", got)
+	}
+}
+
+func TestFailingActionToastsItsStderr(t *testing.T) {
+	f := withScript(t, `actions = [{ key = "u", label = "upgrade", run = "echo 'no such formula: {{name}}' >&2; exit 1" }]`, outdated)
+	f.Press("tab", "u")
+	if footer := f.Line(9); !strings.Contains(footer, "Upgrade failed: exit 1: no such formula: git") {
+		t.Errorf("footer %q, want the failure with stderr", footer)
+	}
+}
+
+func TestBadActionTemplateNeedsSetup(t *testing.T) {
+	f := withScript(t, `actions = [{ key = "u", label = "upgrade" }]`, outdated)
+	if _, _, ok := f.Find("needs setup"); !ok {
+		t.Errorf("an Action without run isn't needs setup:\n%s", f.Screen())
+	}
+}
+
 const outdated = `printf '[{"name":"git","installed":"2.46","current":"2.47"},{"name":"go","installed":"1.27.0","current":"1.27.1"}]'`
 
 func TestScriptRunsItsCommandOnItsIntervalAndShowsTheItemsItPrints(t *testing.T) {
