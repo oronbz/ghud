@@ -181,7 +181,7 @@ func phonetic(t *testing.T, layoutJSON string) *hosttest.Host {
 		types = append(types, widget.Type{
 			Name:  strings.ToLower(title[:1]),
 			Title: title,
-			New:   func() widget.Widget { return blank{} },
+			New:   func(widget.Config) widget.Widget { return blank{} },
 		})
 	}
 	return hosttest.New(t, hosttest.Options{Width: 96, Height: 31, Root: savedLayout(t, layoutJSON), Types: types})

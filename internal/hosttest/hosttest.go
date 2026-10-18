@@ -6,12 +6,15 @@ package hosttest
 
 import (
 	"net/http"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/oronbz/ghud/internal/config"
 	"github.com/oronbz/ghud/internal/host"
 	"github.com/oronbz/ghud/internal/paths"
 	"github.com/oronbz/ghud/internal/ports"
@@ -29,6 +32,8 @@ type Options struct {
 	// Endpoints overrides HTTP base URLs, typically with httptest servers. Unset fields keep the real URLs.
 	Endpoints ports.Endpoints
 	Theme     *theme.Theme
+	// Config, when set, is written to config.toml in the config dir before the app starts.
+	Config string
 	// Types replaces the built-in Widget types (see host.Options.Types).
 	Types []widget.Type
 }
@@ -84,6 +89,14 @@ func New(t testing.TB, o Options) *Host {
 		Keyring:   newKeyring(),
 		Commands:  &Commands{},
 		EventKit:  &EventKit{},
+	}
+	if o.Config != "" {
+		if err := os.MkdirAll(h.Paths.Config, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(h.Paths.Config, config.FileName), []byte(o.Config), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	m := host.New(host.Options{
 		Paths: h.Paths,

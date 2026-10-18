@@ -6,6 +6,8 @@ package host
 import (
 	"fmt"
 	"image"
+	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -13,6 +15,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/oronbz/ghud/internal/config"
 	"github.com/oronbz/ghud/internal/layout"
 	"github.com/oronbz/ghud/internal/paths"
 	"github.com/oronbz/ghud/internal/ports"
@@ -25,10 +28,14 @@ import (
 
 type Options struct {
 	Paths paths.Paths
-	Ports ports.Ports
-	Theme theme.Theme
-	// Types replaces the built-in Widget types, one Widget each; tests use it
-	// to stage Layouts the built-ins can't fill.
+	// ConfigFile overrides Paths.Config/config.toml (--config, GHUD_CONFIG).
+	ConfigFile string
+	// Locale gives time_format and week_start their defaults.
+	Locale config.Locale
+	Ports  ports.Ports
+	Theme  theme.Theme
+	// Types replaces the built-in Widget types; with no config.toml there is
+	// one Widget of each. Tests use it to stage Layouts the built-ins can't fill.
 	Types []widget.Type
 }
 
@@ -42,28 +49,55 @@ type Model struct {
 	// survives unfocusing so focus can return to it.
 	focus, last string
 	keyMap      bool
+	// toast is the message in the footer; it stays until replaced.
+	toast string
 }
 
 type placed struct {
 	typ    widget.Type
+	title  string
 	widget widget.Widget
+	// setup, when set, is the needs-setup hint drawn instead of the Widget.
+	setup string
 }
 
 type tickMsg struct{ at time.Time }
 
-// builtins are the Widget types compiled into ghud, in config order.
-var builtins = []widget.Type{clock.Type, calendar.Type}
+// Builtins are the Widget types compiled into ghud, in reference order.
+var Builtins = []widget.Type{clock.Type, calendar.Type}
 
 func New(o Options) Model {
 	m := Model{opts: o, now: o.Ports.Clock.Now(), widgets: map[string]placed{}}
 	types := o.Types
 	if types == nil {
-		types = builtins
+		types = Builtins
 	}
+	file := o.ConfigFile
+	if file == "" {
+		file = filepath.Join(o.Paths.Config, config.FileName)
+	}
+	cfg, err := config.Load(file, types, o.Locale)
+	var problems []string
+	if err != nil {
+		problems = append(problems, err.Error())
+	}
+	m.toast = toastOf(append(problems, cfg.Problems...))
 	var ids []string
-	for _, t := range types {
-		m.widgets[t.Name] = placed{typ: t, widget: t.New()}
-		ids = append(ids, t.Name)
+	for _, wc := range cfg.Widgets {
+		id := wc.ID
+		// Widgets sharing an id are all in needs setup; suffixes keep them apart on screen only.
+		for n := 2; m.widgets[id].title != ""; n++ {
+			id = fmt.Sprintf("%s~%d", wc.ID, n)
+		}
+		p := placed{title: wc.Title, setup: wc.Setup}
+		if i := slices.IndexFunc(types, func(t widget.Type) bool { return t.Name == wc.Type }); i >= 0 {
+			p.typ = types[i]
+		}
+		if p.setup == "" {
+			p.widget = p.typ.New(widget.Config{Settings: wc.Settings, TimeFormat: cfg.TimeFormat, WeekStart: cfg.WeekStart})
+		}
+		m.widgets[id] = p
+		ids = append(ids, id)
 	}
 	// An unreadable layout.json falls back to the default rather than blocking launch.
 	saved, err := layout.Load(o.Paths.Config)
@@ -94,7 +128,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) nextTick() tea.Cmd {
 	var d time.Duration
 	for _, w := range m.widgets {
-		if w.typ.Tick > 0 && (d == 0 || w.typ.Tick < d) {
+		if w.setup == "" && w.typ.Tick > 0 && (d == 0 || w.typ.Tick < d) {
 			d = w.typ.Tick
 		}
 	}
@@ -117,13 +151,12 @@ func (m Model) View() tea.View {
 		layers = append(layers, lipgloss.NewLayer(m.tooSmall(f.Need)))
 	} else {
 		for _, t := range f.Tiles {
-			w := m.widgets[t.ID]
 			layers = append(layers, lipgloss.NewLayer(render.Draw(m.opts.Theme, render.Tile{
 				Title:   t.Title,
 				W:       t.W,
 				H:       t.H,
 				Focused: t.ID == m.focus,
-				Payload: w.widget.Payload(widget.Frame{
+				Payload: m.payload(t.ID, widget.Frame{
 					Now:     m.now,
 					Size:    widget.Size{W: t.W - 2, H: t.H - 2},
 					Focused: t.ID == m.focus,
@@ -139,6 +172,28 @@ func (m Model) View() tea.View {
 	lipgloss.NewCompositor(layers...).Draw(canvas, image.Rect(0, 0, m.w, m.h))
 	v.SetContent(canvas.Render())
 	return v
+}
+
+func (m Model) payload(id string, f widget.Frame) widget.Payload {
+	w := m.widgets[id]
+	if w.setup != "" {
+		return widget.Payload{Center: true, Lines: []widget.Line{
+			widget.Text(theme.Warn, "needs setup"),
+			widget.Text(theme.Dim, w.setup),
+		}}
+	}
+	return w.widget.Payload(f)
+}
+
+// toastOf shows the first message, counting the rest.
+func toastOf(msgs []string) string {
+	switch len(msgs) {
+	case 0:
+		return ""
+	case 1:
+		return msgs[0]
+	}
+	return fmt.Sprintf("%s (+%d more)", msgs[0], len(msgs)-1)
 }
 
 func (m Model) tooSmall(need layout.Size) string {
@@ -161,7 +216,7 @@ func (m Model) frame() layout.Frame {
 func (m Model) titles() map[string]string {
 	titles := make(map[string]string, len(m.widgets))
 	for id, w := range m.widgets {
-		titles[id] = w.typ.Title
+		titles[id] = w.title
 	}
 	return titles
 }

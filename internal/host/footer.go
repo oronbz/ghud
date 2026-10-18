@@ -16,5 +16,9 @@ func (m Model) footer() string {
 	if m.focus != "" {
 		hints = "Tab rows · hl widgets · HJKL any direction · esc unfocus · ? keys"
 	}
-	return ansi.Truncate(badge+" "+th.Fg(theme.Dim).Render(hints), m.w, "…")
+	toast := ""
+	if m.toast != "" {
+		toast = th.Fg(theme.Warn).Render(m.toast) + "  "
+	}
+	return ansi.Truncate(badge+" "+toast+th.Fg(theme.Dim).Render(hints), m.w, "…")
 }
