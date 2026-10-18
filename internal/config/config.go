@@ -74,7 +74,7 @@ var common = []string{"type", "id", "title", "refresh"}
 func Default(types []widget.Type, loc Locale) Config {
 	c := globalsOnly(loc)
 	for _, t := range types {
-		if t.OptIn {
+		if t.OptIn || t.Missing != "" {
 			continue
 		}
 		c.Widgets = append(c.Widgets, Widget{ID: t.Name, Type: t.Name, Title: t.Title, Settings: widget.Defaults(t.Settings)})
@@ -210,6 +210,10 @@ func (p *parser) widget(i int, v any) (Widget, bool) {
 	}
 	w := Widget{Type: typeName, ID: typeName, Title: typeName}
 	ti := slices.IndexFunc(p.types, func(t widget.Type) bool { return t.Name == typeName })
+	var missing string
+	if ti >= 0 && p.types[ti].Missing != "" {
+		missing, ti = p.types[ti].Missing, -1
+	}
 	var schema []widget.Setting
 	if ti >= 0 {
 		schema = p.types[ti].Settings
@@ -226,6 +230,8 @@ func (p *parser) widget(i int, v any) (Widget, bool) {
 		}
 	}
 	switch {
+	case missing != "":
+		setup = append(setup, missing)
 	case ti < 0 && slices.Contains(widget.MacOnly, typeName):
 		setup = append(setup, fmt.Sprintf("`%s` is not available on this platform", typeName))
 	case ti < 0:

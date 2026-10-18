@@ -119,6 +119,52 @@ func TestWatcherReportsFilesAsTheyWereSpelt(t *testing.T) {
 	}
 }
 
+func TestAWatchedDirectoryReportsEntriesComingAndGoing(t *testing.T) {
+	root := t.TempDir()
+	plugins := filepath.Join(root, "plugins")
+	staging := filepath.Join(plugins, ".staging")
+	write(t, filepath.Join(staging, "new", "manifest"), "v1")
+	write(t, filepath.Join(plugins, "old", "manifest"), "v0")
+	_, r := newTestWatcher(t, plugins)
+
+	if err := os.Rename(filepath.Join(staging, "new"), filepath.Join(plugins, "greet")); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.next(t); !slices.Equal(got, []string{plugins}) {
+		t.Fatalf("an entry moved in: reported %v, want [%s]", got, plugins)
+	}
+	r.quiet(t)
+
+	write(t, filepath.Join(plugins, "greet", "state.json"), "{}")
+	write(t, filepath.Join(plugins, "greet", "manifest"), "v2")
+	r.quiet(t)
+
+	if err := os.Rename(filepath.Join(plugins, "old"), filepath.Join(staging, "old")); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.next(t); !slices.Equal(got, []string{plugins}) {
+		t.Fatalf("an entry moved out: reported %v, want [%s]", got, plugins)
+	}
+}
+
+func TestAWatchedDirectoryThatDidNotExistReportsItsFirstEntry(t *testing.T) {
+	root := t.TempDir()
+	plugins := filepath.Join(root, "share", "plugins")
+	_, r := newTestWatcher(t, plugins)
+
+	if err := os.MkdirAll(plugins, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.next(t); !slices.Equal(got, []string{plugins}) {
+		t.Fatalf("the directory appearing: reported %v", got)
+	}
+	time.Sleep(50 * time.Millisecond)
+	write(t, filepath.Join(plugins, "greet", "manifest"), "v1")
+	if got := r.next(t); !slices.Equal(got, []string{plugins}) {
+		t.Fatalf("its first entry: reported %v, want [%s]", got, plugins)
+	}
+}
+
 func TestClosingTheWatcherReleasesAWaitingNext(t *testing.T) {
 	w, _ := newTestWatcher(t, filepath.Join(t.TempDir(), "x"))
 	got := make(chan tea.Msg, 1)

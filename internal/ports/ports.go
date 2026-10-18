@@ -61,7 +61,8 @@ type Keyring interface {
 // ghud instance, an editor, or this instance itself.
 type Watcher interface {
 	// Watch replaces the set of watched files. A file that doesn't exist
-	// yet is reported when it's created.
+	// yet is reported when it's created. A directory is also reported when
+	// an entry directly in it is created, removed or renamed.
 	Watch(files []string) error
 	// Next returns a Cmd that waits for the next change and delivers
 	// msg(files changed), each spelt as it was given to Watch.

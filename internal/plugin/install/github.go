@@ -140,7 +140,8 @@ func extract(r io.Reader, subdir, dir string) (int, error) {
 			}
 			err = writeFile(target, tr, hdr.FileInfo().Mode())
 		case tar.TypeSymlink:
-			if !filepath.IsLocal(filepath.Join(filepath.Dir(filepath.FromSlash(rel)), filepath.FromSlash(hdr.Linkname))) {
+			link := filepath.FromSlash(hdr.Linkname)
+			if filepath.IsAbs(link) || !filepath.IsLocal(filepath.Join(filepath.Dir(filepath.FromSlash(rel)), link)) {
 				return n, fmt.Errorf("link %s points outside the Plugin", hdr.Name)
 			}
 			if err = os.MkdirAll(filepath.Dir(target), 0o755); err == nil {
