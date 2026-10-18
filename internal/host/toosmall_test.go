@@ -9,7 +9,7 @@ import (
 )
 
 func TestBelowTheMinimumTileSizeACentredNoticeReplacesTheGrid(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 32, Height: 5})
+	h := hosttest.New(t, hosttest.Options{Width: 32, Height: 6})
 	if _, _, ok := h.Find("too small"); ok {
 		t.Fatalf("notice shown at exactly the minimum size:\n%s", h.Screen())
 	}
@@ -17,9 +17,9 @@ func TestBelowTheMinimumTileSizeACentredNoticeReplacesTheGrid(t *testing.T) {
 		t.Errorf("at the minimum size tiles start at %v, want [0 16]", got)
 	}
 
-	for _, size := range [][2]int{{31, 20}, {80, 4}} {
+	for _, size := range [][2]int{{31, 20}, {80, 5}} {
 		h.Resize(size[0], size[1])
-		const notice = "too small (needs 32×5)"
+		const notice = "too small (needs 32×6)"
 		x, y, ok := h.Find(notice)
 		if !ok {
 			t.Fatalf("at %dx%d no notice:\n%s", size[0], size[1], h.Screen())
@@ -41,8 +41,8 @@ func TestTheRequiredSizeFollowsTheLayout(t *testing.T) {
 		{"weight": 1, "widgets": [{"id": "clock", "weight": 1}]},
 		{"weight": 1, "widgets": [{"id": "calendar", "weight": 1}]}
 	]}}`)})
-	if _, _, ok := h.Find("too small (needs 16×10)"); !ok {
-		t.Errorf("two stacked Widgets at 40x9, want the notice to ask for 16×10:\n%s", h.Screen())
+	if _, _, ok := h.Find("too small (needs 16×11)"); !ok {
+		t.Errorf("two stacked Widgets at 40x9, want the notice to ask for 16×11, footer included:\n%s", h.Screen())
 	}
 }
 

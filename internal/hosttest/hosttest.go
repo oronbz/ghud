@@ -19,6 +19,7 @@ import (
 	"github.com/oronbz/ghud/internal/paths"
 	"github.com/oronbz/ghud/internal/ports"
 	"github.com/oronbz/ghud/internal/theme"
+	"github.com/oronbz/ghud/internal/widget"
 )
 
 type Options struct {
@@ -33,6 +34,8 @@ type Options struct {
 	Theme     *theme.Theme
 	// Config, when set, is written to config.toml in the config dir before the app starts.
 	Config string
+	// Types replaces the built-in Widget types (see host.Options.Types).
+	Types []widget.Type
 }
 
 var DefaultNow = time.Date(2026, 10, 18, 14, 5, 9, 0, time.UTC)
@@ -98,6 +101,7 @@ func New(t testing.TB, o Options) *Host {
 	m := host.New(host.Options{
 		Paths: h.Paths,
 		Theme: th,
+		Types: o.Types,
 		Ports: ports.Ports{
 			Clock:     h.Clock,
 			Opener:    h.Opener,

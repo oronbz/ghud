@@ -39,14 +39,14 @@ title = "London"
 }
 
 func TestWidgetIsBuiltFromItsSettings(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 40, Height: 5, Config: `
+	h := hosttest.New(t, hosttest.Options{Width: 40, Height: 6, Config: `
 [[widget]]
 type = "clock"
 seconds = false
 `})
 
-	if got := strings.Trim(h.Line(1), "│ "); got != "14:05" {
-		t.Errorf("clock without seconds shows %q, want 14:05", got)
+	if !strings.Contains(h.Screen(), "14:05") || strings.Contains(h.Screen(), "14:05:") {
+		t.Errorf("clock without seconds, want 14:05:\n%s", h.Screen())
 	}
 }
 
