@@ -49,6 +49,10 @@ type Widget struct {
 	line  int
 }
 
+// Line is the 1-based line of the Widget's [[widget]] header, or 0 for a
+// Widget of the built-in default set.
+func (w Widget) Line() int { return w.line }
+
 // Plugin is a [[plugin]] entry: a local Plugin under development.
 type Plugin struct {
 	Path string
@@ -87,6 +91,11 @@ func Load(path string, types []widget.Type, loc Locale) (Config, error) {
 	if err != nil {
 		return Default(types, loc), fmt.Errorf("%s: %w", name, err)
 	}
+	return parse(name, src, types, loc)
+}
+
+// parse reads config source named name, as Load does.
+func parse(name string, src []byte, types []widget.Type, loc Locale) (Config, error) {
 	var doc map[string]any
 	if err := toml.Unmarshal(src, &doc); err != nil {
 		var de *toml.DecodeError

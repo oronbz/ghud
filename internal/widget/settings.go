@@ -35,7 +35,9 @@ type Setting struct {
 	Choices []string
 	// Fields are the keys each table of a Tables setting takes.
 	Fields []Setting
-	// Required fields must be set.
+	// Required settings belong in every block: Add Widget writes them, at
+	// their defaults, into the block it appends, and a table missing a
+	// required field is rejected.
 	Required bool
 }
 

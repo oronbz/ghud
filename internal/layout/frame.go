@@ -4,11 +4,15 @@ import "github.com/charmbracelet/x/ansi"
 
 type Rect struct{ X, Y, W, H int }
 
+func (r Rect) Contains(x, y int) bool { return x >= r.X && x < r.X+r.W && y >= r.Y && y < r.Y+r.H }
+
 // Tile is one Widget's outer rectangle, border included.
 type Tile struct {
 	ID    string
 	Title string
 	Rect
+	// Handle draws the ⠿ grab handle before the title.
+	Handle bool
 }
 
 type ZoneKind int
@@ -22,6 +26,10 @@ const (
 	WidgetSeam
 	// RowSeam is the bottom borders of one row over the top borders of the next.
 	RowSeam
+	// Item is one line of a list showing an Item; Index is the Item's.
+	Item
+	// Hint is a key hint in the focused Widget's bottom border; Index counts the hints drawn.
+	Hint
 )
 
 func (k ZoneKind) String() string {
@@ -34,6 +42,10 @@ func (k ZoneKind) String() string {
 		return "widget seam"
 	case RowSeam:
 		return "row seam"
+	case Item:
+		return "item"
+	case Hint:
+		return "hint"
 	}
 	return "unknown"
 }
@@ -60,11 +72,16 @@ type Frame struct {
 	// TooSmall replaces the grid with a notice asking for Need.
 	TooSmall bool
 	Need     Size
+	// Tint are the border cells of the hovered or dragged seam, drawn lit.
+	Tint []Rect
+	// Ghost is the dashed outline following a dragged title, and Bar the
+	// heavy line marking where it will drop; zero when there's no drag.
+	Ghost, Bar Rect
 }
 
 // Compute lays l's visible Widgets out over a w×h area. titles gives each
-// Widget's border title.
-func Compute(l Layout, titles map[string]string, w, h int) Frame {
+// Widget's border title, and p the pointer's hover or drag to draw.
+func Compute(l Layout, titles map[string]string, w, h int, p Pointer) Frame {
 	l = l.Visible()
 	var f Frame
 	for _, r := range l.Rows {
@@ -92,11 +109,15 @@ func Compute(l Layout, titles map[string]string, w, h int) Frame {
 		widths := split(w, weights, MinTile.W)
 		for j, cw := range widths {
 			id := r.Widgets[j].ID
-			t := Tile{ID: id, Title: titles[id], Rect: Rect{x, y, cw, rh}}
+			t := Tile{ID: id, Title: titles[id], Rect: Rect{x, y, cw, rh}, Handle: id == p.Handle}
+			tw := ansi.StringWidth(t.Title) + 3
+			if t.Handle {
+				tw += ansi.StringWidth(HandleGlyph)
+			}
 			f.Tiles = append(f.Tiles, t)
 			f.Zones = append(f.Zones,
 				Zone{Kind: Body, ID: id, Row: ri, Index: j, Rect: Rect{x + 1, y + 1, cw - 2, rh - 2}},
-				Zone{Kind: Title, ID: id, Row: ri, Index: j, Rect: Rect{x + 1, y, min(ansi.StringWidth(t.Title)+3, cw-2), 1}},
+				Zone{Kind: Title, ID: id, Row: ri, Index: j, Rect: Rect{x + 1, y, min(tw, cw-2), 1}},
 			)
 			if j < len(widths)-1 {
 				f.Zones = append(f.Zones, Zone{Kind: WidgetSeam, Row: ri, Index: j, Rect: Rect{x + cw - 1, y + 1, 2, rh - 2}})
@@ -107,6 +128,10 @@ func Compute(l Layout, titles map[string]string, w, h int) Frame {
 		if ri < len(heights)-1 {
 			f.Zones = append(f.Zones, Zone{Kind: RowSeam, Row: ri, Rect: Rect{0, y - 1, w, 2}})
 		}
+	}
+	f.Tint = f.tint(p.Seam)
+	if p.Drag != nil {
+		f.Ghost, f.Bar = f.ghost(*p.Drag, w, h)
 	}
 	return f
 }

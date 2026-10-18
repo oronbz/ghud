@@ -13,7 +13,7 @@ import (
 type keyMap struct {
 	Quit, Unfocus, NextRow, PrevRow, Left, Right key.Binding
 	MoveLeft, MoveDown, MoveUp, MoveRight        key.Binding
-	Arrange, Widgets, Jump, Help, Palette        key.Binding
+	Arrange, Widgets, Jump, Help, Palette, Menu  key.Binding
 	Refresh                                      key.Binding
 	Down, Up, First, Last, Primary               key.Binding
 	// Arrange mode.
@@ -37,6 +37,7 @@ var keys = keyMap{
 	Help:      key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "key map")),
 	Palette:   key.NewBinding(key.WithKeys("ctrl+k", ":"), key.WithHelp("^K :", "Action palette: every Widget's Actions")),
 	Refresh:   key.NewBinding(key.WithKeys("ctrl+r"), key.WithHelp("^R", "refresh every Widget now")),
+	Menu:      key.NewBinding(key.WithKeys("."), key.WithHelp(".", "Action menu of the selected Item (right-click)")),
 	Down:      key.NewBinding(key.WithKeys("j", "down"), key.WithHelp("j ↓", "next Item")),
 	Up:        key.NewBinding(key.WithKeys("k", "up"), key.WithHelp("k ↑", "previous Item")),
 	First:     key.NewBinding(key.WithKeys("g"), key.WithHelp("g", "first Item")),
@@ -56,7 +57,7 @@ func normalBindings() []key.Binding {
 	k := keys
 	return []key.Binding{
 		k.NextRow, k.PrevRow, k.Left, k.Right, k.MoveLeft, k.MoveDown, k.MoveUp, k.MoveRight,
-		k.Jump, k.Arrange, k.Widgets, k.Unfocus, k.Down, k.Up, k.First, k.Last, k.Primary, k.Palette, k.Refresh, k.Help, k.Quit,
+		k.Jump, k.Arrange, k.Widgets, k.Unfocus, k.Down, k.Up, k.First, k.Last, k.Primary, k.Palette, k.Menu, k.Refresh, k.Help, k.Quit,
 	}
 }
 
@@ -97,6 +98,9 @@ func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	if m.palette != nil {
 		return m.paletteKey(msg)
 	}
+	if m.menu != nil {
+		return m.menuKey(msg)
+	}
 	if m.editing != nil && editsKey(msg) {
 		return m.editKey(msg)
 	}
@@ -111,6 +115,11 @@ func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m.keyMap = true
 	case key.Matches(msg, keys.Palette):
 		m.palette = &palette{}
+	case key.Matches(msg, keys.Menu):
+		if m.focus != "" {
+			x, y := m.selectedAt(m.focus)
+			m = m.openMenu(m.focus, x, y)
+		}
 	case key.Matches(msg, keys.Quit):
 		return m, tea.Quit
 	case key.Matches(msg, keys.Refresh):
@@ -200,7 +209,7 @@ func (m Model) nearest(ri int) string {
 func (m Model) rects() map[string]layout.Rect {
 	f := m.frame()
 	if f.TooSmall {
-		f = layout.Compute(m.layout, m.titles(), f.Need.W, f.Need.H)
+		f = layout.Compute(m.layout, m.titles(), f.Need.W, f.Need.H, layout.Pointer{})
 	}
 	out := make(map[string]layout.Rect, len(f.Tiles))
 	for _, t := range f.Tiles {

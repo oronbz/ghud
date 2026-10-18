@@ -174,24 +174,32 @@ func (m Model) shown(id string) (Model, tea.Cmd) {
 	return m.start(id)
 }
 
-// beat arms the next wall-clock check, when anything is scheduled.
-func (m Model) beat(now time.Time) tea.Cmd {
+// beat starts the wall-clock checks once anything is scheduled.
+func (m Model) beat() (Model, tea.Cmd) {
+	if m.beating {
+		return m, nil
+	}
 	for id, s := range m.sched {
 		if s.interval > 0 || m.widgets[id].typ.Midnight {
-			want := now.Add(beat)
-			return m.opts.Ports.Clock.After(beat, func(t time.Time) tea.Msg { return beatMsg{want: want, at: t} })
+			m.beating = true
+			return m, m.nextBeat(m.opts.Ports.Clock.Now())
 		}
 	}
-	return nil
+	return m, nil
+}
+
+func (m Model) nextBeat(now time.Time) tea.Cmd {
+	want := now.Add(beat)
+	return m.opts.Ports.Clock.After(beat, func(t time.Time) tea.Msg { return beatMsg{want: want, at: t} })
 }
 
 func (m Model) beaten(msg beatMsg) (Model, tea.Cmd) {
 	m.now = msg.at
 	if msg.at.Sub(msg.want) <= wakeSlack {
-		return m, m.beat(msg.at)
+		return m, m.nextBeat(msg.at)
 	}
 	m, cmd := m.woke()
-	return m, tea.Batch(cmd, m.beat(msg.at))
+	return m, tea.Batch(cmd, m.nextBeat(msg.at))
 }
 
 // woke handles a jump of the wall clock, such as a wake from sleep: every
@@ -226,6 +234,10 @@ func (m Model) woke() (Model, tea.Cmd) {
 
 // refreshed records a refresh's outcome and plans the next one.
 func (m Model) refreshed(msg refreshedMsg) (Model, tea.Cmd) {
+	if _, ok := m.sched[msg.id]; !ok {
+		// The Widget was removed while it refreshed.
+		return m, nil
+	}
 	now := m.opts.Ports.Clock.Now()
 	m.now = now
 	s := m.sched[msg.id]
@@ -331,6 +343,18 @@ func (m Model) pausedUntil(id string) time.Time {
 
 func newRand(now time.Time) *rand.Rand {
 	return rand.New(rand.NewPCG(uint64(now.UnixNano()), 0x9e3779b97f4a7c15))
+}
+
+// schedule sets up Source id's refresh schedule; problem says when its
+// `refresh` was clamped. Other Widgets have none.
+func (m Model) schedule(id string, refresh time.Duration) (problem string) {
+	p := m.widgets[id]
+	if _, ok := p.widget.(widget.Source); !ok {
+		return ""
+	}
+	iv, problem := interval(p, refresh)
+	m.sched[id] = sched{interval: iv}
+	return problem
 }
 
 // interval is how often Source p refreshes: its `refresh` setting, else its

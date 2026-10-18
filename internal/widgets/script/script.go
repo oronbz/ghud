@@ -29,7 +29,7 @@ var Type = widget.Type{
 	Description: "A command run on an interval. It prints a JSON array of objects (one Item each, " +
 		"one column per key) or plain text lines; {\"lines\": [...]} gives styled lines.",
 	Settings: []widget.Setting{{
-		Name: "command", Kind: widget.String, Default: "",
+		Name: "command", Kind: widget.String, Default: "", Required: true,
 		Description: "The command, run by sh (cmd on Windows).",
 		Why:         "Show anything a one-liner can print, such as `brew outdated --json=v2 | jq '[.formulae[] | {name, current: .current_version}]'`.",
 	}, {

@@ -130,7 +130,7 @@ func TestHiddenWidgetsKeepTheirPlaceButAreNotLaidOut(t *testing.T) {
 	if !slices.Equal(l.Hidden, []string{"b", "c"}) {
 		t.Fatalf("Hidden = %v, want [b c]", l.Hidden)
 	}
-	f := layout.Compute(l, nil, 40, 10)
+	f := layout.Compute(l, nil, 40, 10, layout.Pointer{})
 	if len(f.Tiles) != 1 || f.Tiles[0].ID != "a" || f.Tiles[0].Rect != (layout.Rect{X: 0, Y: 0, W: 40, H: 10}) {
 		t.Errorf("tiles %+v, want a alone filling the screen", f.Tiles)
 	}
@@ -138,7 +138,7 @@ func TestHiddenWidgetsKeepTheirPlaceButAreNotLaidOut(t *testing.T) {
 	if !slices.Equal(shown.Hidden, []string{"b"}) {
 		t.Errorf("showing c leaves Hidden = %v, want [b]", shown.Hidden)
 	}
-	if got := layout.Compute(shown, nil, 40, 10).Tiles; len(got) != 2 || got[1].ID != "c" || got[1].Y != 5 {
+	if got := layout.Compute(shown, nil, 40, 10, layout.Pointer{}).Tiles; len(got) != 2 || got[1].ID != "c" || got[1].Y != 5 {
 		t.Errorf("tiles %+v, want c back in its own row below a", got)
 	}
 }
