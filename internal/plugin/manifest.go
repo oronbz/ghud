@@ -77,9 +77,9 @@ func ReadManifest(dir string) (Manifest, error) {
 	return m, nil
 }
 
-// Bundle reads a manifest built into ghud for a Plugin it ships with, whose
+// Shipped reads a manifest built into ghud for a Plugin it ships with, whose
 // executable is exe: the command runs exe, wherever the manifest says.
-func Bundle(src []byte, exe string, env []string) (Manifest, error) {
+func Shipped(src []byte, exe string, env []string) (Manifest, error) {
 	m, err := parseManifest(src)
 	if err != nil {
 		return Manifest{}, fmt.Errorf("%s: %w", exe, err)

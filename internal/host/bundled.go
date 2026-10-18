@@ -24,7 +24,7 @@ func (m Model) bundled() []plugin.Manifest {
 		return nil
 	}
 	e := m.opts.Ports.Endpoints
-	mf, err := plugin.Bundle(weather.Manifest, exe, []string{
+	mf, err := plugin.Shipped(weather.Manifest, exe, []string{
 		weather.EnvCache + "=" + m.opts.Paths.Cache,
 		weather.EnvForecast + "=" + e.OpenMeteo,
 		weather.EnvGeocoding + "=" + e.Geocoding,

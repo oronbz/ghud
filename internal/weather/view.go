@@ -20,7 +20,7 @@ type span struct {
 }
 
 type line struct {
-	Spans []span `json:"spans"`
+	Spans []span `json:"spans,omitempty"`
 }
 
 // block is lines that show or go together; lower rank stays longest
