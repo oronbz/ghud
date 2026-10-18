@@ -234,6 +234,48 @@ func TestAfterWakeFromSleepOverdueWidgetsRefreshOnceStaggered(t *testing.T) {
 	}
 }
 
+// gate needs setup until its setup Action has run.
+type gate struct{ granted *bool }
+
+func (g gate) Refresh(context.Context, time.Time) (widget.Payload, error) {
+	if !*g.granted {
+		return widget.Payload{}, &widget.SetupError{
+			Hint:   "Allow access to your calendars",
+			Action: &widget.Action{ID: "grant", Label: "allow access"},
+		}
+	}
+	return widget.Payload{Columns: []widget.Column{{Flex: true}}, Items: items("", "standup"), Count: 1}, nil
+}
+
+func (g gate) Invoke(_ context.Context, inv widget.Invocation) (widget.Result, error) {
+	*g.granted = inv.Action == "grant"
+	return widget.Result{}, nil
+}
+
+func TestNeedsSetupMakesTheSetupActionPrimary(t *testing.T) {
+	granted := false
+	typ := widget.Type{Name: "meetings", Title: "Meetings", Refresh: time.Minute,
+		New: func(widget.Config) widget.Widget { return gate{granted: &granted} }}
+	h := hosttest.New(t, hosttest.Options{Width: 60, Height: 10, Types: []widget.Type{typ}})
+
+	for _, want := range []string{"needs setup", "Allow access to your calendars", "⏎ allow access"} {
+		if _, _, ok := h.Find(want); !ok {
+			t.Errorf("screen lacks %q:\n%s", want, h.Screen())
+		}
+	}
+	h.Press("tab")
+	if bottom := h.Line(8); !strings.Contains(bottom, "⏎ allow access") {
+		t.Errorf("bottom border %q, want the setup Action as the primary hint", bottom)
+	}
+	h.Press("enter")
+	if !granted {
+		t.Fatal("⏎ didn't run the setup Action")
+	}
+	if _, _, ok := h.Find("standup"); !ok {
+		t.Errorf("the Widget didn't refresh after its setup Action:\n%s", h.Screen())
+	}
+}
+
 func TestThePaletteListsRefreshForEachWidget(t *testing.T) {
 	log := &feedLog{}
 	h := hosttest.New(t, hosttest.Options{Width: 90, Height: 24, Types: []widget.Type{

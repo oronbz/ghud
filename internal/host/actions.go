@@ -148,7 +148,15 @@ func (m Model) actions(id string) []bound {
 		{Action: widget.Action{ID: "hide", Label: "hide"}, by: hide},
 	}
 	if m.widgets[id].setup != "" {
-		return host
+		return host[1:]
+	}
+	if s := m.sched[id].setup; s != nil {
+		if s.Action == nil {
+			return host
+		}
+		a := *s.Action
+		a.Primary = true
+		return append([]bound{{Action: a}}, host...)
 	}
 	p := m.payloadIn(id, r)
 	var out []bound
