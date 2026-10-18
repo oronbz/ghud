@@ -334,17 +334,71 @@ func TestA403WithNoRequestsLeftPausesUntilTheRateLimitResets(t *testing.T) {
 	}
 }
 
-func TestARejectedTokenShowsAnErrorWithTheReason(t *testing.T) {
-	g := team(t)
-	g.reply = func(request) (int, http.Header, string) {
-		return http.StatusUnauthorized, nil, `{"message": "Bad credentials"}`
+// tokenSources stages one GitHub token in each place PRs reads one from.
+var tokenSources = []struct {
+	name string
+	from string
+	o    func(tok string) hosttest.Options
+}{
+	{"GH_TOKEN", "GH_TOKEN", func(tok string) hosttest.Options {
+		return hosttest.Options{Env: map[string]string{"GH_TOKEN": tok}}
+	}},
+	{"GITHUB_TOKEN", "GITHUB_TOKEN", func(tok string) hosttest.Options {
+		return hosttest.Options{Env: map[string]string{"GITHUB_TOKEN": tok}}
+	}},
+	{"gh", "`gh auth token`", func(tok string) hosttest.Options {
+		c := &hosttest.Commands{}
+		c.Script(tok+"\n", nil, "gh", "auth", "token")
+		return hosttest.Options{Env: map[string]string{}, Commands: c}
+	}},
+	{"keyring", "the saved token", func(tok string) hosttest.Options {
+		kr := &hosttest.Keyring{}
+		_ = kr.Set("ghud", "github:github.com", tok)
+		return hosttest.Options{Env: map[string]string{}, Keyring: kr}
+	}},
+}
+
+func TestARejectedTokenFromAnySourceNeedsSetupWithThePasteAction(t *testing.T) {
+	for _, src := range tokenSources {
+		t.Run(src.name, func(t *testing.T) {
+			g := team(t)
+			g.reply = func(request) (int, http.Header, string) {
+				return http.StatusUnauthorized, nil, `{"message": "Bad credentials"}`
+			}
+			o := src.o("ghp_expired")
+			o.Width, o.Height = 140, 12
+			h := withPRs(t, g, o)
+			screen := h.Screen()
+			for _, want := range []string{"needs setup", "rejected", src.from, "press Enter to paste a classic token"} {
+				if !strings.Contains(screen, want) {
+					t.Errorf("screen lacks %q:\n%s", want, screen)
+				}
+			}
+			h.Press("1", "enter")
+			if !strings.Contains(h.Screen(), "INPUT") {
+				t.Errorf("enter didn't open the paste prompt:\n%s", h.Screen())
+			}
+		})
 	}
-	h := withPRs(t, g, hosttest.Options{Width: 70, Height: 9})
-	screen := h.Screen()
-	for _, want := range []string{"GitHub rejected the token: Bad credentials", "gh auth login"} {
-		if !strings.Contains(screen, want) {
-			t.Errorf("screen lacks %q:\n%s", want, screen)
-		}
+}
+
+func TestAFineGrainedTokenFromAnySourceNeedsSetupAndIsNeverSent(t *testing.T) {
+	for _, src := range tokenSources {
+		t.Run(src.name, func(t *testing.T) {
+			g := team(t)
+			o := src.o("github_pat_11ABCDEFG0123456789_abcdefghijklmnop")
+			o.Width, o.Height = 140, 12
+			h := withPRs(t, g, o)
+			screen := h.Screen()
+			for _, want := range []string{"needs setup", "Use a classic token with repo scope", src.from} {
+				if !strings.Contains(screen, want) {
+					t.Errorf("screen lacks %q:\n%s", want, screen)
+				}
+			}
+			if reqs := g.Requests(); len(reqs) != 0 {
+				t.Errorf("GitHub got %v", reqs)
+			}
+		})
 	}
 }
 
