@@ -162,7 +162,7 @@ type = "clock"
 }
 
 func TestSyntaxErrorAtLaunchStartsOnTheDefaultWithAToast(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 100, Height: 12, Config: `
+	h := hosttest.New(t, hosttest.Options{Width: 100, Height: 16, Config: `
 [[widget]]
 type = "clock"
 title = "Broken
@@ -177,7 +177,7 @@ title = "Broken
 }
 
 func TestBadGlobalOptionToastsAndKeepsTheDefault(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 100, Height: 12, Config: `
+	h := hosttest.New(t, hosttest.Options{Width: 100, Height: 16, Config: `
 time_format = "25h"
 `})
 
@@ -190,7 +190,7 @@ time_format = "25h"
 }
 
 func TestMisshapenWidgetAndPluginEntriesToastWithoutCrashing(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Width: 100, Height: 12, Config: `
+	h := hosttest.New(t, hosttest.Options{Width: 100, Height: 16, Config: `
 widget = [1, 2]
 plugin = ["x"]
 `})

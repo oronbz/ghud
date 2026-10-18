@@ -22,7 +22,7 @@ func system(t *testing.T, stdin string, args ...string) (cli.System, *bytes.Buff
 		Stdout: &stdout,
 		Stderr: &stderr,
 		ProgramOptions: []tea.ProgramOption{
-			tea.WithWindowSize(60, 12),
+			tea.WithWindowSize(60, 16),
 			tea.WithoutSignals(),
 		},
 	}, &stdout, &stderr

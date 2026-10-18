@@ -41,6 +41,8 @@ type Options struct {
 	Types []widget.Type
 	// CloseKeys are --close-key values.
 	CloseKeys []string
+	// Env is the process environment the app sees; it's empty by default.
+	Env map[string]string
 }
 
 var DefaultNow = time.Date(2026, 10, 18, 14, 5, 9, 0, time.UTC)
@@ -130,6 +132,7 @@ func New(t testing.TB, o Options) *Host {
 			Watcher:   h.Watcher,
 			HTTP:      &http.Client{Timeout: 5 * time.Second},
 			Endpoints: mergeEndpoints(ports.DefaultEndpoints(), o.Endpoints),
+			Getenv:    func(k string) string { return o.Env[k] },
 		},
 	})
 	h.model = m
