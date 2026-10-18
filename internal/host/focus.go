@@ -2,6 +2,7 @@ package host
 
 import (
 	"math"
+	"slices"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
@@ -13,6 +14,7 @@ type keyMap struct {
 	Quit, Unfocus, NextRow, PrevRow, Left, Right key.Binding
 	MoveLeft, MoveDown, MoveUp, MoveRight        key.Binding
 	Refocus, Jump, Help                          key.Binding
+	Down, Up, First, Last, Primary               key.Binding
 }
 
 var keys = keyMap{
@@ -29,6 +31,11 @@ var keys = keyMap{
 	Refocus:   key.NewBinding(key.WithKeys("m"), key.WithHelp("m", "focus the last-focused Widget")),
 	Jump:      key.NewBinding(key.WithKeys("1", "2", "3", "4", "5", "6", "7", "8", "9"), key.WithHelp("1–9", "jump to the Nth Widget")),
 	Help:      key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "key map")),
+	Down:      key.NewBinding(key.WithKeys("j", "down"), key.WithHelp("j ↓", "next Item")),
+	Up:        key.NewBinding(key.WithKeys("k", "up"), key.WithHelp("k ↑", "previous Item")),
+	First:     key.NewBinding(key.WithKeys("g"), key.WithHelp("g", "first Item")),
+	Last:      key.NewBinding(key.WithKeys("G"), key.WithHelp("G", "last Item")),
+	Primary:   key.NewBinding(key.WithKeys("enter"), key.WithHelp("⏎", "run the Item's primary Action")),
 }
 
 // Bindings lists every host key binding, in key map order.
@@ -36,8 +43,18 @@ func Bindings() []key.Binding {
 	k := keys
 	return []key.Binding{
 		k.NextRow, k.PrevRow, k.Left, k.Right, k.MoveLeft, k.MoveDown, k.MoveUp, k.MoveRight,
-		k.Jump, k.Refocus, k.Unfocus, k.Help, k.Quit,
+		k.Jump, k.Refocus, k.Unfocus, k.Down, k.Up, k.First, k.Last, k.Primary, k.Help, k.Quit,
 	}
+}
+
+// hostKey reports whether a host binding owns key, which then shadows any Action on it.
+func hostKey(key string) bool {
+	for _, b := range Bindings() {
+		if slices.Contains(b.Keys(), key) {
+			return true
+		}
+	}
+	return false
 }
 
 func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
@@ -56,6 +73,9 @@ func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		}
 		return m, nil
 	}
+	if m.overlay != nil {
+		return m.overlayKey(msg)
+	}
 	switch {
 	case key.Matches(msg, keys.Help):
 		m.keyMap = true
@@ -66,6 +86,18 @@ func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case key.Matches(msg, keys.Refocus):
 		if m.focus == "" {
 			m.focus = m.lastFocus()
+		}
+	case key.Matches(msg, keys.Down):
+		m.moveSelection(func(st listState, _ int) int { return st.idx + 1 })
+	case key.Matches(msg, keys.Up):
+		m.moveSelection(func(st listState, _ int) int { return st.idx - 1 })
+	case key.Matches(msg, keys.First):
+		m.moveSelection(func(listState, int) int { return 0 })
+	case key.Matches(msg, keys.Last):
+		m.moveSelection(func(_ listState, n int) int { return n - 1 })
+	case key.Matches(msg, keys.Primary):
+		if a, ok := m.actionFor("enter"); ok {
+			return m.run(m.focus, a)
 		}
 	case key.Matches(msg, keys.Jump):
 		if id := m.nth(int(msg.Code - '1')); id != "" {
@@ -91,6 +123,10 @@ func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 			m.focus = m.nearest((ri + 1) % len(rows))
 		case key.Matches(msg, keys.PrevRow):
 			m.focus = m.nearest((ri - 1 + len(rows)) % len(rows))
+		}
+	default:
+		if a, ok := m.actionFor(msg.String()); ok && m.focus != "" {
+			return m.run(m.focus, a)
 		}
 	}
 	if m.focus != "" {

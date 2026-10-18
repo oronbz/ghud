@@ -9,8 +9,8 @@ import (
 )
 
 func TestHitZonesMatchTheDrawnBorders(t *testing.T) {
-	sideBySide := hosttest.New(t, hosttest.Options{Width: 70, Height: 15})
-	stacked := hosttest.New(t, hosttest.Options{Width: 50, Height: 21, Root: savedLayout(t, `{"default": {"rows": [
+	sideBySide := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 70, Height: 15})
+	stacked := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 50, Height: 21, Root: savedLayout(t, `{"default": {"rows": [
 		{"weight": 1, "widgets": [{"id": "clock", "weight": 1}]},
 		{"weight": 2, "widgets": [{"id": "calendar", "weight": 1}]}
 	]}}`)})

@@ -13,9 +13,7 @@ import (
 
 	"github.com/oronbz/ghud/internal/cli"
 	"github.com/oronbz/ghud/internal/config"
-	"github.com/oronbz/ghud/internal/widget"
-	"github.com/oronbz/ghud/internal/widgets/calendar"
-	"github.com/oronbz/ghud/internal/widgets/clock"
+	"github.com/oronbz/ghud/internal/host"
 )
 
 // sandbox is a temp home with env on top of HOME.
@@ -123,12 +121,14 @@ func TestConfigDefaultPrintsTheFullyCommentedReference(t *testing.T) {
 		`#type = "clock"`,
 		`#type = "calendar"`,
 		`#seconds = true`,
+		`#type = "tasks"`,
+		`#file = ""`,
 	} {
 		if !strings.Contains(ref, want+"\n") {
 			t.Errorf("reference lacks %q:\n%s", want, ref)
 		}
 	}
-	for _, typ := range []widget.Type{clock.Type, calendar.Type} {
+	for _, typ := range host.Builtins {
 		for _, st := range typ.Settings {
 			if !strings.Contains(ref, st.Why) {
 				t.Errorf("reference lacks the why-line of %s.%s", typ.Name, st.Name)
@@ -165,7 +165,7 @@ func TestTheReferenceUncommentedIsAValidConfig(t *testing.T) {
 	path := filepath.Join(home, "uncommented.toml")
 	writeFile(t, path, b.String())
 
-	types := []widget.Type{clock.Type, calendar.Type}
+	types := host.Builtins
 	cfg, err := config.Load(path, types, config.Locale{})
 	if err != nil {
 		t.Fatalf("uncommented reference doesn't parse: %v\n%s", err, b.String())

@@ -28,8 +28,8 @@ func (m Model) footer() string {
 		hints = modifierHints("Ctrl", func(k string) bool { return strings.HasPrefix(k, "ctrl+") })
 	}
 	toast := ""
-	if m.toast != "" {
-		toast = th.Fg(theme.Warn).Render(m.toast) + "  "
+	if m.toast.text != "" {
+		toast = th.Fg(m.toast.tok).Render(m.toast.text) + "  "
 	}
 	return ansi.Truncate(badge+" "+toast+th.Fg(theme.Dim).Render(hints), m.w, "…")
 }

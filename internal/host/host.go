@@ -24,6 +24,7 @@ import (
 	"github.com/oronbz/ghud/internal/widget"
 	"github.com/oronbz/ghud/internal/widgets/calendar"
 	"github.com/oronbz/ghud/internal/widgets/clock"
+	"github.com/oronbz/ghud/internal/widgets/tasks"
 )
 
 type Options struct {
@@ -49,8 +50,12 @@ type Model struct {
 	// survives unfocusing so focus can return to it.
 	focus, last string
 	keyMap      bool
-	// toast is the message in the footer; it stays until replaced.
-	toast string
+	toast       toast
+	// fetched holds each Source's last Payload; lists, each list's selection.
+	fetched map[string]widget.Payload
+	lists   map[string]listState
+	// overlay is the open confirm or text prompt, which takes every key.
+	overlay *overlay
 	// held is the modifier (Shift or Ctrl) held on its own, which swaps the
 	// footer to that modifier's keys; only kitty-protocol terminals report it.
 	held tea.KeyMod
@@ -67,10 +72,11 @@ type placed struct {
 type tickMsg struct{ at time.Time }
 
 // Builtins are the Widget types compiled into ghud, in reference order.
-var Builtins = []widget.Type{clock.Type, calendar.Type}
+var Builtins = []widget.Type{clock.Type, calendar.Type, tasks.Type}
 
 func New(o Options) Model {
-	m := Model{opts: o, now: o.Ports.Clock.Now(), widgets: map[string]placed{}}
+	m := Model{opts: o, now: o.Ports.Clock.Now(), widgets: map[string]placed{},
+		fetched: map[string]widget.Payload{}, lists: map[string]listState{}}
 	types := o.Types
 	if types == nil {
 		types = Builtins
@@ -84,7 +90,7 @@ func New(o Options) Model {
 	if err != nil {
 		problems = append(problems, err.Error())
 	}
-	m.toast = toastOf(append(problems, cfg.Problems...))
+	m.toast = toast{text: toastOf(append(problems, cfg.Problems...)), tok: theme.Warn}
 	var ids []string
 	for _, wc := range cfg.Widgets {
 		id := wc.ID
@@ -97,7 +103,7 @@ func New(o Options) Model {
 			p.typ = types[i]
 		}
 		if p.setup == "" {
-			p.widget = p.typ.New(widget.Config{Settings: wc.Settings, TimeFormat: cfg.TimeFormat, WeekStart: cfg.WeekStart})
+			p.widget = p.typ.New(widget.Config{Settings: wc.Settings, TimeFormat: cfg.TimeFormat, WeekStart: cfg.WeekStart, DataDir: o.Paths.Data})
 		}
 		m.widgets[id] = p
 		ids = append(ids, id)
@@ -111,12 +117,29 @@ func New(o Options) Model {
 	return m
 }
 
-func (m Model) Init() tea.Cmd { return m.nextTick() }
+func (m Model) Init() tea.Cmd {
+	cmds := []tea.Cmd{m.nextTick()}
+	for _, id := range m.ids() {
+		cmds = append(cmds, m.refresh(id))
+	}
+	return tea.Batch(cmds...)
+}
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
+		for _, id := range m.ids() {
+			m.clampList(id)
+		}
+	case refreshedMsg:
+		return m.refreshed(msg)
+	case actedMsg:
+		return m.acted(msg)
+	case toastExpiredMsg:
+		if m.toast.seq == msg.seq {
+			m.toast = toast{}
+		}
 	case tickMsg:
 		m.now = msg.at
 		return m, m.nextTick()
@@ -166,22 +189,26 @@ func (m Model) View() tea.View {
 		layers = append(layers, lipgloss.NewLayer(m.tooSmall(f.Need)))
 	} else {
 		for _, t := range f.Tiles {
-			layers = append(layers, lipgloss.NewLayer(render.Draw(m.opts.Theme, render.Tile{
+			tile := render.Tile{
 				Title:   t.Title,
 				W:       t.W,
 				H:       t.H,
 				Focused: t.ID == m.focus,
-				Payload: m.payload(t.ID, widget.Frame{
-					Now:     m.now,
-					Size:    widget.Size{W: t.W - 2, H: t.H - 2},
-					Focused: t.ID == m.focus,
-				}),
-			})).X(t.X).Y(t.Y))
+				Payload: m.payloadIn(t.ID, t.Rect),
+				List:    m.lists[t.ID].render(),
+			}
+			if tile.Focused {
+				tile.Hints = m.hints(t.ID)
+			}
+			layers = append(layers, lipgloss.NewLayer(render.Draw(m.opts.Theme, tile)).X(t.X).Y(t.Y))
 		}
 		layers = append(layers, lipgloss.NewLayer(m.footer()).Y(m.h-footerHeight))
 	}
 	if m.keyMap {
 		layers = append(layers, m.keyMapLayer())
+	}
+	if m.overlay != nil {
+		layers = append(layers, m.overlayLayer())
 	}
 	canvas := lipgloss.NewCanvas(m.w, m.h)
 	lipgloss.NewCompositor(layers...).Draw(canvas, image.Rect(0, 0, m.w, m.h))
@@ -189,7 +216,8 @@ func (m Model) View() tea.View {
 	return v
 }
 
-func (m Model) payload(id string, f widget.Frame) widget.Payload {
+// payloadIn is what Widget id shows in a tile at r, border included.
+func (m Model) payloadIn(id string, r layout.Rect) widget.Payload {
 	w := m.widgets[id]
 	if w.setup != "" {
 		return widget.Payload{Center: true, Lines: []widget.Line{
@@ -197,7 +225,23 @@ func (m Model) payload(id string, f widget.Frame) widget.Payload {
 			widget.Text(theme.Dim, w.setup),
 		}}
 	}
-	return w.widget.Payload(f)
+	switch v := w.widget.(type) {
+	case widget.Source:
+		return m.fetched[id]
+	case widget.View:
+		return v.Payload(widget.Frame{Now: m.now, Size: widget.Size{W: r.W - 2, H: r.H - 2}, Focused: id == m.focus})
+	}
+	return widget.Payload{}
+}
+
+// ids lists the placed Widgets in a stable order.
+func (m Model) ids() []string {
+	ids := make([]string, 0, len(m.widgets))
+	for id := range m.widgets {
+		ids = append(ids, id)
+	}
+	slices.Sort(ids)
+	return ids
 }
 
 // toastOf shows the first message, counting the rest.
