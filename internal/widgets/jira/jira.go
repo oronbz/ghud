@@ -27,7 +27,7 @@ var Type = widget.Type{
 		{
 			Name: "site", Kind: widget.String, Default: "",
 			Description: "Your Jira site, such as \"acme.atlassian.net\".",
-			Why:         "Jira needs it; `ghud auth jira` fills it in.",
+			Why:         "ghud needs it to know which Jira to sign in to.",
 		},
 		{
 			Name: "email", Kind: widget.String, Default: "",
