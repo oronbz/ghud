@@ -155,6 +155,98 @@ func (e Editor) RemoveWidget(r Ref) error {
 	})
 }
 
+// SetSettings writes settings into Widget r's block by commenting the block
+// out and appending a copy with those keys filled in, so the old values
+// stay in the file. With r.ID empty it appends a new block of type typ.
+// Settings the block already has write nothing.
+func (e Editor) SetSettings(typ string, r Ref, settings widget.Settings) (Widget, error) {
+	ti := slices.IndexFunc(e.Types, func(t widget.Type) bool { return t.Name == typ })
+	if ti < 0 {
+		return Widget{}, fmt.Errorf("unknown Widget type `%s`", typ)
+	}
+	var keys []string
+	for _, s := range e.Types[ti].Settings {
+		if _, ok := settings[s.Name]; ok {
+			keys = append(keys, s.Name)
+		}
+	}
+	if len(keys) != len(settings) {
+		return Widget{}, fmt.Errorf("Widget type `%s` has no such setting", typ)
+	}
+	var fill strings.Builder
+	for _, k := range keys {
+		fmt.Fprintf(&fill, "%s = %s\n", k, widget.TOMLValue(settings[k]))
+	}
+
+	old, id, same := -1, "", false
+	var set Widget
+	err := e.Edit(func(src []byte, c Config) ([]byte, error) {
+		if r.ID == "" {
+			id = freshID(typ, c)
+			return appendBlock(src, block(typ, id, nil)+fill.String()), nil
+		}
+		i, err := find(c, r)
+		if err != nil {
+			return nil, err
+		}
+		if w := c.Widgets[i]; w.Type != typ {
+			return nil, fmt.Errorf("Widget `%s` is a `%s` Widget, not `%s`", w.ID, w.Type, typ)
+		}
+		old, id = i, c.Widgets[i].ID
+		if same = !slices.ContainsFunc(keys, func(k string) bool { return !reflect.DeepEqual(c.Widgets[i].Settings[k], settings[k]) }); same {
+			return src, nil
+		}
+		lines := bytes.SplitAfter(src, []byte("\n"))
+		start, end := blockLines(src, c.Widgets[i].line)
+		var filled []byte
+		for n := start; n <= end; n++ {
+			l := lines[n-1]
+			if !slices.Contains(keys, keyOf(l)) {
+				filled = append(filled, l...)
+			}
+			if len(bytes.TrimSpace(l)) > 0 {
+				lines[n-1] = append([]byte("# "), l...)
+			}
+		}
+		if !bytes.HasSuffix(filled, []byte("\n")) {
+			filled = append(filled, '\n')
+		}
+		return appendBlock(bytes.Join(lines, nil), string(filled)+fill.String()), nil
+	}, func(before, after Config) error {
+		if same {
+			set = after.Widgets[old]
+			return sameWidgets(before, after, true)
+		}
+		if old >= 0 {
+			before.Widgets = slices.Delete(slices.Clone(before.Widgets), old, old+1)
+		}
+		if len(after.Widgets) != len(before.Widgets)+1 {
+			return fmt.Errorf("%d Widgets, want %d", len(after.Widgets), len(before.Widgets)+1)
+		}
+		set = after.Widgets[len(after.Widgets)-1]
+		if set.ID != id || set.Type != typ || set.Setup != "" {
+			return fmt.Errorf("the new block reads as Widget `%s` of type `%s`", set.ID, set.Type)
+		}
+		for _, k := range keys {
+			if !reflect.DeepEqual(set.Settings[k], settings[k]) {
+				return fmt.Errorf("`%s` reads back as %v", k, set.Settings[k])
+			}
+		}
+		after.Widgets = after.Widgets[:len(after.Widgets)-1]
+		return sameWidgets(before, after, true)
+	})
+	return set, err
+}
+
+// keyOf is the key a line of TOML sets, or "".
+func keyOf(line []byte) string {
+	k, _, ok := bytes.Cut(line, []byte("="))
+	if !ok {
+		return ""
+	}
+	return string(bytes.Trim(bytes.TrimSpace(k), `"`))
+}
+
 // Locate is the line of Widget r's [[widget]] header, for opening the
 // config in an editor there. A Widget of the default set gets its block
 // written first.

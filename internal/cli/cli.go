@@ -41,6 +41,8 @@ type System struct {
 const usage = `Usage: ghud [--config <path>] [--close-key <keys>]... [--version]
        ghud config default   print the full commented config reference
        ghud config init      write the reference to the config path, once
+       ghud auth jira        set up Jira: site, email and an API token,
+                             which goes only to the keyring
 
 ghud draws a full-screen dashboard of your day. Press q to quit.
 The config is $XDG_CONFIG_HOME/ghud/config.toml (default ~/.config/ghud),
@@ -92,6 +94,10 @@ func Run(s System) int {
 		configFile = *configFlag
 	}
 	locale := config.LocaleFromEnv(s.Getenv)
+	pp := ports.System(s.Getenv)
+	if s.Ports != nil {
+		pp = *s.Ports
+	}
 
 	switch strings.Join(fs.Args(), " ") {
 	case "":
@@ -100,13 +106,11 @@ func Run(s System) int {
 		return 0
 	case "config init":
 		return configInit(s, configFile, config.Reference(host.Builtins, locale))
+	case "auth jira":
+		return authJira(s, pp, config.Editor{Path: configFile, LockDir: filepath.Join(p.Data, "locks"), Types: host.Builtins, Locale: locale})
 	default:
 		fmt.Fprintf(s.Stderr, "ghud: unknown command %q\n\n%s", strings.Join(fs.Args(), " "), usage)
 		return 2
-	}
-	pp := ports.System(s.Getenv)
-	if s.Ports != nil {
-		pp = *s.Ports
 	}
 	// Popups have no HERDR_PANE_ID, and right-click can't reach them anyway.
 	if s.Getenv("HERDR_PANE_ID") != "" {

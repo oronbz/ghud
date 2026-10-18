@@ -46,7 +46,7 @@ func withJira(t *testing.T, j *fakeJira, o hosttest.Options) *hosttest.Host {
 	if o.Width == 0 {
 		o.Width, o.Height = 80, 10
 	}
-	o.Endpoints = ports.Endpoints{Jira: j.srv.URL}
+	o.Endpoints = ports.Endpoints{Jira: j.srv.URL, AtlassianAPI: j.srv.URL}
 	return hosttest.New(t, o)
 }
 
