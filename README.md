@@ -21,7 +21,7 @@ And you can act on it, not just look at it. Approve a PR, move a ticket along, c
 brew install oronbz/tap/ghud
 ```
 
-The formula installs a universal binary, plus `ghud-weather`, the Weather Plugin that ships with ghud. It isn't a cask, so there's no quarantine prompt.
+The cask installs a universal binary, plus `ghud-weather`, the Weather Plugin that ships with ghud. It needs no Xcode, and it clears the quarantine flag, so macOS doesn't block the first run.
 
 Apple silicon is what I use and test on. Intel Macs get the same universal binary, but they're untested, so it's best effort.
 

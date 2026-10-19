@@ -94,9 +94,11 @@ release:
     name: ghud
   prerelease: auto
 
-# brews is deprecated in favour of homebrew_casks, but a cask would need signing
-# and notarization to avoid quarantine. GoReleaser v3 drops brews; see spec #24 debt.
-brews:
+# A cask, not a formula: Homebrew runs a formula without bottles as a source
+# build and demands developer tools matching macOS (Xcode 27 on macOS 27) just
+# to copy two binaries. The binaries aren't notarized, so the hook clears the
+# quarantine flag a download gets.
+homebrew_casks:
   - name: ghud
     ids: [ghud]
     repository:
@@ -106,8 +108,10 @@ brews:
     homepage: https://github.com/oronbz/ghud
     description: A god's-eye HUD for your day, in the terminal
     commit_msg_template: "Update ghud to {{ .Version }}"
-    install: |
-      bin.install "ghud"
-      bin.install "ghud-weather"
-    test: |
-      assert_match version.to_s, shell_output("#{bin}/ghud --version")
+    binaries: [ghud, ghud-weather]
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/ghud", "#{staged_path}/ghud-weather"]
+          end

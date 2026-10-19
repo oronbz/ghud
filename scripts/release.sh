@@ -2,7 +2,7 @@
 # Usage: scripts/release.sh [--dry-run] <version>
 #
 # Releases ghud from this Mac: verifies a snapshot build, tags v<version>, then
-# GoReleaser publishes the GitHub release and the oronbz/homebrew-tap formula
+# GoReleaser publishes the GitHub release and the oronbz/homebrew-tap cask
 # with the local gh login. --dry-run stops after the snapshot verification and
 # never tags, pushes or publishes.
 set -euo pipefail
@@ -55,16 +55,7 @@ preflight() {
 }
 
 check_config() {
-    local out status=0
-    out=$(goreleaser check 2>&1) || status=$?
-    # check fails on any deprecation, and brews is deliberate; go run hides the
-    # distinct exit code, so read the verdict from the output.
-    local others
-    others=$(printf '%s\n' "$out" | grep 'DEPRECATED:' | grep -v 'DEPRECATED:  *brews ' || true)
-    if [[ $status -ne 0 ]] && ! [[ "$out" == *"configuration is valid, but uses deprecated properties"* && -z "$others" ]]; then
-        printf '%s\n' "$out" >&2
-        die "goreleaser check failed"
-    fi
+    goreleaser check || die "goreleaser check failed"
 }
 
 binary() {
@@ -110,12 +101,13 @@ verify_snapshot() {
     expect "darwin archive" "$(tar -tzf "dist/ghud_${want}_darwin_all.tar.gz")" "ghud-weather"
     expect "linux archive" "$(tar -tzf "dist/ghud_${want}_linux_amd64.tar.gz")" "ghud-weather"
     expect "windows archive" "$(unzip -l "dist/ghud_${want}_windows_amd64.zip")" "ghud-weather.exe"
-    expect "formula" "$(cat dist/homebrew/ghud.rb)" 'bin.install "ghud-weather"'
+    expect "cask" "$(cat dist/homebrew/Casks/ghud.rb)" 'binary "ghud-weather"'
+    expect "cask quarantine hook" "$(cat dist/homebrew/Casks/ghud.rb)" 'com.apple.quarantine'
     for pattern in "ghud_${want}_darwin_all.tar.gz" "ghud_${want}_linux_amd64.tar.gz" "ghud_${want}_linux_arm64.tar.gz" \
-        "ghud_${want}_windows_amd64.zip" "ghud_${want}_windows_arm64.zip" '*.deb' '*.rpm' '*.apk' checksums.txt homebrew/ghud.rb; do
+        "ghud_${want}_windows_amd64.zip" "ghud_${want}_windows_arm64.zip" '*.deb' '*.rpm' '*.apk' checksums.txt homebrew/Casks/ghud.rb; do
         compgen -G "dist/$pattern" >/dev/null || die "Missing dist/$pattern"
     done
-    green "  archives, packages, checksums and ghud.rb present"
+    green "  archives, packages, checksums and the cask present"
 }
 
 if $DRY_RUN; then bold "Releasing ghud $TAG (dry run)"; else bold "Releasing ghud $TAG"; fi
