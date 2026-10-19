@@ -15,3 +15,7 @@ Plugins never draw cells. List Widgets send Items as typed fields with column pr
 - Built-in Widget types implement the same internal contract; a script Widget type (a command plus an interval that prints JSON) is the easy tier on the same contract.
 - Installing a plugin means trusting it; there is no sandbox.
 - The repo ships a JSON Schema for the protocol and manifest, with `visor plugin check` as a conformance test.
+
+## Note (2026-10-19)
+
+mirador now has plugins: its external panel protocol v1 shipped in 1.6.0 and is a compatibility commitment (1.22.1 at the time of writing). The decision stands. v1 is still one tile per process drawing whole frames of styled lines with key bindings; it has no request/response matching, Items, typed Actions or choice menus.
