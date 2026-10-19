@@ -2,9 +2,9 @@
 
 **A god's-eye HUD for your day, right in your terminal.**
 
-![ghud: clock, calendar, meetings, tasks, notes, CPU and memory, GitHub review requests, Jira issues and the weather in one terminal dashboard](docs/screenshot.png)
+![ghud: clock, calendar, meetings, tasks, reminders, notes, CPU and memory, GitHub review requests, Jira issues and the weather in one terminal dashboard](docs/screenshot.png)
 
-Stop jumping between Calendar, GitHub, Jira and your notes to figure out what's next. ghud shows your next meeting, the PRs waiting for your review, your Jira tickets, your tasks and the weather on one screen, and keeps it fresh while you work.
+Stop jumping between Calendar, GitHub, Jira and your notes to figure out what's next. ghud shows your next meeting, the PRs waiting for your review, your Jira tickets, today's tasks and reminders, and the weather on one screen, and keeps it fresh while you work.
 
 And you can act on it, not just look at it. Approve a PR, move a ticket along, check off a task or open a meeting straight from the dashboard, without going to the browser.
 
@@ -64,7 +64,7 @@ Both binaries need to end up in the same directory, which `go install` does for 
 
 ## Getting started
 
-Run `ghud`. With no config you get the default Widgets: Clock, Calendar, Meetings (macOS), Tasks, Notes, CPU + memory, PRs, Jira and Weather. Reminders and Script are opt-in, add them with `ctrl+k` and Add Widget.
+Run `ghud`. With no config you get the default Widgets: Clock, Calendar, Meetings (macOS), Tasks, Reminders (macOS), Notes, CPU + memory, PRs, Jira and Weather. Script is opt-in, add it with `ctrl+k` and Add Widget.
 
 - `?` shows every key. `ctrl+k` opens the Action palette, and the footer shows the keys for whatever is focused.
 - `q` quits.

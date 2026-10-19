@@ -105,7 +105,7 @@ func system(t *testing.T, stdin string, args ...string) (cli.System, *screen, *b
 		Stdout: stdout,
 		Stderr: stderr,
 		ProgramOptions: []tea.ProgramOption{
-			tea.WithWindowSize(60, 16),
+			tea.WithWindowSize(80, 24),
 			tea.WithoutSignals(),
 		},
 	}, stdout, stderr

@@ -22,11 +22,11 @@ func TestMeetingsIsBuiltInOnMacOSOnly(t *testing.T) {
 	}
 }
 
-func TestRemindersIsAddableOnMacOSOnlyAndNotInTheDefaultDashboard(t *testing.T) {
+func TestRemindersIsBuiltInOnMacOSOnly(t *testing.T) {
 	mac := runtime.GOOS == "darwin"
 	h := hosttest.New(t, hosttest.Options{})
-	if _, _, ok := h.Find("─ Reminders "); ok {
-		t.Errorf("Reminders is in the default dashboard on %s:\n%s", runtime.GOOS, h.Screen())
+	if _, _, ok := h.Find("─ Reminders "); ok != mac {
+		t.Errorf("Reminders in the default dashboard = %v on %s:\n%s", ok, runtime.GOOS, h.Screen())
 	}
 
 	h.Press("ctrl+k")

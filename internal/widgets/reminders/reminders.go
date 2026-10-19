@@ -21,7 +21,6 @@ var Type = widget.Type{
 	Description: "Reminders due today or overdue, from every list in Reminders.app (macOS).",
 	Refresh:     time.Minute,
 	Fetches:     true,
-	OptIn:       true,
 	New: func(c widget.Config) widget.Widget {
 		return &reminders{ek: c.Ports.EventKit, twelve: c.TimeFormat == "12h"}
 	},

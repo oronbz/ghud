@@ -53,7 +53,7 @@ func setUp(h *hosttest.Host, site, email, token string) {
 func TestSetUpJiraPromptsForSiteEmailAndTokenThenLoads(t *testing.T) {
 	j := queue(t)
 	j.queries["project = OPS"] = j.issues
-	h := withJira(t, j, hosttest.Options{Width: 100, Height: 12, Env: map[string]string{}, Config: handWritten})
+	h := withJira(t, j, hosttest.Options{Width: 100, Height: 14, Env: map[string]string{}, Config: handWritten})
 	if s := h.Screen(); !strings.Contains(s, "needs setup") || !strings.Contains(s, setupHint) {
 		t.Fatalf("want needs setup offering %q:\n%s", setupHint, s)
 	}

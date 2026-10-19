@@ -23,9 +23,9 @@ type Cell struct {
 // Widget type names; Join drops the ones whose type isn't available.
 func Default() Layout {
 	return Layout{Rows: []Row{
-		{Weight: 10, Widgets: []Cell{{"clock", 3}, {"calendar", 3}, {"meetings", 5}}},
-		{Weight: 12, Widgets: []Cell{{"tasks", 4}, {"notes", 4}, {"cpu", 4}}},
-		{Weight: 16, Widgets: []Cell{{"prs", 6}, {"jira", 4}, {"weather", 3}}},
+		{Weight: 12, Widgets: []Cell{{"clock", 3}, {"calendar", 3}, {"meetings", 4}}},
+		{Weight: 12, Widgets: []Cell{{"tasks", 3}, {"reminders", 4}, {"notes", 3}, {"cpu", 3}}},
+		{Weight: 12, Widgets: []Cell{{"prs", 6}, {"jira", 4}, {"weather", 3}}},
 	}}
 }
 
