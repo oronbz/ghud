@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/x/ansi"
+
 	"github.com/oronbz/ghud/internal/theme"
 	"github.com/oronbz/ghud/internal/widget"
 )
@@ -65,27 +67,19 @@ func Reference(types []widget.Type, loc Locale) string {
 	option(`path = "~/code/my-ghud-plugin"`)
 	b.WriteString("\n")
 
-	prose("Widgets. Each [[widget]] block places one Widget; the dashboard shows the")
-	prose("blocks in this file, or the built-in default Widgets when there are none:")
 	var defaults []string
 	for _, w := range Default(types, loc).Widgets {
 		defaults = append(defaults, w.Title)
 	}
-	line := " "
-	for i, title := range defaults {
-		word := " " + title
-		if i < len(defaults)-1 {
-			word += ","
-		} else {
-			word += "."
+	prose("Widgets. Each [[widget]] block places one Widget; the dashboard shows the")
+	if len(defaults) == 0 {
+		prose("blocks in this file.")
+	} else {
+		prose("blocks in this file, or the default Widgets when there are none:")
+		for _, line := range strings.Split(ansi.Wordwrap(strings.Join(defaults, ", ")+".", 78, ""), "\n") {
+			prose("%s", line)
 		}
-		if len(line)+len(word) > 78 {
-			prose("%s", line[1:])
-			line = " "
-		}
-		line += word
 	}
-	prose("%s", line[1:])
 	prose("Every block takes:")
 	prose(`  type     the Widget type (required)`)
 	prose(`  id       defaults to the type name; give each Widget of the same type its own`)

@@ -23,7 +23,7 @@ import (
 
 const FileName = "config.toml"
 
-// Config is a parsed config.toml, or the built-in default when there's none.
+// Config is a parsed config.toml, or the default when there's none.
 type Config struct {
 	Theme      string
 	TimeFormat string
@@ -50,7 +50,7 @@ type Widget struct {
 }
 
 // Line is the 1-based line of the Widget's [[widget]] header, or 0 for a
-// Widget of the built-in default set.
+// Widget of the default set.
 func (w Widget) Line() int { return w.line }
 
 // Equal reports whether two blocks configure the same Widget, wherever in
