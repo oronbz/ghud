@@ -109,6 +109,19 @@ func TestWatcherReportsAFileCreatedInADirectoryThatDidNotExist(t *testing.T) {
 	}
 }
 
+// Each missing directory is created before the watch on its parent is in
+// place, which is how CI on Linux missed the file one directory deep.
+func TestWatcherReportsAFileCreatedManyMissingDirectoriesDeep(t *testing.T) {
+	root := t.TempDir()
+	notes := filepath.Join(root, "a", "b", "c", "d", "e", "f", "g", "h", "notes.md")
+	_, r := newTestWatcher(t, notes)
+
+	write(t, notes, "hello\n")
+	if got := r.next(t); !slices.Equal(got, []string{notes}) {
+		t.Fatalf("reported %v, want [%s]", got, notes)
+	}
+}
+
 func TestWatcherReportsFilesAsTheyWereSpelt(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)

@@ -64,6 +64,38 @@ func (f *fsWatcher) Watch(files []string) error {
 // existing ancestor, and stops watching directories no file needs. It
 // returns the directories it started watching.
 func (f *fsWatcher) addDirs() ([]string, error) {
+	var want map[string]bool
+	var added []string
+	var errs []error
+	// A directory created inside an ancestor before its watch was in place
+	// sends no event, so look again after every watch added until none is.
+	for grew := true; grew; {
+		grew = false
+		want = f.wantDirs()
+		for d := range want {
+			if f.dirs[d] {
+				continue
+			}
+			if err := f.w.Add(d); err != nil {
+				errs = append(errs, err)
+				continue
+			}
+			f.dirs[d] = true
+			added = append(added, d)
+			grew = true
+		}
+	}
+	for d := range f.dirs {
+		if !want[d] {
+			_ = f.w.Remove(d)
+			delete(f.dirs, d)
+		}
+	}
+	return added, errors.Join(errs...)
+}
+
+// wantDirs are the directories addDirs should be watching right now.
+func (f *fsWatcher) wantDirs() map[string]bool {
 	want := map[string]bool{}
 	for abs := range f.files {
 		if fi, err := os.Stat(abs); err == nil && fi.IsDir() {
@@ -82,26 +114,7 @@ func (f *fsWatcher) addDirs() ([]string, error) {
 		}
 		want[d] = true
 	}
-	var added []string
-	var errs []error
-	for d := range want {
-		if f.dirs[d] {
-			continue
-		}
-		if err := f.w.Add(d); err != nil {
-			errs = append(errs, err)
-			continue
-		}
-		f.dirs[d] = true
-		added = append(added, d)
-	}
-	for d := range f.dirs {
-		if !want[d] {
-			_ = f.w.Remove(d)
-			delete(f.dirs, d)
-		}
-	}
-	return added, errors.Join(errs...)
+	return want
 }
 
 func (f *fsWatcher) loop() {
