@@ -96,8 +96,9 @@ release:
 
 # A cask, not a formula: Homebrew runs a formula without bottles as a source
 # build and demands developer tools matching macOS (Xcode 27 on macOS 27) just
-# to copy two binaries. The binaries aren't notarized, so the hook clears the
-# quarantine flag a download gets.
+# to copy two binaries. The binaries aren't notarized, so postflight_steps
+# clears the quarantine flag Homebrew gives the download; it's a custom block
+# because GoReleaser's hooks write the Ruby postflight Homebrew 7 deprecates.
 homebrew_casks:
   - name: ghud
     ids: [ghud]
@@ -109,9 +110,9 @@ homebrew_casks:
     description: A god's-eye HUD for your day, in the terminal
     commit_msg_template: "Update ghud to {{ .Version }}"
     binaries: [ghud, ghud-weather]
-    hooks:
-      post:
-        install: |
-          if OS.mac?
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/ghud", "#{staged_path}/ghud-weather"]
-          end
+    custom_block: |
+      postflight_steps do
+        on_macos do
+          run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ "{{" }}staged_path{{ "}}" }}/ghud", "{{ "{{" }}staged_path{{ "}}" }}/ghud-weather"]
+        end
+      end
