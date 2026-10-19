@@ -7,8 +7,8 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/oronbz/ghud/internal/closekey"
-	"github.com/oronbz/ghud/internal/layout"
+	"github.com/oronbz/visor/internal/closekey"
+	"github.com/oronbz/visor/internal/layout"
 )
 
 type keyMap struct {

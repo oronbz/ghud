@@ -7,11 +7,11 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/oronbz/ghud/internal/ports"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/ports"
+	"github.com/oronbz/visor/internal/widget"
 )
 
-// Setup is the one flow behind `ghud auth jira` and the Set up Jira
+// Setup is the one flow behind `visor auth jira` and the Set up Jira
 // Action: prompts for the site, the email and, with the page that makes one
 // opened, a masked API token. Only the token goes to the keyring; site and
 // email come back as the Widget's settings. Each step's answers so far ride

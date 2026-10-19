@@ -5,13 +5,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/oronbz/ghud/internal/hosttest"
-	"github.com/oronbz/ghud/internal/theme"
-	"github.com/oronbz/ghud/internal/weather/weathertest"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/hosttest"
+	"github.com/oronbz/visor/internal/theme"
+	"github.com/oronbz/visor/internal/weather/weathertest"
+	"github.com/oronbz/visor/internal/widget"
 )
 
-// withWeather starts ghud with the Weather Plugin next to its executable, the
+// withWeather starts visor with the Weather Plugin next to its executable, the
 // way an install ships it, and only the Widgets config places.
 func withWeather(t *testing.T, s *sky, config string) *hosttest.Host {
 	t.Helper()

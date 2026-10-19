@@ -25,7 +25,7 @@ func Binary(t testing.TB) string {
 	t.Helper()
 	build.Do(func() {
 		_, here, _, _ := runtime.Caller(0)
-		dir, err := os.MkdirTemp("", "ghud-fixture-")
+		dir, err := os.MkdirTemp("", "visor-fixture-")
 		if err != nil {
 			buildErr = err
 			return
@@ -73,14 +73,14 @@ type Options struct {
 	Build   [][]string
 }
 
-// Write lays out a fixture Plugin in dir: its ghud-plugin.toml, whose
+// Write lays out a fixture Plugin in dir: its visor-plugin.toml, whose
 // command runs the built fixture. It returns dir.
 func Write(t testing.TB, dir string, o Options) string {
 	t.Helper()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "ghud-plugin.toml"), []byte(Manifest(t, o)), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "visor-plugin.toml"), []byte(Manifest(t, o)), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	return dir

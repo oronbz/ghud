@@ -9,13 +9,13 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/oronbz/ghud/internal/hosttest"
-	"github.com/oronbz/ghud/internal/layout"
-	"github.com/oronbz/ghud/internal/theme"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/hosttest"
+	"github.com/oronbz/visor/internal/layout"
+	"github.com/oronbz/visor/internal/theme"
+	"github.com/oronbz/visor/internal/widget"
 )
 
-func TestGhudReportsMouseMotionUnlessMouseIsFalse(t *testing.T) {
+func TestVisorReportsMouseMotionUnlessMouseIsFalse(t *testing.T) {
 	on := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 80, Height: 12})
 	if got := on.View().MouseMode; got != tea.MouseModeAllMotion {
 		t.Errorf("mouse mode %v by default, want all motion (1003)", got)

@@ -1,4 +1,4 @@
-// Package ports holds ghud's outside-world adapters. The host reaches the world
+// Package ports holds visor's outside-world adapters. The host reaches the world
 // only through Ports, so the headless test host can swap every one for a fake.
 package ports
 
@@ -66,7 +66,7 @@ type Keyring interface {
 }
 
 // Watcher reports changes to files on disk, whoever made them: another
-// ghud instance, an editor, or this instance itself.
+// visor instance, an editor, or this instance itself.
 type Watcher interface {
 	// Watch replaces the set of watched files. A file that doesn't exist
 	// yet is reported when it's created. A directory is also reported when
@@ -96,7 +96,7 @@ type Stats struct {
 	Load [3]float64
 }
 
-// Commands runs other CLIs ghud borrows from, such as `gh auth token` and `herdr`.
+// Commands runs other CLIs visor borrows from, such as `gh auth token` and `herdr`.
 type Commands interface {
 	Output(ctx context.Context, name string, args ...string) ([]byte, error)
 }
@@ -158,7 +158,7 @@ type Event struct {
 	Canceled   bool
 }
 
-// Endpoints holds the base URLs of every HTTP service ghud talks to, so tests
+// Endpoints holds the base URLs of every HTTP service visor talks to, so tests
 // can point them at httptest servers.
 type Endpoints struct {
 	GitHubGraphQL string

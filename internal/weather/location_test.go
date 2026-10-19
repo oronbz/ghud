@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/oronbz/ghud/internal/paths"
+	"github.com/oronbz/visor/internal/paths"
 )
 
 func TestACityIsGeocodedOnceAcrossRefreshesAndInstances(t *testing.T) {

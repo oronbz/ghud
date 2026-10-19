@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/oronbz/ghud/internal/plugin/install"
+	"github.com/oronbz/visor/internal/plugin/install"
 )
 
 // serving is a GitHub whose every tarball holds entries.

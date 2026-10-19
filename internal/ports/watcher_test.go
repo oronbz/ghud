@@ -96,7 +96,7 @@ func TestWatcherIgnoresOtherFilesInTheDirectory(t *testing.T) {
 
 func TestWatcherReportsAFileCreatedInADirectoryThatDidNotExist(t *testing.T) {
 	root := t.TempDir()
-	notes := filepath.Join(root, "share", "ghud", "notes.md")
+	notes := filepath.Join(root, "share", "visor", "notes.md")
 	_, r := newTestWatcher(t, notes)
 
 	write(t, notes, "hello\n")
@@ -113,7 +113,7 @@ func TestWatcherReportsFilesAsTheyWereSpelt(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
 	_, r := newTestWatcher(t, "config.toml")
-	write(t, filepath.Join(dir, "config.toml"), "theme = \"ghud\"\n")
+	write(t, filepath.Join(dir, "config.toml"), "theme = \"visor\"\n")
 	if got := r.next(t); !slices.Equal(got, []string{"config.toml"}) {
 		t.Fatalf("reported %v, want [config.toml]", got)
 	}

@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/oronbz/ghud/internal/cache"
-	"github.com/oronbz/ghud/internal/theme"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/cache"
+	"github.com/oronbz/visor/internal/theme"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 func TestAnEntryReadsBackAsItWasSaved(t *testing.T) {
@@ -40,6 +40,6 @@ func TestAnEntryReadsBackAsItWasSaved(t *testing.T) {
 func TestAnUpgradeStartsANewEntry(t *testing.T) {
 	settings := widget.Settings{"query": "is:open"}
 	if cache.Key("prs", "prs", "0.1.0", settings) == cache.Key("prs", "prs", "0.1.1", settings) {
-		t.Error("two ghud versions share a cache entry")
+		t.Error("two visor versions share a cache entry")
 	}
 }

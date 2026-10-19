@@ -11,10 +11,10 @@ import (
 
 	"github.com/charmbracelet/x/term"
 
-	"github.com/oronbz/ghud/internal/config"
-	"github.com/oronbz/ghud/internal/ports"
-	"github.com/oronbz/ghud/internal/widget"
-	"github.com/oronbz/ghud/internal/widgets/jira"
+	"github.com/oronbz/visor/internal/config"
+	"github.com/oronbz/visor/internal/ports"
+	"github.com/oronbz/visor/internal/widget"
+	"github.com/oronbz/visor/internal/widgets/jira"
 )
 
 // authJira runs the Set up Jira flow, the same one as the TUI's Action, on
@@ -22,7 +22,7 @@ import (
 func authJira(s System, pp ports.Ports, edits config.Editor) int {
 	cfg, err := config.Load(edits.Path, edits.Types, edits.Locale)
 	if err != nil {
-		fmt.Fprintln(s.Stderr, "ghud:", err)
+		fmt.Fprintln(s.Stderr, "visor:", err)
 		return 1
 	}
 	var ref config.Ref
@@ -49,17 +49,17 @@ func authJira(s System, pp ports.Ports, edits config.Editor) int {
 		}
 		text, err := ask(s, in, a)
 		if err != nil {
-			fmt.Fprintln(s.Stderr, "ghud:", err)
+			fmt.Fprintln(s.Stderr, "visor:", err)
 			return 1
 		}
 		res, err := flow.Invoke(context.Background(), widget.Invocation{Action: a.ID, Text: text, Base: a.Value, Now: pp.Clock.Now()})
 		if err != nil {
-			fmt.Fprintln(s.Stderr, "ghud:", err)
+			fmt.Fprintln(s.Stderr, "visor:", err)
 			return 1
 		}
 		if len(res.Settings) > 0 {
 			if _, err := edits.SetSettings(jira.Type.Name, ref, res.Settings); err != nil {
-				fmt.Fprintln(s.Stderr, "ghud:", err)
+				fmt.Fprintln(s.Stderr, "visor:", err)
 				return 1
 			}
 		}

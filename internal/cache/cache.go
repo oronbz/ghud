@@ -1,5 +1,5 @@
 // Package cache keeps the last Payload of each fetching Widget on disk, so
-// ghud's first frame draws without waiting for the network and instances
+// visor's first frame draws without waiting for the network and instances
 // running side by side share one fetch.
 package cache
 
@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 // Entry is one Widget's cached data and the outcome of its last fetch.
@@ -42,11 +42,11 @@ type Status struct {
 	Until  time.Time      `json:"until,omitzero"`
 }
 
-// Store is the cache directory, ~/.cache/ghud/widgets.
+// Store is the cache directory, ~/.cache/visor/widgets.
 type Store struct{ Dir string }
 
 // Key names a Widget's entry: its id plus a hash of its type, settings and
-// the ghud version, so changing any starts a new entry. An upgrade never shows
+// the visor version, so changing any starts a new entry. An upgrade never shows
 // a payload the previous version built.
 func Key(id, typ, version string, settings widget.Settings) string {
 	b, _ := json.Marshal(struct {

@@ -8,8 +8,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/oronbz/ghud/internal/theme"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/theme"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 // choicesMsg brings the choices of the choice menu numbered seq.

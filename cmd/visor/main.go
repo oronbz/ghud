@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/oronbz/ghud/internal/cli"
+	"github.com/oronbz/visor/internal/cli"
 )
 
 func main() {

@@ -54,7 +54,7 @@ func (m *machine) stub(dir, name, body string) string {
 func (m *machine) brew(dir, prefix string, code int) {
 	m.stub(dir, "brew", `if [ "$1" = --prefix ]; then echo `+prefix+`; exit 0; fi
 echo "brew $* HOMEBREW_NO_INSTALL_UPGRADE=$HOMEBREW_NO_INSTALL_UPGRADE" >> `+m.log+`
-echo "==> Installing ghud"
+echo "==> Installing visor"
 exit `+strconv.Itoa(code))
 }
 
@@ -66,8 +66,8 @@ type result struct {
 
 func (m *machine) run(fallbacks string) result {
 	m.t.Helper()
-	cmd := exec.Command("/bin/bash", "install-ghud.sh")
-	cmd.Env = []string{"PATH=" + m.path, "HOME=" + m.t.TempDir(), "GHUD_BREW_FALLBACKS=" + fallbacks}
+	cmd := exec.Command("/bin/bash", "install-visor.sh")
+	cmd.Env = []string{"PATH=" + m.path, "HOME=" + m.t.TempDir(), "VISOR_BREW_FALLBACKS=" + fallbacks}
 	var out, errb bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errb
 	err := cmd.Run()
@@ -83,9 +83,9 @@ func (m *machine) run(fallbacks string) result {
 	return r
 }
 
-func TestGhudOnPathIsLeftAlone(t *testing.T) {
+func TestVisorOnPathIsLeftAlone(t *testing.T) {
 	m := newMachine(t)
-	m.stub(m.path, "ghud", "exit 0")
+	m.stub(m.path, "visor", "exit 0")
 	m.brew(m.path, t.TempDir(), 0)
 
 	r := m.run("")
@@ -98,7 +98,7 @@ func TestGhudOnPathIsLeftAlone(t *testing.T) {
 	}
 }
 
-func TestMissingGhudIsInstalledQuietlyWithBrewWithoutUpgrading(t *testing.T) {
+func TestMissingVisorIsInstalledQuietlyWithBrewWithoutUpgrading(t *testing.T) {
 	m := newMachine(t)
 	m.brew(m.path, t.TempDir(), 0)
 
@@ -107,14 +107,14 @@ func TestMissingGhudIsInstalledQuietlyWithBrewWithoutUpgrading(t *testing.T) {
 	if r.code != 0 {
 		t.Fatalf("exit %d, stderr: %s", r.code, r.stderr)
 	}
-	want := []string{"brew install oronbz/tap/ghud HOMEBREW_NO_INSTALL_UPGRADE=1"}
+	want := []string{"brew install oronbz/tap/visor HOMEBREW_NO_INSTALL_UPGRADE=1"}
 	if strings.Join(r.calls, "|") != strings.Join(want, "|") {
 		t.Errorf("brew calls = %q, want %q", r.calls, want)
 	}
-	if strings.Contains(r.stdout+r.stderr, "==> Installing ghud") {
+	if strings.Contains(r.stdout+r.stderr, "==> Installing visor") {
 		t.Errorf("brew's own output was shown after it succeeded: %q", r.stdout+r.stderr)
 	}
-	if !strings.Contains(r.stdout, "ghud is installed") {
+	if !strings.Contains(r.stdout, "visor is installed") {
 		t.Errorf("stdout lacks the success line: %q", r.stdout)
 	}
 }
@@ -128,20 +128,20 @@ func TestBrewOffPathIsFoundInItsStandardLocations(t *testing.T) {
 	if r.code != 0 {
 		t.Fatalf("exit %d, stderr: %s", r.code, r.stderr)
 	}
-	if len(r.calls) != 1 || !strings.HasPrefix(r.calls[0], "brew install oronbz/tap/ghud ") {
+	if len(r.calls) != 1 || !strings.HasPrefix(r.calls[0], "brew install oronbz/tap/visor ") {
 		t.Errorf("brew calls = %q, want one install", r.calls)
 	}
 }
 
 // herdr's build environment may lack brew's bin on PATH even when brew
-// already installed ghud there.
-func TestGhudInstalledByBrewButOffPathIsLeftAlone(t *testing.T) {
+// already installed visor there.
+func TestVisorInstalledByBrewButOffPathIsLeftAlone(t *testing.T) {
 	m := newMachine(t)
 	prefix := t.TempDir()
 	if err := os.Mkdir(filepath.Join(prefix, "bin"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	m.stub(filepath.Join(prefix, "bin"), "ghud", "exit 0")
+	m.stub(filepath.Join(prefix, "bin"), "visor", "exit 0")
 	m.brew(m.fallback, prefix, 0)
 
 	r := m.run(filepath.Join(m.fallback, "brew"))
@@ -162,7 +162,7 @@ func TestWithoutBrewTheInstallOptionsArePrinted(t *testing.T) {
 	if r.code != 1 {
 		t.Fatalf("exit %d, want 1", r.code)
 	}
-	for _, want := range []string{"https://brew.sh", "brew install oronbz/tap/ghud", "https://github.com/oronbz/ghud/releases", "herdr plugin install oronbz/ghud/herdr"} {
+	for _, want := range []string{"https://brew.sh", "brew install oronbz/tap/visor", "https://github.com/oronbz/visor/releases", "herdr plugin install oronbz/visor/herdr"} {
 		if !strings.Contains(r.stderr, want) {
 			t.Errorf("stderr lacks %q:\n%s", want, r.stderr)
 		}
@@ -178,7 +178,7 @@ func TestAFailedBrewInstallFailsTheBuildAndShowsBrewsOutput(t *testing.T) {
 	if r.code == 0 {
 		t.Fatal("exit 0 after brew failed")
 	}
-	if !strings.Contains(r.stderr, "==> Installing ghud") {
+	if !strings.Contains(r.stderr, "==> Installing visor") {
 		t.Errorf("brew's output wasn't shown after it failed: %q", r.stderr)
 	}
 }

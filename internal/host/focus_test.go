@@ -4,12 +4,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/oronbz/ghud/internal/hosttest"
-	"github.com/oronbz/ghud/internal/theme"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/hosttest"
+	"github.com/oronbz/visor/internal/theme"
+	"github.com/oronbz/visor/internal/widget"
 )
 
-func TestGhudStartsUnfocusedAndTabReturnsToTheLastFocusedWidget(t *testing.T) {
+func TestVisorStartsUnfocusedAndTabReturnsToTheLastFocusedWidget(t *testing.T) {
 	h := hosttest.New(t, hosttest.Options{Width: 100, Height: 21})
 	titles := []string{"Clock", "Calendar"}
 
@@ -112,7 +112,7 @@ func TestDigitsJumpToTheNthWidget(t *testing.T) {
 	}
 	h.Press("esc", "9")
 	if got := focused(t, h, phoneticTitles); got != "" {
-		t.Errorf("9 with six Widgets focused %q, want ghud left unfocused", got)
+		t.Errorf("9 with six Widgets focused %q, want visor left unfocused", got)
 	}
 }
 

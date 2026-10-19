@@ -2,43 +2,43 @@
 # snapshot first and supplies GITHUB_TOKEN from the local gh login.
 version: 2
 
-project_name: ghud
+project_name: visor
 
 builds:
   # cgo because go-eventkit (Calendar and Reminders) needs it.
-  - id: ghud-darwin
-    main: ./cmd/ghud
-    binary: ghud
+  - id: visor-darwin
+    main: ./cmd/visor
+    binary: visor
     env: [CGO_ENABLED=1]
     goos: [darwin]
     goarch: [arm64, amd64]
     flags: [-trimpath]
     ldflags:
-      - -s -w -X github.com/oronbz/ghud/internal/version.Version={{.Version}}
+      - -s -w -X github.com/oronbz/visor/internal/version.Version={{.Version}}
 
-  - id: ghud-other
-    main: ./cmd/ghud
-    binary: ghud
+  - id: visor-other
+    main: ./cmd/visor
+    binary: visor
     env: [CGO_ENABLED=0]
     goos: [linux, windows]
     goarch: [amd64, arm64]
     flags: [-trimpath]
     ldflags:
-      - -s -w -X github.com/oronbz/ghud/internal/version.Version={{.Version}}
+      - -s -w -X github.com/oronbz/visor/internal/version.Version={{.Version}}
 
-  # The Weather Plugin ships beside ghud, which finds it there. Pure Go everywhere.
-  - id: ghud-weather-darwin
-    main: ./cmd/ghud-weather
-    binary: ghud-weather
+  # The Weather Plugin ships beside visor, which finds it there. Pure Go everywhere.
+  - id: visor-weather-darwin
+    main: ./cmd/visor-weather
+    binary: visor-weather
     env: [CGO_ENABLED=0]
     goos: [darwin]
     goarch: [arm64, amd64]
     flags: [-trimpath]
     ldflags: [-s -w]
 
-  - id: ghud-weather-other
-    main: ./cmd/ghud-weather
-    binary: ghud-weather
+  - id: visor-weather-other
+    main: ./cmd/visor-weather
+    binary: visor-weather
     env: [CGO_ENABLED=0]
     goos: [linux, windows]
     goarch: [amd64, arm64]
@@ -46,18 +46,18 @@ builds:
     ldflags: [-s -w]
 
 universal_binaries:
-  - id: ghud-universal
-    ids: [ghud-darwin]
-    name_template: ghud
+  - id: visor-universal
+    ids: [visor-darwin]
+    name_template: visor
     replace: true
-  - id: ghud-weather-universal
-    ids: [ghud-weather-darwin]
-    name_template: ghud-weather
+  - id: visor-weather-universal
+    ids: [visor-weather-darwin]
+    name_template: visor-weather
     replace: true
 
 archives:
-  - id: ghud
-    ids: [ghud-universal, ghud-other, ghud-weather-universal, ghud-weather-other]
+  - id: visor
+    ids: [visor-universal, visor-other, visor-weather-universal, visor-weather-other]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     formats: [tar.gz]
     format_overrides:
@@ -65,13 +65,13 @@ archives:
         formats: [zip]
 
 nfpms:
-  - id: ghud
-    ids: [ghud-other, ghud-weather-other]
-    package_name: ghud
+  - id: visor
+    ids: [visor-other, visor-weather-other]
+    package_name: visor
     file_name_template: "{{ .ConventionalFileName }}"
     formats: [deb, rpm, apk]
     vendor: oronbz
-    homepage: https://github.com/oronbz/ghud
+    homepage: https://github.com/oronbz/visor
     maintainer: Oron Ben Zvi <1288090+oronbz@users.noreply.github.com>
     description: A god's-eye HUD for your day, in the terminal.
     bindir: /usr/bin
@@ -91,7 +91,7 @@ changelog:
 release:
   github:
     owner: oronbz
-    name: ghud
+    name: visor
   prerelease: auto
 
 # A cask, not a formula: Homebrew runs a formula without bottles as a source
@@ -100,19 +100,19 @@ release:
 # clears the quarantine flag Homebrew gives the download; it's a custom block
 # because GoReleaser's hooks write the Ruby postflight Homebrew 7 deprecates.
 homebrew_casks:
-  - name: ghud
-    ids: [ghud]
+  - name: visor
+    ids: [visor]
     repository:
       owner: oronbz
       name: homebrew-tap
       token: "{{ .Env.GITHUB_TOKEN }}"
-    homepage: https://github.com/oronbz/ghud
+    homepage: https://github.com/oronbz/visor
     description: A god's-eye HUD for your day, in the terminal
-    commit_msg_template: "Update ghud to {{ .Version }}"
-    binaries: [ghud, ghud-weather]
+    commit_msg_template: "Update visor to {{ .Version }}"
+    binaries: [visor, visor-weather]
     custom_block: |
       postflight_steps do
         on_macos do
-          run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ "{{" }}staged_path{{ "}}" }}/ghud", "{{ "{{" }}staged_path{{ "}}" }}/ghud-weather"]
+          run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ "{{" }}staged_path{{ "}}" }}/visor", "{{ "{{" }}staged_path{{ "}}" }}/visor-weather"]
         end
       end

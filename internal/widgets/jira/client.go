@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 // client calls one Jira site's REST API: with Basic auth, or with a Data
@@ -61,7 +61,7 @@ func (c client) get(ctx context.Context, path string, out any) error {
 		return err
 	}
 	if err := json.Unmarshal(b, out); err != nil {
-		return fmt.Errorf("Jira sent a reply ghud can't read: %w", err)
+		return fmt.Errorf("Jira sent a reply visor can't read: %w", err)
 	}
 	return nil
 }

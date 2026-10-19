@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://ghud.dev/schema/protocol.json",
-  "title": "ghud plugin protocol, version 1",
-  "description": "JSON-RPC 2.0 between ghud (the host) and a Plugin's process, one message per line (newline-delimited JSON) on the process's stdin and stdout. stderr isn't part of the protocol; its last line is shown when the process stops. The host starts one process per Plugin and addresses every Widget-specific message by its Widget id. Sequence: the host sends `initialize` and waits for its result; it then sends `widget/open` for each placed Widget, `widget/frame` when a Widget's size, focus or visibility changes, `widget/refresh` on its schedule, `action/choices` and `action/invoke` when the user runs an Action, and `widget/close` when a Widget goes away. The Plugin may send `widget/update` at any time. Closing stdin means quit. A result is checked against the matching $defs entry: initializeResult, refreshResult, choicesResult or invokeResult; this top-level schema checks the envelope and every request's and notification's params.",
+  "$id": "https://visor.dev/schema/protocol.json",
+  "title": "visor plugin protocol, version 1",
+  "description": "JSON-RPC 2.0 between visor (the host) and a Plugin's process, one message per line (newline-delimited JSON) on the process's stdin and stdout. stderr isn't part of the protocol; its last line is shown when the process stops. The host starts one process per Plugin and addresses every Widget-specific message by its Widget id. Sequence: the host sends `initialize` and waits for its result; it then sends `widget/open` for each placed Widget, `widget/frame` when a Widget's size, focus or visibility changes, `widget/refresh` on its schedule, `action/choices` and `action/invoke` when the user runs an Action, and `widget/close` when a Widget goes away. The Plugin may send `widget/update` at any time. Closing stdin means quit. A result is checked against the matching $defs entry: initializeResult, refreshResult, choicesResult or invokeResult; this top-level schema checks the envelope and every request's and notification's params.",
   "type": "object",
   "required": ["jsonrpc"],
   "properties": {
@@ -56,7 +56,7 @@
       "required": ["protocol"],
       "properties": {
         "protocol": { "description": "The version the host speaks.", "type": "integer", "minimum": 1 },
-        "ghud": { "description": "ghud's version.", "type": "string" }
+        "visor": { "description": "visor's version.", "type": "string" }
       }
     },
     "initializeResult": {
@@ -264,7 +264,7 @@
             "properties": {
               "id": { "description": "Comes back as action/invoke's choice.", "type": "string" },
               "label": { "type": "string" },
-              "target": { "description": "A page the host opens instead of invoking the Action, for a choice ghud can't complete itself.", "type": "string" }
+              "target": { "description": "A page the host opens instead of invoking the Action, for a choice visor can't complete itself.", "type": "string" }
             }
           }
         }

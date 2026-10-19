@@ -1,6 +1,6 @@
 // Command fixture is a Plugin that plays scripted protocol behaviours for
-// ghud's plugin host tests. It speaks raw JSON, the way a Plugin written in
-// another language would, and depends on nothing in ghud.
+// visor's plugin host tests. It speaks raw JSON, the way a Plugin written in
+// another language would, and depends on nothing in visor.
 //
 // Flags pick process-wide behaviour (-protocol answers the handshake with
 // another version, -handshake silent never answers it and -handshake empty

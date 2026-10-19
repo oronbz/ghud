@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/oronbz/ghud/internal/host"
-	"github.com/oronbz/ghud/internal/hosttest"
+	"github.com/oronbz/visor/internal/host"
+	"github.com/oronbz/visor/internal/hosttest"
 )
 
 func TestQuestionMarkShowsAndClosesTheKeyMap(t *testing.T) {
@@ -32,7 +32,7 @@ func TestQuestionMarkShowsAndClosesTheKeyMap(t *testing.T) {
 			t.Errorf("%s left the key map open:\n%s", closer, h.Screen())
 		}
 		if h.Quit() {
-			t.Fatalf("%s on the key map quit ghud", closer)
+			t.Fatalf("%s on the key map quit visor", closer)
 		}
 	}
 }

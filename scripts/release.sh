@@ -1,13 +1,13 @@
 #!/bin/bash
 # Usage: scripts/release.sh [--dry-run] <version>
 #
-# Releases ghud from this Mac: verifies a snapshot build, tags v<version>, then
+# Releases visor from this Mac: verifies a snapshot build, tags v<version>, then
 # GoReleaser publishes the GitHub release and the oronbz/homebrew-tap cask
 # with the local gh login. --dry-run stops after the snapshot verification and
 # never tags, pushes or publishes.
 set -euo pipefail
 
-REPO="oronbz/ghud"
+REPO="oronbz/visor"
 GORELEASER_VERSION="v2.18.2"
 
 red()   { printf '\033[1;31m%s\033[0m\n' "$*"; }
@@ -77,40 +77,40 @@ archs() {
 
 verify_snapshot() {
     local want="$VERSION-snapshot" bin
-    bin=$(binary 'ghud-universal_darwin_all' ghud)
+    bin=$(binary 'visor-universal_darwin_all' visor)
     expect "darwin archs" "$(archs "$bin")" "arm64 x86_64"
     expect "darwin cgo" "$(go version -m "$bin")" "CGO_ENABLED=1"
-    expect "darwin --version" "$("$bin" --version)" "ghud $want"
+    expect "darwin --version" "$("$bin" --version)" "visor $want"
     for target in linux_amd64 linux_arm64 windows_amd64 windows_arm64; do
-        local name=ghud
-        if [[ "$target" == windows_* ]]; then name=ghud.exe; fi
-        bin=$(binary "ghud-other_${target}*" "$name")
+        local name=visor
+        if [[ "$target" == windows_* ]]; then name=visor.exe; fi
+        bin=$(binary "visor-other_${target}*" "$name")
         expect "$target pure Go" "$(go version -m "$bin")" "CGO_ENABLED=0"
         if [[ "$target" == linux_* ]]; then
             expect "$target linking" "$(file "$bin")" "statically linked"
         fi
     done
-    bin=$(binary 'ghud-weather-universal_darwin_all' ghud-weather)
+    bin=$(binary 'visor-weather-universal_darwin_all' visor-weather)
     expect "weather darwin archs" "$(archs "$bin")" "arm64 x86_64"
     for target in linux_amd64 linux_arm64 windows_amd64 windows_arm64; do
-        local name=ghud-weather
-        if [[ "$target" == windows_* ]]; then name=ghud-weather.exe; fi
-        bin=$(binary "ghud-weather-other_${target}*" "$name")
+        local name=visor-weather
+        if [[ "$target" == windows_* ]]; then name=visor-weather.exe; fi
+        bin=$(binary "visor-weather-other_${target}*" "$name")
         expect "weather $target pure Go" "$(go version -m "$bin")" "CGO_ENABLED=0"
     done
-    expect "darwin archive" "$(tar -tzf "dist/ghud_${want}_darwin_all.tar.gz")" "ghud-weather"
-    expect "linux archive" "$(tar -tzf "dist/ghud_${want}_linux_amd64.tar.gz")" "ghud-weather"
-    expect "windows archive" "$(unzip -l "dist/ghud_${want}_windows_amd64.zip")" "ghud-weather.exe"
-    expect "cask" "$(cat dist/homebrew/Casks/ghud.rb)" 'binary "ghud-weather"'
-    expect "cask quarantine hook" "$(cat dist/homebrew/Casks/ghud.rb)" 'com.apple.quarantine'
-    for pattern in "ghud_${want}_darwin_all.tar.gz" "ghud_${want}_linux_amd64.tar.gz" "ghud_${want}_linux_arm64.tar.gz" \
-        "ghud_${want}_windows_amd64.zip" "ghud_${want}_windows_arm64.zip" '*.deb' '*.rpm' '*.apk' checksums.txt homebrew/Casks/ghud.rb; do
+    expect "darwin archive" "$(tar -tzf "dist/visor_${want}_darwin_all.tar.gz")" "visor-weather"
+    expect "linux archive" "$(tar -tzf "dist/visor_${want}_linux_amd64.tar.gz")" "visor-weather"
+    expect "windows archive" "$(unzip -l "dist/visor_${want}_windows_amd64.zip")" "visor-weather.exe"
+    expect "cask" "$(cat dist/homebrew/Casks/visor.rb)" 'binary "visor-weather"'
+    expect "cask quarantine hook" "$(cat dist/homebrew/Casks/visor.rb)" 'com.apple.quarantine'
+    for pattern in "visor_${want}_darwin_all.tar.gz" "visor_${want}_linux_amd64.tar.gz" "visor_${want}_linux_arm64.tar.gz" \
+        "visor_${want}_windows_amd64.zip" "visor_${want}_windows_arm64.zip" '*.deb' '*.rpm' '*.apk' checksums.txt homebrew/Casks/visor.rb; do
         compgen -G "dist/$pattern" >/dev/null || die "Missing dist/$pattern"
     done
     green "  archives, packages, checksums and the cask present"
 }
 
-if $DRY_RUN; then bold "Releasing ghud $TAG (dry run)"; else bold "Releasing ghud $TAG"; fi
+if $DRY_RUN; then bold "Releasing visor $TAG (dry run)"; else bold "Releasing visor $TAG"; fi
 
 bold "[1/5] Preflight"
 preflight
@@ -133,7 +133,7 @@ if $DRY_RUN; then
 fi
 
 bold "[5/5] Tagging $TAG and publishing"
-git tag -a "$TAG" -m "ghud $TAG"
+git tag -a "$TAG" -m "visor $TAG"
 git push origin "$TAG"
 if ! GITHUB_TOKEN="$(gh auth token)" goreleaser release --clean; then
     red "GoReleaser failed after $TAG was pushed. Fix the cause and rerun:" >&2
@@ -144,9 +144,9 @@ fi
 
 echo
 green "========================================="
-green "  Released ghud $TAG"
+green "  Released visor $TAG"
 green "========================================="
 echo
 echo "  GitHub:   https://github.com/$REPO/releases/tag/$TAG"
-echo "  Homebrew: brew update && brew install oronbz/tap/ghud"
+echo "  Homebrew: brew update && brew install oronbz/tap/visor"
 echo

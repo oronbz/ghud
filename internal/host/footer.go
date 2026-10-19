@@ -9,7 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/oronbz/ghud/internal/theme"
+	"github.com/oronbz/visor/internal/theme"
 )
 
 const footerHeight = 1

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/oronbz/ghud/internal/hosttest"
+	"github.com/oronbz/visor/internal/hosttest"
 )
 
 func TestBelowTheMinimumTileSizeACentredNoticeReplacesTheGrid(t *testing.T) {

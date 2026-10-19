@@ -81,7 +81,7 @@ func (c *conn) read(r io.Reader) error {
 		}
 		switch {
 		case msg.Method != "" && msg.ID != nil:
-			c.send(message{ID: msg.ID, Error: &RPCError{Code: -32601, Message: "ghud answers no requests"}})
+			c.send(message{ID: msg.ID, Error: &RPCError{Code: -32601, Message: "visor answers no requests"}})
 		case msg.Method != "":
 			c.notify(msg.Method, msg.Params)
 		case msg.ID != nil:
@@ -211,4 +211,4 @@ func (c *conn) closedErr() error {
 
 func (c *conn) Close() { c.fail(errClosed) }
 
-var errClosed = errors.New("closed by ghud")
+var errClosed = errors.New("closed by visor")

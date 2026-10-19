@@ -68,7 +68,7 @@ func (s *server) serve(in io.Reader) int {
 	for sc.Scan() {
 		var msg message
 		if err := json.Unmarshal(sc.Bytes(), &msg); err != nil {
-			fmt.Fprintln(os.Stderr, "ghud-weather: bad message:", err)
+			fmt.Fprintln(os.Stderr, "visor-weather: bad message:", err)
 			continue
 		}
 		s.handle(msg)

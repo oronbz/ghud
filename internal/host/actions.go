@@ -11,9 +11,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/oronbz/ghud/internal/render"
-	"github.com/oronbz/ghud/internal/theme"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/render"
+	"github.com/oronbz/visor/internal/theme"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 const toastLife = 5 * time.Second

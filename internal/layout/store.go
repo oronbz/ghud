@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-// FileName is the Layout file in the config dir. ghud owns it (ADR 0003).
+// FileName is the Layout file in the config dir. visor owns it (ADR 0003).
 const FileName = "layout.json"
 
 // file keeps the Layout under "default" so named Layouts can come later.

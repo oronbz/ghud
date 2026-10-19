@@ -6,8 +6,8 @@ package ekaccess
 import (
 	"context"
 
-	"github.com/oronbz/ghud/internal/ports"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/ports"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 // Grant is the ID of the setup Action that asks for access; a Widget's

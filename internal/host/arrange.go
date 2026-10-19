@@ -8,8 +8,8 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/oronbz/ghud/internal/layout"
-	"github.com/oronbz/ghud/internal/theme"
+	"github.com/oronbz/visor/internal/layout"
+	"github.com/oronbz/visor/internal/theme"
 )
 
 // arrangeKey handles a key in arrange mode, which works on the focused Widget.

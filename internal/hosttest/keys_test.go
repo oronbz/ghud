@@ -3,7 +3,7 @@ package hosttest_test
 import (
 	"testing"
 
-	"github.com/oronbz/ghud/internal/hosttest"
+	"github.com/oronbz/visor/internal/hosttest"
 )
 
 func TestKeyPrintsTheWayBubbleTeaDecodesIt(t *testing.T) {

@@ -11,7 +11,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/oronbz/ghud/internal/ports"
+	"github.com/oronbz/visor/internal/ports"
 )
 
 // Clock is a fake clock. Timers fire only when the test calls Host.Advance.

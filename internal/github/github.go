@@ -5,7 +5,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/oronbz/ghud/internal/ports"
+	"github.com/oronbz/visor/internal/ports"
 )
 
 // FromGh is Token's from for a token gh gave.

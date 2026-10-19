@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/oronbz/ghud/internal/hosttest"
-	"github.com/oronbz/ghud/internal/theme"
+	"github.com/oronbz/visor/internal/hosttest"
+	"github.com/oronbz/visor/internal/theme"
 )
 
 func TestFooterShowsTheNormalBadgeAndGlobalHintsBelowTheGrid(t *testing.T) {

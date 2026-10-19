@@ -1,6 +1,6 @@
-// Package weather is the Weather Plugin ghud ships with. It runs as its own
-// process (cmd/ghud-weather) and speaks the plugin protocol over stdio like
-// any external Plugin, so it depends on nothing else in ghud: it only
+// Package weather is the Weather Plugin visor ships with. It runs as its own
+// process (cmd/visor-weather) and speaks the plugin protocol over stdio like
+// any external Plugin, so it depends on nothing else in visor: it only
 // describes what to draw, from Open-Meteo, at a place found by the `city`
 // or `lat`/`lon` settings, else by IP address, else by time zone.
 package weather
@@ -12,25 +12,25 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/oronbz/ghud/internal/paths"
+	"github.com/oronbz/visor/internal/paths"
 )
 
-// Manifest is the Plugin's ghud-plugin.toml, built into ghud, which reads
+// Manifest is the Plugin's visor-plugin.toml, built into visor, which reads
 // it when it finds Binary next to its own executable.
 //
-//go:embed ghud-plugin.toml
+//go:embed visor-plugin.toml
 var Manifest []byte
 
 // Binary is the Plugin's executable name (plus .exe on Windows).
-const Binary = "ghud-weather"
+const Binary = "visor-weather"
 
-// The environment ghud sets for the Plugin's process. Empty ones fall back
+// The environment visor sets for the Plugin's process. Empty ones fall back
 // to the real services and the usual cache dir.
 const (
-	EnvCache     = "GHUD_CACHE_DIR"
-	EnvForecast  = "GHUD_OPEN_METEO_URL"
-	EnvGeocoding = "GHUD_GEOCODING_URL"
-	EnvIPAPI     = "GHUD_IPAPI_URL"
+	EnvCache     = "VISOR_CACHE_DIR"
+	EnvForecast  = "VISOR_OPEN_METEO_URL"
+	EnvGeocoding = "VISOR_GEOCODING_URL"
+	EnvIPAPI     = "VISOR_IPAPI_URL"
 )
 
 // Main serves the protocol on stdin and stdout until stdin closes.
@@ -64,16 +64,16 @@ func or(v, fallback string) string {
 	return v
 }
 
-// cacheDir is ghud's cache dir: the one ghud passes, else where ghud keeps it.
+// cacheDir is visor's cache dir: the one visor passes, else where visor keeps it.
 func cacheDir(getenv func(string) string) string {
 	if d := getenv(EnvCache); d != "" {
 		return d
 	}
 	if d := getenv("XDG_CACHE_HOME"); filepath.IsAbs(d) {
-		return filepath.Join(d, "ghud")
+		return filepath.Join(d, "visor")
 	}
 	if home := paths.Home(getenv); home != "" {
-		return filepath.Join(home, ".cache", "ghud")
+		return filepath.Join(home, ".cache", "visor")
 	}
-	return filepath.Join(os.TempDir(), "ghud")
+	return filepath.Join(os.TempDir(), "visor")
 }

@@ -5,9 +5,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/oronbz/ghud/internal/skills"
-	"github.com/oronbz/ghud/internal/theme"
-	"github.com/oronbz/ghud/internal/version"
+	"github.com/oronbz/visor/internal/skills"
+	"github.com/oronbz/visor/internal/theme"
+	"github.com/oronbz/visor/internal/version"
 )
 
 // skillsMsg is the outcome of installing the agent skills, or of bringing
@@ -19,7 +19,7 @@ type skillsMsg struct {
 	err     error
 }
 
-// version is the ghud version this Model runs as.
+// version is the visor version this Model runs as.
 func (m Model) version() string {
 	if m.opts.Version != "" {
 		return m.opts.Version
@@ -36,7 +36,7 @@ func (m Model) skillsInstaller() (skills.Installer, error) {
 	return skills.For(getenv, v)
 }
 
-// refreshSkills updates the skills an older ghud installed, off the UI thread.
+// refreshSkills updates the skills an older visor installed, off the UI thread.
 func (m Model) refreshSkills() tea.Cmd {
 	in, err := m.skillsInstaller()
 	if err != nil {
@@ -48,7 +48,7 @@ func (m Model) refreshSkills() tea.Cmd {
 	}
 }
 
-// installSkills is the host Action that does what `ghud skills install` does.
+// installSkills is the host Action that does what `visor skills install` does.
 func (m Model) installSkills() tea.Cmd {
 	in, err := m.skillsInstaller()
 	return func() tea.Msg {
@@ -63,7 +63,7 @@ func (m Model) installSkills() tea.Cmd {
 func (m Model) skillsDone(msg skillsMsg) (Model, tea.Cmd) {
 	switch {
 	case msg.refresh && msg.err != nil:
-		return m.say("Updating agent skills failed: "+msg.err.Error()+"; run `ghud skills install`", theme.Warn)
+		return m.say("Updating agent skills failed: "+msg.err.Error()+"; run `visor skills install`", theme.Warn)
 	case msg.refresh && msg.hint != "":
 		return m.say(msg.hint, theme.Warn)
 	case msg.refresh:
@@ -76,7 +76,7 @@ func (m Model) skillsDone(msg skillsMsg) (Model, tea.Cmd) {
 		text += ", linked for Claude Code"
 	}
 	if n := len(msg.report.Kept); n > 0 {
-		text += fmt.Sprintf("; left %d Claude Code skill folders ghud didn't make", n)
+		text += fmt.Sprintf("; left %d Claude Code skill folders visor didn't make", n)
 	}
 	return m.say(text, theme.Fg)
 }

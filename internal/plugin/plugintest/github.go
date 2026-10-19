@@ -14,7 +14,7 @@ import (
 	"testing"
 )
 
-// GitHub is a fake of the GitHub REST endpoints `ghud plugin install`
+// GitHub is a fake of the GitHub REST endpoints `visor plugin install`
 // uses: resolving a ref to a commit and downloading a commit's tarball.
 // Repositories live in memory; Push adds commits.
 type GitHub struct {

@@ -63,8 +63,8 @@ func TestManifestIsAValidHerdrPlugin(t *testing.T) {
 	}
 
 	localID := regexp.MustCompile(`^[A-Za-z0-9:_-]+$`)
-	if len(m.Panes) != 1 || m.Panes[0].ID != "ghud" || m.Panes[0].Placement != "overlay" {
-		t.Fatalf("panes = %+v, want one overlay pane with id ghud, which toggle-ghud.sh opens", m.Panes)
+	if len(m.Panes) != 1 || m.Panes[0].ID != "visor" || m.Panes[0].Placement != "overlay" {
+		t.Fatalf("panes = %+v, want one overlay pane with id visor, which toggle-visor.sh opens", m.Panes)
 	}
 	if len(m.Actions) != 1 || m.Actions[0].ID != "toggle" {
 		t.Fatalf("actions = %+v, want one action with id toggle, which the README binds", m.Actions)

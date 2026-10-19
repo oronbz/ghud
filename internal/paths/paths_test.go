@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/oronbz/ghud/internal/paths"
+	"github.com/oronbz/visor/internal/paths"
 )
 
 func TestResolve(t *testing.T) {
@@ -19,25 +19,25 @@ func TestResolve(t *testing.T) {
 			name: "home defaults on macOS, not ~/Library",
 			goos: "darwin",
 			env:  map[string]string{"HOME": "/Users/me"},
-			want: paths.Paths{Config: j("/Users/me", ".config", "ghud"), Data: j("/Users/me", ".local", "share", "ghud"), Cache: j("/Users/me", ".cache", "ghud")},
+			want: paths.Paths{Config: j("/Users/me", ".config", "visor"), Data: j("/Users/me", ".local", "share", "visor"), Cache: j("/Users/me", ".cache", "visor")},
 		},
 		{
 			name: "XDG variables win",
 			goos: "darwin",
 			env:  map[string]string{"HOME": "/Users/me", "XDG_CONFIG_HOME": "/x/conf", "XDG_DATA_HOME": "/x/data", "XDG_CACHE_HOME": "/x/cache"},
-			want: paths.Paths{Config: j("/x/conf", "ghud"), Data: j("/x/data", "ghud"), Cache: j("/x/cache", "ghud")},
+			want: paths.Paths{Config: j("/x/conf", "visor"), Data: j("/x/data", "visor"), Cache: j("/x/cache", "visor")},
 		},
 		{
 			name: "relative XDG values are ignored, per the XDG spec",
 			goos: "linux",
 			env:  map[string]string{"HOME": "/home/me", "XDG_CONFIG_HOME": "rel"},
-			want: paths.Paths{Config: j("/home/me", ".config", "ghud"), Data: j("/home/me", ".local", "share", "ghud"), Cache: j("/home/me", ".cache", "ghud")},
+			want: paths.Paths{Config: j("/home/me", ".config", "visor"), Data: j("/home/me", ".local", "share", "visor"), Cache: j("/home/me", ".cache", "visor")},
 		},
 		{
 			name: "Windows uses AppData and LocalAppData",
 			goos: "windows",
 			env:  map[string]string{"AppData": "/w/roaming", "LocalAppData": "/w/local"},
-			want: paths.Paths{Config: j("/w/roaming", "ghud"), Data: j("/w/local", "ghud", "data"), Cache: j("/w/local", "ghud", "cache")},
+			want: paths.Paths{Config: j("/w/roaming", "visor"), Data: j("/w/local", "visor", "data"), Cache: j("/w/local", "visor", "cache")},
 		},
 	}
 	for _, tt := range tests {

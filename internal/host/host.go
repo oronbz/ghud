@@ -1,4 +1,4 @@
-// Package host is the ghud Bubble Tea program: it owns the Widgets, input
+// Package host is the visor Bubble Tea program: it owns the Widgets, input
 // modes and focus, and draws the dashboard. Everything outside the process
 // goes through Options.Ports.
 package host
@@ -16,29 +16,29 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/oronbz/ghud/internal/cache"
-	"github.com/oronbz/ghud/internal/closekey"
-	"github.com/oronbz/ghud/internal/config"
-	"github.com/oronbz/ghud/internal/layout"
-	"github.com/oronbz/ghud/internal/paths"
-	"github.com/oronbz/ghud/internal/plugin"
-	"github.com/oronbz/ghud/internal/ports"
-	"github.com/oronbz/ghud/internal/render"
-	"github.com/oronbz/ghud/internal/theme"
-	"github.com/oronbz/ghud/internal/widget"
-	"github.com/oronbz/ghud/internal/widgets/calendar"
-	"github.com/oronbz/ghud/internal/widgets/clock"
-	"github.com/oronbz/ghud/internal/widgets/cpu"
-	"github.com/oronbz/ghud/internal/widgets/jira"
-	"github.com/oronbz/ghud/internal/widgets/notes"
-	"github.com/oronbz/ghud/internal/widgets/prs"
-	"github.com/oronbz/ghud/internal/widgets/script"
-	"github.com/oronbz/ghud/internal/widgets/tasks"
+	"github.com/oronbz/visor/internal/cache"
+	"github.com/oronbz/visor/internal/closekey"
+	"github.com/oronbz/visor/internal/config"
+	"github.com/oronbz/visor/internal/layout"
+	"github.com/oronbz/visor/internal/paths"
+	"github.com/oronbz/visor/internal/plugin"
+	"github.com/oronbz/visor/internal/ports"
+	"github.com/oronbz/visor/internal/render"
+	"github.com/oronbz/visor/internal/theme"
+	"github.com/oronbz/visor/internal/widget"
+	"github.com/oronbz/visor/internal/widgets/calendar"
+	"github.com/oronbz/visor/internal/widgets/clock"
+	"github.com/oronbz/visor/internal/widgets/cpu"
+	"github.com/oronbz/visor/internal/widgets/jira"
+	"github.com/oronbz/visor/internal/widgets/notes"
+	"github.com/oronbz/visor/internal/widgets/prs"
+	"github.com/oronbz/visor/internal/widgets/script"
+	"github.com/oronbz/visor/internal/widgets/tasks"
 )
 
 type Options struct {
 	Paths paths.Paths
-	// ConfigFile overrides Paths.Config/config.toml (--config, GHUD_CONFIG).
+	// ConfigFile overrides Paths.Config/config.toml (--config, VISOR_CONFIG).
 	ConfigFile string
 	// Locale gives time_format and week_start their defaults.
 	Locale config.Locale
@@ -52,7 +52,7 @@ type Options struct {
 	CloseKeys []closekey.Seq
 	// Version stamps agent skills; "" is the version this binary was built as.
 	Version string
-	// BundleDir is where ghud's executable and the Plugins it ships with sit.
+	// BundleDir is where visor's executable and the Plugins it ships with sit.
 	BundleDir string
 }
 
@@ -64,7 +64,7 @@ type Model struct {
 	now     time.Time
 	widgets map[string]placed
 	layout  layout.Layout
-	// focus is "" when ghud is unfocused; last survives unfocusing.
+	// focus is "" when visor is unfocused; last survives unfocusing.
 	focus, last string
 	keyMap      bool
 	arranging   bool
@@ -126,7 +126,7 @@ type tickMsg struct {
 	seq int
 }
 
-// Builtins are the Widget types compiled into ghud, in reference order.
+// Builtins are the Widget types compiled into visor, in reference order.
 var Builtins = slices.Concat([]widget.Type{clock.Type, calendar.Type}, macTypes,
 	[]widget.Type{tasks.Type, cpu.Type, notes.Type, prs.Type, jira.Type, script.Type})
 

@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/oronbz/ghud/internal/hosttest"
-	"github.com/oronbz/ghud/internal/layout"
-	"github.com/oronbz/ghud/internal/theme"
+	"github.com/oronbz/visor/internal/hosttest"
+	"github.com/oronbz/visor/internal/layout"
+	"github.com/oronbz/visor/internal/theme"
 )
 
 const threeAcross = `{"default": {"rows": [

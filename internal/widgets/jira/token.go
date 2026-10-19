@@ -5,20 +5,20 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/oronbz/ghud/internal/paths"
-	"github.com/oronbz/ghud/internal/ports"
+	"github.com/oronbz/visor/internal/paths"
+	"github.com/oronbz/visor/internal/ports"
 )
 
-// service is the keyring service ghud keeps its own credentials under; the
+// service is the keyring service visor keeps its own credentials under; the
 // account is the Widget's Credential.
-const service = "ghud"
+const service = "visor"
 
 // cliService is jira-cli's keychain service; its account is the login.
-// ghud reads it, never writes it.
+// visor reads it, never writes it.
 const cliService = "jira-cli"
 
 // token finds an API token for email on site without prompting: from
-// JIRA_API_TOKEN, ghud's keyring item, jira-cli's keychain item, then
+// JIRA_API_TOKEN, visor's keyring item, jira-cli's keychain item, then
 // ~/.netrc. It's read afresh on every call and never kept.
 func token(p ports.Ports, site, email, account string) (string, bool) {
 	getenv := p.Getenv

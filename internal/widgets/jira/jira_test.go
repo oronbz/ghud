@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/oronbz/ghud/internal/hosttest"
-	"github.com/oronbz/ghud/internal/ports"
-	"github.com/oronbz/ghud/internal/theme"
+	"github.com/oronbz/visor/internal/hosttest"
+	"github.com/oronbz/visor/internal/ports"
+	"github.com/oronbz/visor/internal/theme"
 )
 
 const (

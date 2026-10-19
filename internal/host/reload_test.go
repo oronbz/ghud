@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/oronbz/ghud/internal/config"
-	"github.com/oronbz/ghud/internal/hosttest"
-	"github.com/oronbz/ghud/internal/layout"
+	"github.com/oronbz/visor/internal/config"
+	"github.com/oronbz/visor/internal/hosttest"
+	"github.com/oronbz/visor/internal/layout"
 )
 
 func layoutFile(h *hosttest.Host) string { return filepath.Join(h.Paths.Config, layout.FileName) }
@@ -128,7 +128,7 @@ func TestALiveConfigEditAddingAWidgetShowsIt(t *testing.T) {
 	}
 }
 
-func TestTheReloadAfterGhudsOwnConfigEditsChangesNothingMore(t *testing.T) {
+func TestTheReloadAfterVisorsOwnConfigEditsChangesNothingMore(t *testing.T) {
 	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 80, Height: 20, Config: oneClock})
 
 	runFromPalette(t, h, "add calendar")

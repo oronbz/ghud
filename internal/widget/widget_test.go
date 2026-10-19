@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/oronbz/ghud/internal/theme"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/theme"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 func TestLiveViewLinesTakeThemeTokens(t *testing.T) {

@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/oronbz/ghud/internal/render"
-	"github.com/oronbz/ghud/internal/theme"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/render"
+	"github.com/oronbz/visor/internal/theme"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 // status is a Widget's Status (GLOSSARY.md), drawn the same way for every Widget.

@@ -6,22 +6,22 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/oronbz/ghud/internal/github"
-	"github.com/oronbz/ghud/internal/ports"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/github"
+	"github.com/oronbz/visor/internal/ports"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 // credential names the GitHub token every PRs Widget shares, so a rate limit
-// on one pauses them all. It's also the account of ghud's keyring item.
+// on one pauses them all. It's also the account of visor's keyring item.
 const credential = "github:github.com"
 
-const service = "ghud"
+const service = "visor"
 
-const tokenPage = "https://github.com/settings/tokens/new?scopes=repo&description=ghud"
+const tokenPage = "https://github.com/settings/tokens/new?scopes=repo&description=visor"
 
 const pasteToken = "paste-token"
 
-// fromKeyring is how setup hints name the token pasted into ghud.
+// fromKeyring is how setup hints name the token pasted into visor.
 const fromKeyring = "The saved token"
 
 var (
@@ -30,7 +30,7 @@ var (
 )
 
 // token borrows a GitHub token from GH_TOKEN, GITHUB_TOKEN or `gh auth token`,
-// else reads the one pasted into ghud from the keyring; from names where it
+// else reads the one pasted into visor from the keyring; from names where it
 // came from. It's read afresh each time and never kept, so a `gh auth login`
 // is picked up on the next refresh.
 func token(ctx context.Context, p ports.Ports) (tok, from string, err error) {
@@ -72,7 +72,7 @@ func needsToken(err error) *widget.SetupError {
 }
 
 // unusable is the Status of a Widget whose token can't be used, problem
-// saying why. Only a token pasted into ghud can be replaced by pasting
+// saying why. Only a token pasted into visor can be replaced by pasting
 // another: one borrowed from the environment or gh always wins over it.
 func unusable(p ports.Ports, from, problem string) *widget.SetupError {
 	switch {

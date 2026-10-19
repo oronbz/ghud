@@ -7,17 +7,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/oronbz/ghud/internal/cli"
-	"github.com/oronbz/ghud/internal/hosttest"
+	"github.com/oronbz/visor/internal/cli"
+	"github.com/oronbz/visor/internal/hosttest"
 )
 
-// authJira runs `ghud auth jira` in a temp home holding config (none when
+// authJira runs `visor auth jira` in a temp home holding config (none when
 // empty), answering its prompts with stdin.
 func authJira(t *testing.T, config, stdin string) (code int, home string, k *hosttest.Keyring, o *hosttest.Opener, stdout, stderr *bytes.Buffer) {
 	t.Helper()
 	home = t.TempDir()
 	if config != "" {
-		dir := filepath.Join(home, ".config", "ghud")
+		dir := filepath.Join(home, ".config", "visor")
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -36,7 +36,7 @@ func authJira(t *testing.T, config, stdin string) (code int, home string, k *hos
 
 func configOf(t *testing.T, home string) string {
 	t.Helper()
-	b, err := os.ReadFile(filepath.Join(home, ".config", "ghud", "config.toml"))
+	b, err := os.ReadFile(filepath.Join(home, ".config", "visor", "config.toml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ jql = "project = OPS"
 	if code != 0 {
 		t.Fatalf("exit %d, stderr: %s", code, stderr)
 	}
-	if got, err := k.Get("ghud", "jira:acme.atlassian.net:oron@acme.io"); err != nil || got != "secret-token" {
+	if got, err := k.Get("visor", "jira:acme.atlassian.net:oron@acme.io"); err != nil || got != "secret-token" {
 		t.Errorf("keyring holds %q (%v), want the token", got, err)
 	}
 	want := `# mine
@@ -131,7 +131,7 @@ func TestAuthJiraWithoutATokenChangesNothing(t *testing.T) {
 	if got := configOf(t, home); got != config {
 		t.Errorf("config.toml changed:\n%s", got)
 	}
-	if _, err := k.Get("ghud", "jira:acme.atlassian.net:oron@acme.io"); err == nil {
+	if _, err := k.Get("visor", "jira:acme.atlassian.net:oron@acme.io"); err == nil {
 		t.Error("a token reached the keyring")
 	}
 }

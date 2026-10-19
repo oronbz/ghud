@@ -17,8 +17,8 @@ import (
 
 	toml "github.com/pelletier/go-toml/v2"
 
-	"github.com/oronbz/ghud/internal/theme"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/theme"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 const FileName = "config.toml"

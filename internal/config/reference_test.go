@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/oronbz/ghud/internal/config"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/config"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 func TestTheReferenceWrapsTheDefaultWidgetsWithinTheLine(t *testing.T) {

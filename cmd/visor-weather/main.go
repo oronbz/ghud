@@ -1,11 +1,11 @@
-// Command ghud-weather is the Weather Plugin ghud ships with: it speaks the
+// Command visor-weather is the Weather Plugin visor ships with: it speaks the
 // plugin protocol on stdin and stdout, like any external Plugin.
 package main
 
 import (
 	"os"
 
-	"github.com/oronbz/ghud/internal/weather"
+	"github.com/oronbz/visor/internal/weather"
 )
 
 func main() {

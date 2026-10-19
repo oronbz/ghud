@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/oronbz/ghud/internal/hosttest"
+	"github.com/oronbz/visor/internal/hosttest"
 )
 
 func closeKeys(t *testing.T) *hosttest.Host {
@@ -84,6 +84,6 @@ func TestWithoutCloseKeysCtrlBDDoesNotQuit(t *testing.T) {
 	h := hosttest.New(t, hosttest.Options{Width: 100, Height: 30, Types: liveViews})
 	h.Press("ctrl+b", "d", "shift+super+g")
 	if h.Quit() {
-		t.Error("ghud quit with no --close-key given")
+		t.Error("visor quit with no --close-key given")
 	}
 }

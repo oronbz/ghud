@@ -1,10 +1,10 @@
-# ghud
+# visor
 
 **A god's-eye HUD for your day, right in your terminal.**
 
-![ghud: clock, calendar, meetings, tasks, reminders, notes, CPU and memory, GitHub review requests, Jira issues and the weather in one terminal dashboard](docs/screenshot.png)
+![visor: clock, calendar, meetings, tasks, reminders, notes, CPU and memory, GitHub review requests, Jira issues and the weather in one terminal dashboard](docs/screenshot.png)
 
-Stop jumping between Calendar, GitHub, Jira and your notes to figure out what's next. ghud shows your next meeting, the PRs waiting for your review, your Jira tickets, today's tasks and reminders, and the weather on one screen, and keeps it fresh while you work.
+Stop jumping between Calendar, GitHub, Jira and your notes to figure out what's next. visor shows your next meeting, the PRs waiting for your review, your Jira tickets, today's tasks and reminders, and the weather on one screen, and keeps it fresh while you work.
 
 And you can act on it, not just look at it. Approve a PR, move a ticket along, check off a task or open a meeting straight from the dashboard, without going to the browser.
 
@@ -18,10 +18,10 @@ And you can act on it, not just look at it. Approve a PR, move a ticket along, c
 ### macOS
 
 ```sh
-brew install oronbz/tap/ghud
+brew install oronbz/tap/visor
 ```
 
-The cask installs a universal binary, plus `ghud-weather`, the Weather Plugin that ships with ghud. It needs no Xcode, and it clears the quarantine flag, so macOS doesn't block the first run.
+The cask installs a universal binary, plus `visor-weather`, the Weather Plugin that ships with visor. It needs no Xcode, and it clears the quarantine flag, so macOS doesn't block the first run.
 
 Apple silicon is what I use and test on. Intel Macs get the same universal binary, but they're untested, so it's best effort.
 
@@ -32,32 +32,32 @@ The Meetings and Reminders Widgets ask for Calendar and Reminders access the fir
 With [Homebrew on Linux](https://docs.brew.sh/Homebrew-on-Linux):
 
 ```sh
-brew install oronbz/tap/ghud
+brew install oronbz/tap/visor
 ```
 
-Or take a deb, rpm or apk package from the [latest release](https://github.com/oronbz/ghud/releases/latest) (amd64 and arm64):
+Or take a deb, rpm or apk package from the [latest release](https://github.com/oronbz/visor/releases/latest) (amd64 and arm64):
 
 ```sh
-sudo dpkg -i ghud_X.Y.Z_amd64.deb      # Debian, Ubuntu
-sudo rpm -i ghud-X.Y.Z-1.x86_64.rpm    # Fedora, RHEL
-sudo apk add --allow-untrusted ghud_X.Y.Z_x86_64.apk   # Alpine
+sudo dpkg -i visor_X.Y.Z_amd64.deb      # Debian, Ubuntu
+sudo rpm -i visor-X.Y.Z-1.x86_64.rpm    # Fedora, RHEL
+sudo apk add --allow-untrusted visor_X.Y.Z_x86_64.apk   # Alpine
 ```
 
-The packages install `ghud` and `ghud-weather` in `/usr/bin`. Meetings and Reminders are macOS only, everything else works the same.
+The packages install `visor` and `visor-weather` in `/usr/bin`. Meetings and Reminders are macOS only, everything else works the same.
 
 ### Windows
 
-1. Download `ghud_X.Y.Z_windows_amd64.zip` (or `arm64`) from the [latest release](https://github.com/oronbz/ghud/releases/latest).
-2. Extract `ghud.exe` and `ghud-weather.exe` into the same folder, for example `%LOCALAPPDATA%\Programs\ghud`. Keep them together, ghud looks for the Weather Plugin next to itself.
-3. Add that folder to your `PATH` (Settings > System > About > Advanced system settings > Environment Variables), then open a new terminal and run `ghud`.
+1. Download `visor_X.Y.Z_windows_amd64.zip` (or `arm64`) from the [latest release](https://github.com/oronbz/visor/releases/latest).
+2. Extract `visor.exe` and `visor-weather.exe` into the same folder, for example `%LOCALAPPDATA%\Programs\visor`. Keep them together, visor looks for the Weather Plugin next to itself.
+3. Add that folder to your `PATH` (Settings > System > About > Advanced system settings > Environment Variables), then open a new terminal and run `visor`.
 
-Use Windows Terminal or another terminal with good Unicode and true colour support. The config lives in `%AppData%\ghud\config.toml`.
+Use Windows Terminal or another terminal with good Unicode and true colour support. The config lives in `%AppData%\visor\config.toml`.
 
 ### From source
 
 ```sh
-go install github.com/oronbz/ghud/cmd/ghud@latest
-go install github.com/oronbz/ghud/cmd/ghud-weather@latest
+go install github.com/oronbz/visor/cmd/visor@latest
+go install github.com/oronbz/visor/cmd/visor-weather@latest
 ```
 
 Both binaries need to end up in the same directory, which `go install` does for you.
@@ -67,32 +67,32 @@ Both binaries need to end up in the same directory, which `go install` does for 
 With Homebrew, on macOS or Linux:
 
 ```sh
-brew upgrade ghud
+brew upgrade visor
 ```
 
 With a package, the Windows zip or `go install`, install the newer release the same way you installed the first one.
 
 ## Getting started
 
-Run `ghud`. With no config you get the default Widgets: Clock, Calendar, Meetings (macOS), Tasks, Reminders (macOS), Notes, CPU + memory, PRs, Jira and Weather. Script is opt-in, add it with `ctrl+k` and Add Widget.
+Run `visor`. With no config you get the default Widgets: Clock, Calendar, Meetings (macOS), Tasks, Reminders (macOS), Notes, CPU + memory, PRs, Jira and Weather. Script is opt-in, add it with `ctrl+k` and Add Widget.
 
 - `?` shows every key. `ctrl+k` opens the Action palette, and the footer shows the keys for whatever is focused.
 - `q` quits.
-- Widgets that need a sign-in or a setting show *needs setup* with a way to fix it right there. GitHub uses your `gh` login or a pasted token. Jira is set up with `ghud auth jira`. Tokens go only to your system keyring.
+- Widgets that need a sign-in or a setting show *needs setup* with a way to fix it right there. GitHub uses your `gh` login or a pasted token. Jira is set up with `visor auth jira`. Tokens go only to your system keyring.
 
 ## Configure
 
-Your Widgets and settings live in `~/.config/ghud/config.toml` (`$XDG_CONFIG_HOME` is respected, `%AppData%\ghud` on Windows). `GHUD_CONFIG` or `--config <path>` point ghud at another file. ghud never rewrites this file, so it's safe in your dotfiles. The arrangement and sizes you set with the mouse or in arrange mode go to a separate `layout.json` that ghud owns.
+Your Widgets and settings live in `~/.config/visor/config.toml` (`$XDG_CONFIG_HOME` is respected, `%AppData%\visor` on Windows). `VISOR_CONFIG` or `--config <path>` point visor at another file. visor never rewrites this file, so it's safe in your dotfiles. The arrangement and sizes you set with the mouse or in arrange mode go to a separate `layout.json` that visor owns.
 
 ```sh
-ghud config default   # print the full commented reference
-ghud config init      # write that reference to your config path, once
+visor config default   # print the full commented reference
+visor config init      # write that reference to your config path, once
 ```
 
 The reference lists every option and every Widget type, built-in and installed, with its settings, defaults and why you'd change them. A small config looks like this:
 
 ```toml
-theme = "ghud"   # or "terminal" to take colours from your terminal
+theme = "visor"   # or "terminal" to take colours from your terminal
 
 [[widget]]
 type = "jira"
@@ -116,53 +116,53 @@ accent = "#8aa9ff"
 accent = "#3f63d8"
 ```
 
-Running instances reload the config as soon as you save it, so you can keep ghud open while you edit.
+Running instances reload the config as soon as you save it, so you can keep visor open while you edit.
 
 ## herdr
 
 ### Install with herdr
 
-If you use herdr, this installs ghud with Homebrew when it's missing:
+If you use herdr, this installs visor with Homebrew when it's missing:
 
 ```sh
-herdr plugin install oronbz/ghud/herdr
+herdr plugin install oronbz/visor/herdr
 ```
 
-When ghud is already on your `PATH` it does nothing. It never upgrades ghud and never asks anything. Without Homebrew it stops and prints the other ways to install.
+When visor is already on your `PATH` it does nothing. It never upgrades visor and never asks anything. Without Homebrew it stops and prints the other ways to install.
 
 ### Update with herdr
 
-The plugin and ghud update separately. To get the plugin's latest actions, such as the one-key toggle below:
+The plugin and visor update separately. To get the plugin's latest actions, such as the one-key toggle below:
 
 ```sh
-herdr plugin update ghud
+herdr plugin update visor
 ```
 
-The plugin never upgrades ghud itself. To upgrade ghud, see [Update](#update).
+The plugin never upgrades visor itself. To upgrade visor, see [Update](#update).
 
-### Open ghud with one key
+### Open visor with one key
 
-The plugin above also gives herdr a `ghud.toggle` action. Bind it in herdr's `config.toml` (`~/.config/herdr/config.toml`) and run `herdr server reload-config`:
+The plugin above also gives herdr a `visor.toggle` action. Bind it in herdr's `config.toml` (`~/.config/herdr/config.toml`) and run `herdr server reload-config`:
 
 ```toml
 [[keys.command]]
 key = "cmd+shift+g"
 type = "plugin_action"
-command = "ghud.toggle"
-description = "ghud"
+command = "visor.toggle"
+description = "visor"
 
 [[keys.command]]
 key = "prefix+d"
 type = "plugin_action"
-command = "ghud.toggle"
-description = "ghud"
+command = "visor.toggle"
+description = "visor"
 ```
 
-`cmd+shift+g` or `prefix+d` opens ghud over the whole tab you're in, and the same key closes it and brings your panes back. herdr's sidebar stays visible and clickable while ghud is open. If you switch to another tab and press the key, ghud moves to that tab. `q` quits ghud too.
+`cmd+shift+g` or `prefix+d` opens visor over the whole tab you're in, and the same key closes it and brings your panes back. herdr's sidebar stays visible and clickable while visor is open. If you switch to another tab and press the key, visor moves to that tab. `q` quits visor too.
 
-ghud runs in a real herdr pane here, so right-click opens ghud's Action menus, as it does in a tab.
+visor runs in a real herdr pane here, so right-click opens visor's Action menus, as it does in a tab.
 
-### Open ghud as a popup
+### Open visor as a popup
 
 Without the plugin, a herdr popup works too, but it covers the sidebar and takes every click until it closes:
 
@@ -170,67 +170,67 @@ Without the plugin, a herdr popup works too, but it covers the sidebar and takes
 [[keys.command]]
 key = "cmd+shift+g"
 type = "popup"
-command = "ghud --close-key cmd+shift+g --close-key 'ctrl+b d'"
-description = "ghud"
+command = "visor --close-key cmd+shift+g --close-key 'ctrl+b d'"
+description = "visor"
 width = "100%"
 height = "100%"
 ```
 
-A herdr popup sends every key to ghud, so `--close-key` is how ghud knows which keys should close it. It takes herdr's key syntax, either a chord (`cmd+shift+g`) or a sequence of two (`'ctrl+b d'`), and you can pass it more than once. If you changed herdr's prefix, change `ctrl+b` to match.
+A herdr popup sends every key to visor, so `--close-key` is how visor knows which keys should close it. It takes herdr's key syntax, either a chord (`cmd+shift+g`) or a sequence of two (`'ctrl+b d'`), and you can pass it more than once. If you changed herdr's prefix, change `ctrl+b` to match.
 
 Right-click can't reach a popup, so everything in a right-click menu is on the keyboard too (`ctrl+k`).
 
-### Keep ghud in a tab
+### Keep visor in a tab
 
-You can also keep ghud open next to your agents. Open a new herdr tab, name it ghud and run `ghud` in it (no `--close-key` needed, `q` quits). The tab stays there when you detach and come back.
+You can also keep visor open next to your agents. Open a new herdr tab, name it visor and run `visor` in it (no `--close-key` needed, `q` quits). The tab stays there when you detach and come back.
 
-In a tab, ghud turns on right-click for its pane when it starts, so right-click opens ghud's Action menus, and it gives right-click back to herdr when it quits. ghud in a tab and ghud opened with a key can run at the same time, and they stay in sync.
+In a tab, visor turns on right-click for its pane when it starts, so right-click opens visor's Action menus, and it gives right-click back to herdr when it quits. visor in a tab and visor opened with a key can run at the same time, and they stay in sync.
 
 ## Agent skills
 
-ghud comes with two skills for coding agents:
+visor comes with two skills for coding agents:
 
-- `ghud-configure` sets up your config, Widgets and the herdr keybinds for you.
-- `ghud-make-plugin` writes a Plugin with you and tests it with `ghud plugin check`.
+- `visor-configure` sets up your config, Widgets and the herdr keybinds for you.
+- `visor-make-plugin` writes a Plugin with you and tests it with `visor plugin check`.
 
 Install them for every agent you have:
 
 ```sh
-ghud skills install
+visor skills install
 ```
 
-This writes the skills to `~/.agents/skills/` (Codex, Cursor, Gemini CLI, opencode, Copilot, Pi) and links them into `~/.claude/skills/` when Claude Code is installed. The skills match your ghud version, and ghud quietly refreshes them after an upgrade unless you edited them, then it suggests running `ghud skills install` again. `ghud skills uninstall` removes only the skills ghud installed.
+This writes the skills to `~/.agents/skills/` (Codex, Cursor, Gemini CLI, opencode, Copilot, Pi) and links them into `~/.claude/skills/` when Claude Code is installed. The skills match your visor version, and visor quietly refreshes them after an upgrade unless you edited them, then it suggests running `visor skills install` again. `visor skills uninstall` removes only the skills visor installed.
 
-You can also install them with the [skills](https://github.com/vercel-labs/skills) CLI. Pin the tag of your ghud version (`ghud --version`):
+You can also install them with the [skills](https://github.com/vercel-labs/skills) CLI. Pin the tag of your visor version (`visor --version`):
 
 ```sh
-npx skills add oronbz/ghud#vX.Y.Z -g
+npx skills add oronbz/visor#vX.Y.Z -g
 ```
 
 Both write the same layout, so either one can replace the other's copy.
 
 ## Plugins
 
-A Plugin is a program that adds one or more Widget types. ghud starts it and talks to it over stdin and stdout (JSON-RPC), so you can write one in any language. Weather is a Plugin too, it ships with ghud.
+A Plugin is a program that adds one or more Widget types. visor starts it and talks to it over stdin and stdout (JSON-RPC), so you can write one in any language. Weather is a Plugin too, it ships with visor.
 
 ### Installing Plugins
 
 ```sh
-ghud plugin install owner/repo            # or owner/repo/subdir, with --ref <tag or branch>
-ghud plugin list
-ghud plugin update [name...]
-ghud plugin uninstall <name>
+visor plugin install owner/repo            # or owner/repo/subdir, with --ref <tag or branch>
+visor plugin list
+visor plugin update [name...]
+visor plugin uninstall <name>
 ```
 
-Before it builds anything, `install` shows the Plugin's Widget types and every build command it will run, and asks you to trust it (`-y` skips the question). Installing a Plugin means trusting its code, the same as `herdr plugin install`. Plugins go to `~/.local/share/ghud/plugins/<name>/`, and running instances pick up an install, update or uninstall without a restart.
+Before it builds anything, `install` shows the Plugin's Widget types and every build command it will run, and asks you to trust it (`-y` skips the question). Installing a Plugin means trusting its code, the same as `herdr plugin install`. Plugins go to `~/.local/share/visor/plugins/<name>/`, and running instances pick up an install, update or uninstall without a restart.
 
-To find Plugins, look for the [`ghud-plugin` topic](https://github.com/topics/ghud-plugin) on GitHub.
+To find Plugins, look for the [`visor-plugin` topic](https://github.com/topics/visor-plugin) on GitHub.
 
 ### Writing a Plugin
 
-The quickest way is to ask your agent to use the `ghud-make-plugin` skill. By hand:
+The quickest way is to ask your agent to use the `visor-make-plugin` skill. By hand:
 
-1. Make a directory with a `ghud-plugin.toml` manifest:
+1. Make a directory with a `visor-plugin.toml` manifest:
 
    ```toml
    name = "hello"
@@ -251,10 +251,10 @@ The quickest way is to ask your agent to use the `ghud-make-plugin` skill. By ha
    description = "What to say"
    ```
 
-   If it needs building, add `[[build]]` steps such as `run = ["go", "build", "-o", "hello"]`. `ghud plugin install` runs them in the Plugin's directory, with no shell.
+   If it needs building, add `[[build]]` steps such as `run = ["go", "build", "-o", "hello"]`. `visor plugin install` runs them in the Plugin's directory, with no shell.
 
-2. `ghud plugin schema` prints the JSON Schema of the manifest and the protocol for your ghud version. Your program answers `initialize`, then `widget/refresh` with a payload, and can push updates on its own.
-3. `ghud plugin check <dir>` starts it and runs the whole protocol against it (handshake, a Widget's lifecycle, a refresh and an Action), and tells you what's wrong.
+2. `visor plugin schema` prints the JSON Schema of the manifest and the protocol for your visor version. Your program answers `initialize`, then `widget/refresh` with a payload, and can push updates on its own.
+3. `visor plugin check <dir>` starts it and runs the whole protocol against it (handshake, a Widget's lifecycle, a refresh and an Action), and tells you what's wrong.
 4. Load it while you work on it by adding its path to your config:
 
    ```toml
@@ -262,6 +262,6 @@ The quickest way is to ask your agent to use the `ghud-make-plugin` skill. By ha
    path = "~/code/hello"
    ```
 
-5. To publish, push it to GitHub and add the `ghud-plugin` topic to the repo. People install it with `ghud plugin install you/hello`.
+5. To publish, push it to GitHub and add the `visor-plugin` topic to the repo. People install it with `visor plugin install you/hello`.
 
-Plugins draw only with ghud's 13 colour tokens, never raw colours, so they follow the user's theme.
+Plugins draw only with visor's 13 colour tokens, never raw colours, so they follow the user's theme.

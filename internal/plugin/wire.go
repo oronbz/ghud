@@ -7,14 +7,14 @@ import (
 	"slices"
 	"time"
 
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 // The protocol's messages, as schema/protocol.json describes them.
 
 type initializeParams struct {
 	Protocol int    `json:"protocol"`
-	Ghud     string `json:"ghud"`
+	Visor    string `json:"visor"`
 }
 
 type initializeResult struct {
@@ -128,7 +128,7 @@ func (u update) read() (*widget.Payload, error) {
 			err = validateJSON("protocol.json#/$defs/payload", u.Payload)
 		}
 		if err != nil {
-			return nil, fmt.Errorf("sent a payload ghud can't show: %w", err)
+			return nil, fmt.Errorf("sent a payload visor can't show: %w", err)
 		}
 	}
 	if u.Status == nil {

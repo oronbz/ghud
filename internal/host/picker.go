@@ -8,9 +8,9 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/oronbz/ghud/internal/render"
-	"github.com/oronbz/ghud/internal/theme"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/render"
+	"github.com/oronbz/visor/internal/theme"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 var pickerKeys = struct{ Down, Up, Toggle, Close key.Binding }{
@@ -41,7 +41,7 @@ func (m Model) pickerKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 }
 
 // setHidden shows or hides Widget id and writes the Layout at once. Hiding
-// the focused Widget unfocuses ghud.
+// the focused Widget unfocuses visor.
 func (m Model) setHidden(id string, hidden bool) Model {
 	m.layout = m.layout.SetHidden(id, hidden)
 	if m.layout.IsHidden(m.focus) {

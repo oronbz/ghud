@@ -1,4 +1,4 @@
-// Package hosttest is the headless host: the full ghud app built in-process
+// Package hosttest is the headless host: the full visor app built in-process
 // with a temp root, an injected clock, a fixed terminal size and fake
 // outside-world adapters. Tests drive it with key, mouse and resize messages
 // and read the rendered screen back as text and styled cells.
@@ -14,13 +14,13 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/oronbz/ghud/internal/closekey"
-	"github.com/oronbz/ghud/internal/config"
-	"github.com/oronbz/ghud/internal/host"
-	"github.com/oronbz/ghud/internal/paths"
-	"github.com/oronbz/ghud/internal/ports"
-	"github.com/oronbz/ghud/internal/theme"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/closekey"
+	"github.com/oronbz/visor/internal/config"
+	"github.com/oronbz/visor/internal/host"
+	"github.com/oronbz/visor/internal/paths"
+	"github.com/oronbz/visor/internal/ports"
+	"github.com/oronbz/visor/internal/theme"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 type Options struct {
@@ -52,9 +52,9 @@ type Options struct {
 	Commands *Commands
 	// Env is the process environment the app sees; it's empty by default.
 	Env map[string]string
-	// Version is the ghud version the app runs as (see host.Options.Version).
+	// Version is the visor version the app runs as (see host.Options.Version).
 	Version string
-	// BundleDir stands in for the directory ghud is installed in, where it
+	// BundleDir stands in for the directory visor is installed in, where it
 	// finds the Plugins it ships with; empty ships none.
 	BundleDir string
 }

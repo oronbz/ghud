@@ -10,8 +10,8 @@ import (
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 
-	"github.com/oronbz/ghud/internal/hosttest"
-	"github.com/oronbz/ghud/internal/theme"
+	"github.com/oronbz/visor/internal/hosttest"
+	"github.com/oronbz/visor/internal/theme"
 )
 
 func hexOf(c color.Color) string {
@@ -72,7 +72,7 @@ func TestSettingTheBackgroundRedrawsTheWholeScreen(t *testing.T) {
 
 	h.Send(tea.BackgroundColorMsg{Color: lipgloss.Color("#1e1e2e")})
 	if h.Clears() != 0 {
-		t.Fatalf("screen cleared %d times while ghud still leaves the background alone, want 0", h.Clears())
+		t.Fatalf("screen cleared %d times while visor still leaves the background alone, want 0", h.Clears())
 	}
 	h.Send(answered)
 	if h.Clears() != 1 {
@@ -134,16 +134,16 @@ func TestTerminalThemeDerivesTokensFromTheTerminalsColours(t *testing.T) {
 	}
 }
 
-func TestTerminalThemeFallsBackToGhudWithoutAnswers(t *testing.T) {
+func TestTerminalThemeFallsBackToVisorWithoutAnswers(t *testing.T) {
 	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 40, Height: 9, Config: `theme = "terminal"`})
 
 	h.Send(answered)
 
 	if got := fgHex(t, h, "╭"); got != "#3d4757" {
-		t.Errorf("border %s, want the ghud dark palette's line #3d4757", got)
+		t.Errorf("border %s, want the visor dark palette's line #3d4757", got)
 	}
 	if got := hexOf(h.View().BackgroundColor); got != "#13171d" {
-		t.Errorf("terminal background %s, want the ghud dark palette's bg #13171d", got)
+		t.Errorf("terminal background %s, want the visor dark palette's bg #13171d", got)
 	}
 }
 

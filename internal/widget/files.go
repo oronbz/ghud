@@ -10,7 +10,7 @@ import (
 
 	"github.com/gofrs/flock"
 
-	"github.com/oronbz/ghud/internal/paths"
+	"github.com/oronbz/visor/internal/paths"
 )
 
 // DataFile resolves a Widget's `file` setting: empty means def in the data
@@ -60,7 +60,7 @@ func WriteFile(path string, data []byte) error {
 	return os.Rename(tmp.Name(), path)
 }
 
-// EditLock is the lock file serialising edits of file across ghud
+// EditLock is the lock file serialising edits of file across visor
 // instances, named for kind. It lives in the data dir so synced folders
 // don't collect lock files.
 func (c Config) EditLock(kind, file string) string {

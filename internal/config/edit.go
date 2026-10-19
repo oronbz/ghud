@@ -11,10 +11,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/widget"
 )
 
-// Editor makes ghud's only writes to config.toml (ADR 0003). Every edit is
+// Editor makes visor's only writes to config.toml (ADR 0003). Every edit is
 // a text edit taken under a lock file: re-read the file, change it, re-parse
 // the result and write it atomically only when it parses to the intended
 // config, so comments and formatting elsewhere stay byte-identical.

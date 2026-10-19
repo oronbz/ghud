@@ -10,8 +10,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/oronbz/ghud/internal/cache"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/cache"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 const (

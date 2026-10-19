@@ -6,8 +6,8 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/oronbz/ghud/internal/theme"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/theme"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 // Reference is the full commented config.toml: every global option and
@@ -34,9 +34,9 @@ func Reference(types []widget.Type, loc Locale) string {
 		option("%s = %s", s.Name, widget.TOMLValue(s.Default))
 	}
 
-	prose("ghud config.toml: the full reference, everything commented out.")
-	prose("Uncomment a line (delete its leading #) to change an option. ghud reads this")
-	prose("file but never rewrites it; new options appear in `ghud config default`.")
+	prose("visor config.toml: the full reference, everything commented out.")
+	prose("Uncomment a line (delete its leading #) to change an option. visor reads this")
+	prose("file but never rewrites it; new options appear in `visor config default`.")
 	b.WriteString("\n")
 	for _, s := range Globals(loc) {
 		setting(s)
@@ -47,7 +47,7 @@ func Reference(types []widget.Type, loc Locale) string {
 	prose("change it everywhere, plugins included. [colors.dark] applies when the terminal")
 	prose("background is dark (or unknown), [colors.light] when it's light, on top of")
 	prose("`theme`. Values are \"#rrggbb\"; an invalid one is reported and ignored. The")
-	prose("values below are ghud's own palette. Tokens:")
+	prose("values below are visor's own palette. Tokens:")
 	for _, tok := range theme.Tokens() {
 		prose("  %-7s %s", tok, tok.Use())
 	}
@@ -64,7 +64,7 @@ func Reference(types []widget.Type, loc Locale) string {
 
 	prose("Plugins under development, loaded from a local directory.")
 	option("[[plugin]]")
-	option(`path = "~/code/my-ghud-plugin"`)
+	option(`path = "~/code/my-visor-plugin"`)
 	b.WriteString("\n")
 
 	var defaults []string

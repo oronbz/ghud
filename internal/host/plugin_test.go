@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/oronbz/ghud/internal/hosttest"
-	"github.com/oronbz/ghud/internal/paths"
-	"github.com/oronbz/ghud/internal/plugin/plugintest"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/hosttest"
+	"github.com/oronbz/visor/internal/paths"
+	"github.com/oronbz/visor/internal/plugin/plugintest"
+	"github.com/oronbz/visor/internal/widget"
 )
 
-// withPlugin starts ghud with the fixture Plugin installed in the plugins
+// withPlugin starts visor with the fixture Plugin installed in the plugins
 // directory and config placing its Widgets; no built-in types.
 func withPlugin(t *testing.T, o plugintest.Options, config string) *hosttest.Host {
 	t.Helper()
@@ -123,13 +123,13 @@ func TestAPluginActionCanLeadIntoAnother(t *testing.T) {
 
 func TestARawColourPayloadIsAnErrorNamingIt(t *testing.T) {
 	h := withPlugin(t, plugintest.Options{}, fixtureWidget+"mode = \"raw-colour\"\n")
-	shows(t, h, "Plugin `fixture` sent a payload ghud can't", `"#ff0000" is not a theme token`)
+	shows(t, h, "Plugin `fixture` sent a payload visor can't", `"#ff0000" is not a theme token`)
 }
 
 func TestAWrongProtocolVersionNeedsSetupNamingBothVersions(t *testing.T) {
 	h := withPlugin(t, plugintest.Options{Args: []string{"-protocol", "2"}}, fixtureWidget)
 	h.Resize(120, 12)
-	shows(t, h, "needs setup", "Plugin `fixture` speaks protocol 2, but this ghud speaks 1.")
+	shows(t, h, "needs setup", "Plugin `fixture` speaks protocol 2, but this visor speaks 1.")
 }
 
 func TestACrashedPluginShowsAnErrorAndRestartsWithGrowingDelays(t *testing.T) {

@@ -9,11 +9,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/oronbz/ghud/internal/theme"
-	"github.com/oronbz/ghud/skills"
+	"github.com/oronbz/visor/internal/theme"
+	"github.com/oronbz/visor/skills"
 )
 
-var want = []string{"ghud-configure", "ghud-make-plugin"}
+var want = []string{"visor-configure", "visor-make-plugin"}
 
 // TestTheRepoHoldsExactlyTheBundledSkills is what `npx skills add <repo>`
 // relies on: no root SKILL.md, and one folder per skill under skills/.
@@ -103,7 +103,7 @@ func TestEverySkillHasValidAgentSkillsFrontmatter(t *testing.T) {
 }
 
 func TestTheMakePluginSkillListsEveryThemeToken(t *testing.T) {
-	md, err := os.ReadFile(filepath.Join("ghud-make-plugin", "SKILL.md"))
+	md, err := os.ReadFile(filepath.Join("visor-make-plugin", "SKILL.md"))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -15,9 +15,9 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/oronbz/ghud/internal/cli"
-	"github.com/oronbz/ghud/internal/hosttest"
-	"github.com/oronbz/ghud/internal/ports"
+	"github.com/oronbz/visor/internal/cli"
+	"github.com/oronbz/visor/internal/hosttest"
+	"github.com/oronbz/visor/internal/ports"
 )
 
 // hermetic are the real ports with every way out of the machine faked:
@@ -27,7 +27,7 @@ import (
 func hermetic(t *testing.T, getenv func(string) string) (*ports.Ports, *hosttest.Commands) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Errorf("ghud reached the network: %s %s", r.Method, r.URL)
+		t.Errorf("visor reached the network: %s %s", r.Method, r.URL)
 		http.Error(w, "offline", http.StatusServiceUnavailable)
 	}))
 	t.Cleanup(srv.Close)
@@ -48,7 +48,7 @@ func hermetic(t *testing.T, getenv func(string) string) (*ports.Ports, *hosttest
 // scratch is a temp dir that a fetch still in flight at exit may write its
 // cache entry into after the test ends, so removing it is best effort.
 func scratch(t *testing.T) string {
-	dir, err := os.MkdirTemp("", "ghud-cli")
+	dir, err := os.MkdirTemp("", "visor-cli")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func scratch(t *testing.T) string {
 	return dir
 }
 
-// screen is ghud's output, noting when a frame with text is first drawn.
+// screen is visor's output, noting when a frame with text is first drawn.
 type screen struct {
 	bytes.Buffer
 	mu    sync.Mutex
@@ -76,7 +76,7 @@ func (s *screen) Write(p []byte) (int, error) {
 	return n, err
 }
 
-// keys is stdin typed once ghud has drawn a frame. Bubble Tea sends the
+// keys is stdin typed once visor has drawn a frame. Bubble Tea sends the
 // window size from a goroutine, so a q read sooner can quit before the first
 // frame is drawn.
 type keys struct {
@@ -119,12 +119,12 @@ func run(t *testing.T, s cli.System) int {
 	case code := <-done:
 		return code
 	case <-time.After(5 * time.Second):
-		t.Fatal("ghud did not exit")
+		t.Fatal("visor did not exit")
 		return -1
 	}
 }
 
-func TestGhudDrawsTheClockAndQuitsOnQ(t *testing.T) {
+func TestVisorDrawsTheClockAndQuitsOnQ(t *testing.T) {
 	s, stdout, stderr := system(t, "q")
 
 	if code := run(t, s); code != 0 {
@@ -140,7 +140,7 @@ func TestGhudDrawsTheClockAndQuitsOnQ(t *testing.T) {
 	}
 }
 
-func TestGhudEnablesKittyKeyboardFlagsAndRestoresThemOnExit(t *testing.T) {
+func TestVisorEnablesKittyKeyboardFlagsAndRestoresThemOnExit(t *testing.T) {
 	// Shift press and release, then q, all kitty-encoded.
 	s, stdout, stderr := system(t, "\x1b[57441;2u\x1b[57441;1:3u\x1b[113u")
 
@@ -162,7 +162,7 @@ func TestVersionFlagPrintsTheVersionWithoutStartingTheTUI(t *testing.T) {
 	if code := run(t, s); code != 0 {
 		t.Fatalf("exit code %d, stderr: %s", code, stderr)
 	}
-	if got, want := stdout.String(), "ghud dev\n"; got != want {
+	if got, want := stdout.String(), "visor dev\n"; got != want {
 		t.Errorf("stdout %q, want %q", got, want)
 	}
 }
@@ -173,7 +173,7 @@ func TestUnknownArgumentIsAUsageError(t *testing.T) {
 	if code := run(t, s); code != 2 {
 		t.Errorf("exit code %d, want 2", code)
 	}
-	if !strings.Contains(stderr.String(), "Usage: ghud") {
+	if !strings.Contains(stderr.String(), "Usage: visor") {
 		t.Errorf("stderr has no usage:\n%s", stderr)
 	}
 }

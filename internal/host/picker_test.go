@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/oronbz/ghud/internal/hosttest"
-	"github.com/oronbz/ghud/internal/layout"
+	"github.com/oronbz/visor/internal/hosttest"
+	"github.com/oronbz/visor/internal/layout"
 )
 
 func TestWHidesAWidgetReflowsTheGridAndRecordsItHidden(t *testing.T) {
@@ -58,7 +58,7 @@ func TestHidingTheFocusedWidgetUnfocusesIt(t *testing.T) {
 	h := phonetic(t, threeAcross)
 	h.Press("2", "w", "j", "space", "esc")
 	if got := focused(t, h, []string{"Alpha", "Charlie", "Delta"}); got != "" {
-		t.Errorf("hiding focused Bravo moved focus to %q, want ghud unfocused", got)
+		t.Errorf("hiding focused Bravo moved focus to %q, want visor unfocused", got)
 	}
 	h.Press("tab")
 	if got := focused(t, h, []string{"Alpha", "Charlie", "Delta"}); got != "Alpha" {
@@ -95,7 +95,7 @@ func TestTheWidgetListSwallowsOtherKeys(t *testing.T) {
 	h := hosttest.New(t, hosttest.Options{Width: 100, Height: 21})
 	h.Press("w", "tab", "m", "k", "k", "q")
 	if h.Quit() {
-		t.Fatal("q in the Widget list quit ghud")
+		t.Fatal("q in the Widget list quit visor")
 	}
 	if got := focused(t, h, []string{"Clock", "Calendar"}); got != "" {
 		t.Errorf("keys in the Widget list focused %q", got)

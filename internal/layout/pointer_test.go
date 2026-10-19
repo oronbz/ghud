@@ -3,7 +3,7 @@ package layout_test
 import (
 	"testing"
 
-	"github.com/oronbz/ghud/internal/layout"
+	"github.com/oronbz/visor/internal/layout"
 )
 
 func TestHitRanksTheTitleOverTheRowSeamItSitsIn(t *testing.T) {

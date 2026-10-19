@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/oronbz/ghud/internal/hosttest"
-	"github.com/oronbz/ghud/internal/layout"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/hosttest"
+	"github.com/oronbz/visor/internal/layout"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 // mailAndTodo stages two list Widgets side by side: Mail with an Item and
@@ -224,7 +224,7 @@ func TestHideFromThePaletteHidesTheWidgetAndRecordsIt(t *testing.T) {
 		t.Errorf("Todo still drawn after Hide:\n%s", h.Screen())
 	}
 	if footer := h.Line(23); !strings.Contains(footer, "Tab/hl focus") {
-		t.Errorf("footer %q after hiding the focused Todo, want ghud unfocused", footer)
+		t.Errorf("footer %q after hiding the focused Todo, want visor unfocused", footer)
 	}
 	if len(*todoRan) != 0 {
 		t.Errorf("Hide reached the Widget: %+v", *todoRan)

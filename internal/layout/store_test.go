@@ -7,11 +7,11 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/oronbz/ghud/internal/layout"
+	"github.com/oronbz/visor/internal/layout"
 )
 
 func TestSaveWritesWhatLoadReadsAndLeavesOnlyLayoutJSON(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "ghud")
+	dir := filepath.Join(t.TempDir(), "visor")
 	if _, err := layout.Load(dir); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("Load before any Save: %v, want not-exist", err)
 	}

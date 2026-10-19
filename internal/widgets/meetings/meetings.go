@@ -13,10 +13,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/oronbz/ghud/internal/ports"
-	"github.com/oronbz/ghud/internal/theme"
-	"github.com/oronbz/ghud/internal/widget"
-	"github.com/oronbz/ghud/internal/widgets/ekaccess"
+	"github.com/oronbz/visor/internal/ports"
+	"github.com/oronbz/visor/internal/theme"
+	"github.com/oronbz/visor/internal/widget"
+	"github.com/oronbz/visor/internal/widgets/ekaccess"
 )
 
 var Type = widget.Type{

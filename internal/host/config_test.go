@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/oronbz/ghud/internal/hosttest"
+	"github.com/oronbz/visor/internal/hosttest"
 )
 
 func TestTwoClocksWithTheirOwnIdsAndTitlesBothRender(t *testing.T) {

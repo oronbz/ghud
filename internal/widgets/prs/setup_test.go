@@ -11,19 +11,19 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/oronbz/ghud/internal/hosttest"
+	"github.com/oronbz/visor/internal/hosttest"
 )
 
 const (
-	tokenPage = "https://github.com/settings/tokens/new?scopes=repo&description=ghud"
+	tokenPage = "https://github.com/settings/tokens/new?scopes=repo&description=visor"
 	pasteHint = "Run `gh auth login`, or press Enter to paste a classic token"
 	classic   = "ghp_pAsTeDcLaSsIc0123456789abcdefABCDEF"
 )
 
-// stored is the token ghud keeps in the keyring, or "".
+// stored is the token visor keeps in the keyring, or "".
 func stored(t *testing.T, h *hosttest.Host) string {
 	t.Helper()
-	s, err := h.Keyring.Get("ghud", "github:github.com")
+	s, err := h.Keyring.Get("visor", "github:github.com")
 	if err != nil {
 		return ""
 	}
@@ -31,7 +31,7 @@ func stored(t *testing.T, h *hosttest.Host) string {
 }
 
 // leaks lists every place outside the keyring where secret shows up: the
-// screen, every file ghud wrote, and whatever it handed other programs.
+// screen, every file visor wrote, and whatever it handed other programs.
 func leaks(t *testing.T, h *hosttest.Host, secret string) []string {
 	t.Helper()
 	var out []string
@@ -140,7 +140,7 @@ func TestAFineGrainedTokenIsRefusedAndNotStored(t *testing.T) {
 
 func TestTheStoredTokenIsReadAfterGhAuthToken(t *testing.T) {
 	kr := &hosttest.Keyring{}
-	if err := kr.Set("ghud", "github:github.com", classic); err != nil {
+	if err := kr.Set("visor", "github:github.com", classic); err != nil {
 		t.Fatal(err)
 	}
 	g := team(t)
@@ -158,7 +158,7 @@ func TestTheStoredTokenIsReadAfterGhAuthToken(t *testing.T) {
 
 func TestARejectedStoredTokenReturnsTheWidgetToNeedsSetup(t *testing.T) {
 	kr := &hosttest.Keyring{}
-	if err := kr.Set("ghud", "github:github.com", "ghp_expired"); err != nil {
+	if err := kr.Set("visor", "github:github.com", "ghp_expired"); err != nil {
 		t.Fatal(err)
 	}
 	g := team(t)

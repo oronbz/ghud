@@ -8,7 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/oronbz/ghud/internal/theme"
+	"github.com/oronbz/visor/internal/theme"
 )
 
 // editing is INSERT mode: the host's multi-line editor over a Widget's body,

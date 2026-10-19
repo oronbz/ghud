@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/oronbz/ghud/internal/hosttest"
+	"github.com/oronbz/visor/internal/hosttest"
 )
 
 // fixture is a script Widget whose command logs each run to a file in a temp

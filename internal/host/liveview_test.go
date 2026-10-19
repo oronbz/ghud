@@ -5,13 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/oronbz/ghud/internal/hosttest"
-	"github.com/oronbz/ghud/internal/ports"
-	"github.com/oronbz/ghud/internal/theme"
-	"github.com/oronbz/ghud/internal/widget"
-	"github.com/oronbz/ghud/internal/widgets/calendar"
-	"github.com/oronbz/ghud/internal/widgets/clock"
-	"github.com/oronbz/ghud/internal/widgets/cpu"
+	"github.com/oronbz/visor/internal/hosttest"
+	"github.com/oronbz/visor/internal/ports"
+	"github.com/oronbz/visor/internal/theme"
+	"github.com/oronbz/visor/internal/widget"
+	"github.com/oronbz/visor/internal/widgets/calendar"
+	"github.com/oronbz/visor/internal/widgets/clock"
+	"github.com/oronbz/visor/internal/widgets/cpu"
 )
 
 func TestLargeClockDrawsBlockDigits(t *testing.T) {

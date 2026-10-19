@@ -10,13 +10,13 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 // ManifestFile is the file that makes a directory a Plugin.
-const ManifestFile = "ghud-plugin.toml"
+const ManifestFile = "visor-plugin.toml"
 
-// Manifest is a Plugin's ghud-plugin.toml (schema/manifest.json).
+// Manifest is a Plugin's visor-plugin.toml (schema/manifest.json).
 type Manifest struct {
 	Name        string       `toml:"name"`
 	Description string       `toml:"description"`
@@ -26,11 +26,11 @@ type Manifest struct {
 	Widgets     []WidgetType `toml:"widget"`
 	// Dir is also the command's working directory.
 	Dir string `toml:"-"`
-	// Env is added to the environment the process inherits from ghud.
+	// Env is added to the environment the process inherits from visor.
 	Env []string `toml:"-"`
 }
 
-// Build is a step `ghud plugin install` runs.
+// Build is a step `visor plugin install` runs.
 type Build struct {
 	Run []string `toml:"run"`
 }
@@ -76,7 +76,7 @@ func ReadManifest(dir string) (Manifest, error) {
 	return m, nil
 }
 
-// Shipped reads a manifest built into ghud for a Plugin it ships with, whose
+// Shipped reads a manifest built into visor for a Plugin it ships with, whose
 // executable is exe: the command runs exe, wherever the manifest says.
 func Shipped(src []byte, exe string, env []string) (Manifest, error) {
 	m, err := parseManifest(src)

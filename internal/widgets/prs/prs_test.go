@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/oronbz/ghud/internal/hosttest"
-	"github.com/oronbz/ghud/internal/ports"
+	"github.com/oronbz/visor/internal/hosttest"
+	"github.com/oronbz/visor/internal/ports"
 )
 
 const onePRsWidget = `
@@ -386,7 +386,7 @@ var tokenSources = []struct {
 	}},
 	{"The saved token", "Run `gh auth login`, or press Enter to paste a classic token", true, func(tok string) hosttest.Options {
 		kr := &hosttest.Keyring{}
-		_ = kr.Set("ghud", "github:github.com", tok)
+		_ = kr.Set("visor", "github:github.com", tok)
 		return hosttest.Options{Env: map[string]string{}, Keyring: kr}
 	}},
 }

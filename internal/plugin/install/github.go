@@ -78,7 +78,7 @@ func (g GitHub) get(ctx context.Context, owner, repo, kind, ref, accept string) 
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", "ghud")
+	req.Header.Set("User-Agent", "visor")
 	if accept != "" {
 		req.Header.Set("Accept", accept)
 	}

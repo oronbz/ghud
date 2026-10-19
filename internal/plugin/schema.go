@@ -20,7 +20,7 @@ import (
 var schemaFiles embed.FS
 
 // SchemaBase is the URL every shipped schema's $id starts with.
-const SchemaBase = "https://ghud.dev/schema/"
+const SchemaBase = "https://visor.dev/schema/"
 
 var SchemaNames = []string{"manifest.json", "protocol.json"}
 
@@ -30,7 +30,7 @@ func Schema(name string) []byte {
 }
 
 // Bundle is every shipped schema in one JSON Schema document, each under
-// $defs by its name without ".json", as `ghud plugin schema` prints it.
+// $defs by its name without ".json", as `visor plugin schema` prints it.
 func Bundle() []byte {
 	defs := map[string]json.RawMessage{}
 	for _, name := range SchemaNames {
@@ -44,9 +44,9 @@ func Bundle() []byte {
 		Defs        map[string]json.RawMessage `json:"$defs"`
 	}{
 		Schema:      "https://json-schema.org/draft/2020-12/schema",
-		ID:          SchemaBase + "ghud.json",
-		Title:       "ghud plugin schemas, protocol " + strconv.Itoa(Protocol),
-		Description: "$defs/manifest is ghud-plugin.toml read as JSON. $defs/protocol is every message between ghud and a Plugin's process; check a result against the $defs entry of protocol matching its request: initializeResult, refreshResult, choicesResult or invokeResult.",
+		ID:          SchemaBase + "visor.json",
+		Title:       "visor plugin schemas, protocol " + strconv.Itoa(Protocol),
+		Description: "$defs/manifest is visor-plugin.toml read as JSON. $defs/protocol is every message between visor and a Plugin's process; check a result against the $defs entry of protocol matching its request: initializeResult, refreshResult, choicesResult or invokeResult.",
 		Defs:        defs,
 	}, "", "  ")
 	return append(b, '\n')

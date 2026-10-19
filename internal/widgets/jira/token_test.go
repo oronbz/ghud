@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/oronbz/ghud/internal/hosttest"
+	"github.com/oronbz/visor/internal/hosttest"
 )
 
-const ghudAccount = "jira:acme.atlassian.net:oron@acme.io"
+const visorAccount = "jira:acme.atlassian.net:oron@acme.io"
 
 // keyring is a keyring holding secrets, keyed "service account".
 func keyring(t *testing.T, secrets map[string]string) *hosttest.Keyring {
@@ -34,8 +34,8 @@ func netrc(t *testing.T, text string) string {
 	return home
 }
 
-func TestTheTokenComesFromTheEnvThenGhudsKeyringThenJiraCLIThenNetrc(t *testing.T) {
-	both := keyring(t, map[string]string{"ghud " + ghudAccount: "ghud-token", "jira-cli oron@acme.io": "cli-token"})
+func TestTheTokenComesFromTheEnvThenVisorsKeyringThenJiraCLIThenNetrc(t *testing.T) {
+	both := keyring(t, map[string]string{"visor " + visorAccount: "visor-token", "jira-cli oron@acme.io": "cli-token"})
 	cliOnly := keyring(t, map[string]string{"jira-cli oron@acme.io": "cli-token"})
 	home := netrc(t, "machine github.com login me password nope\n"+
 		"machine acme.atlassian.net\n  login oron@acme.io\n  password netrc-token\n")
@@ -46,7 +46,7 @@ func TestTheTokenComesFromTheEnvThenGhudsKeyringThenJiraCLIThenNetrc(t *testing.
 		want    string
 	}{
 		{"JIRA_API_TOKEN wins", map[string]string{"JIRA_API_TOKEN": "env-token", "HOME": home}, both, "env-token"},
-		{"then ghud's keyring item", map[string]string{"HOME": home}, both, "ghud-token"},
+		{"then visor's keyring item", map[string]string{"HOME": home}, both, "visor-token"},
 		{"then jira-cli's keychain item", map[string]string{"HOME": home}, cliOnly, "cli-token"},
 		{"then .netrc", map[string]string{"HOME": home}, &hosttest.Keyring{}, "netrc-token"},
 	} {

@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/oronbz/ghud/internal/plugin/plugintest"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/plugin/plugintest"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 func invoke(t *testing.T, w widget.Widget, inv widget.Invocation) (widget.Result, error) {
@@ -89,7 +89,7 @@ func TestARawColourIsRejectedNamingIt(t *testing.T) {
 	_, typ := fixture(t, plugintest.Options{})
 	w := open(t, typ, "fx", &clock{now: t0}, widget.Settings{"mode": "raw-colour"})
 	_, err := refresh(t, w)
-	if err == nil || !strings.Contains(err.Error(), "Plugin `fixture` sent a payload ghud can't show") || !strings.Contains(err.Error(), `"#ff0000" is not a theme token`) {
+	if err == nil || !strings.Contains(err.Error(), "Plugin `fixture` sent a payload visor can't show") || !strings.Contains(err.Error(), `"#ff0000" is not a theme token`) {
 		t.Fatalf("err = %v", err)
 	}
 }
@@ -127,7 +127,7 @@ func TestAWrongProtocolVersionNeedsSetupNamingBoth(t *testing.T) {
 			if !errors.As(err, &setup) {
 				t.Fatalf("err = %v, want needs setup", err)
 			}
-			if want := fmt.Sprintf("Plugin `fixture` %s, but this ghud speaks 1.", c.want); !strings.HasPrefix(setup.Hint, want) {
+			if want := fmt.Sprintf("Plugin `fixture` %s, but this visor speaks 1.", c.want); !strings.HasPrefix(setup.Hint, want) {
 				t.Errorf("hint = %q, want %q…", setup.Hint, want)
 			}
 		})

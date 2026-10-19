@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/oronbz/ghud/internal/config"
-	"github.com/oronbz/ghud/internal/hosttest"
+	"github.com/oronbz/visor/internal/config"
+	"github.com/oronbz/visor/internal/hosttest"
 )
 
 const oneClock = `# my dashboard, by hand

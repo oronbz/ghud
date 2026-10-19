@@ -13,14 +13,14 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/oronbz/ghud/internal/config"
-	"github.com/oronbz/ghud/internal/github"
-	"github.com/oronbz/ghud/internal/host"
-	"github.com/oronbz/ghud/internal/paths"
-	"github.com/oronbz/ghud/internal/plugin"
-	"github.com/oronbz/ghud/internal/plugin/install"
-	"github.com/oronbz/ghud/internal/ports"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/config"
+	"github.com/oronbz/visor/internal/github"
+	"github.com/oronbz/visor/internal/host"
+	"github.com/oronbz/visor/internal/paths"
+	"github.com/oronbz/visor/internal/plugin"
+	"github.com/oronbz/visor/internal/plugin/install"
+	"github.com/oronbz/visor/internal/ports"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 const fetchTimeout = 5 * time.Minute
@@ -49,7 +49,7 @@ func pluginManage(s System, pp ports.Ports, p paths.Paths, configFile string, lo
 	return c.list(host.PluginPaths(configFile, locale, s.Getenv))
 }
 
-// lockPlugins keeps two `ghud plugin` commands from changing the plugins
+// lockPlugins keeps two `visor plugin` commands from changing the plugins
 // directory at once; the second fails rather than waiting on a slow build.
 func lockPlugins(dataDir string) (unlock func(), err error) {
 	unlock, ok, err := widget.TryLock(filepath.Join(dataDir, "locks", "plugins.lock"))
@@ -57,7 +57,7 @@ func lockPlugins(dataDir string) (unlock func(), err error) {
 	case err != nil:
 		return nil, fmt.Errorf("can't lock the plugins directory: %w", err)
 	case !ok:
-		return nil, errors.New("another `ghud plugin` command is running; try again once it's done")
+		return nil, errors.New("another `visor plugin` command is running; try again once it's done")
 	}
 	return unlock, nil
 }
@@ -101,16 +101,16 @@ func (c *pluginCLI) parse(fs *flag.FlagSet, args []string) ([]string, bool) {
 }
 
 func (c *pluginCLI) fail(err error) int {
-	fmt.Fprintln(c.s.Stderr, "ghud:", err)
+	fmt.Fprintln(c.s.Stderr, "visor:", err)
 	return 1
 }
 
 func (c *pluginCLI) install(args []string) int {
-	fs := flag.NewFlagSet("ghud plugin install", flag.ContinueOnError)
+	fs := flag.NewFlagSet("visor plugin install", flag.ContinueOnError)
 	ref := fs.String("ref", "", "the branch, tag or commit to install")
 	rest, ok := c.parse(fs, args)
 	if !ok || len(rest) != 1 {
-		fmt.Fprintln(c.s.Stderr, "Usage: ghud plugin install <owner/repo[/subdir]> [--ref <ref>] [-y]")
+		fmt.Fprintln(c.s.Stderr, "Usage: visor plugin install <owner/repo[/subdir]> [--ref <ref>] [-y]")
 		return 2
 	}
 	src, err := install.ParseSource(rest[0])
@@ -128,9 +128,9 @@ func (c *pluginCLI) install(args []string) int {
 }
 
 func (c *pluginCLI) update(args []string) int {
-	rest, ok := c.parse(flag.NewFlagSet("ghud plugin update", flag.ContinueOnError), args)
+	rest, ok := c.parse(flag.NewFlagSet("visor plugin update", flag.ContinueOnError), args)
 	if !ok {
-		fmt.Fprintln(c.s.Stderr, "Usage: ghud plugin update [name...] [-y]")
+		fmt.Fprintln(c.s.Stderr, "Usage: visor plugin update [name...] [-y]")
 		return 2
 	}
 	if len(rest) == 0 {
@@ -147,7 +147,7 @@ func (c *pluginCLI) update(args []string) int {
 		cancel()
 		switch {
 		case err != nil:
-			fmt.Fprintf(c.s.Stderr, "ghud: %s: %v\n", name, err)
+			fmt.Fprintf(c.s.Stderr, "visor: %s: %v\n", name, err)
 			code = 1
 		case was == now:
 			fmt.Fprintf(c.s.Stdout, "%s is up to date at %s\n", name, short(now.Commit))
@@ -160,7 +160,7 @@ func (c *pluginCLI) update(args []string) int {
 
 func (c *pluginCLI) uninstall(args []string) int {
 	if len(args) != 1 {
-		fmt.Fprintln(c.s.Stderr, "Usage: ghud plugin uninstall <name>")
+		fmt.Fprintln(c.s.Stderr, "Usage: visor plugin uninstall <name>")
 		return 2
 	}
 	if _, err := c.installer.Uninstall(args[0]); err != nil {

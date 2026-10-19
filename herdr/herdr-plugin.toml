@@ -1,22 +1,22 @@
-id = "ghud"
-name = "ghud"
+id = "visor"
+name = "visor"
 version = "0.2.0"
 min_herdr_version = "0.8.0"
-description = "Install ghud, a god's-eye HUD for your day, if it's missing, and open it over the current tab with one key."
+description = "Install visor, a god's-eye HUD for your day, if it's missing, and open it over the current tab with one key."
 platforms = ["macos", "linux"]
 
 [[build]]
-command = ["bash", "install-ghud.sh"]
+command = ["bash", "install-visor.sh"]
 
 [[panes]]
-id = "ghud"
-title = "ghud"
+id = "visor"
+title = "visor"
 placement = "overlay"
-command = ["ghud"]
+command = ["visor"]
 
 [[actions]]
 id = "toggle"
-title = "ghud: open or close"
-description = "Open ghud over the current tab, or close it when it's open there."
+title = "visor: open or close"
+description = "Open visor over the current tab, or close it when it's open there."
 contexts = ["global"]
-command = ["bash", "toggle-ghud.sh"]
+command = ["bash", "toggle-visor.sh"]

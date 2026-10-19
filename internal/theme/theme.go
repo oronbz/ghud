@@ -1,4 +1,4 @@
-// Package theme maps ghud's 13 colour tokens to colours. Widgets and payloads
+// Package theme maps visor's 13 colour tokens to colours. Widgets and payloads
 // only ever name tokens, so a theme recolours everything, plugins included.
 package theme
 
@@ -120,7 +120,7 @@ type Theme struct {
 	fromTerminal bool
 }
 
-// New builds a theme from a colour per token; tokens left out fall back to the ghud dark palette.
+// New builds a theme from a colour per token; tokens left out fall back to the visor dark palette.
 func New(colors map[Token]color.Color) Theme {
 	t := Dark()
 	for tok, c := range colors {
@@ -157,7 +157,7 @@ func palette(hex [tokenCount]string) Theme {
 
 // Names of the themes config.toml's `theme` picks from.
 const (
-	Ghud          = "ghud"
+	Visor         = "visor"
 	TerminalTheme = "terminal"
 )
 
@@ -178,9 +178,9 @@ type Overrides struct {
 }
 
 // Resolve builds the named theme for what the terminal answered, with the
-// overrides for its background on top. ghud picks its light or dark palette
+// overrides for its background on top. visor picks its light or dark palette
 // from the background, dark when there's none. terminal derives tokens from
-// the terminal's colours, and is ghud until both foreground and background
+// the terminal's colours, and is visor until both foreground and background
 // are known.
 func Resolve(name string, term Terminal, o Overrides) Theme {
 	dark := term.Bg == nil || IsDark(term.Bg)
@@ -234,7 +234,7 @@ func mix(a, b color.Color, p float64) color.Color {
 }
 
 // FromTerminal reports whether t was derived from the terminal's colours,
-// so ghud leaves the terminal's background alone.
+// so visor leaves the terminal's background alone.
 func (t Theme) FromTerminal() bool { return t.fromTerminal }
 
 // IsDark reports whether c has an HSL lightness under one half.

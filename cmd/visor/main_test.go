@@ -24,7 +24,7 @@ func TestReleaseLdflagsStampTheVersion(t *testing.T) {
 		t.Fatal(".goreleaser.yaml has no -X <var>={{.Version}} ldflag")
 	}
 
-	bin := filepath.Join(t.TempDir(), "ghud")
+	bin := filepath.Join(t.TempDir(), "visor")
 	build := exec.Command("go", "build", "-ldflags", "-X "+string(stamp[1])+"=1.2.3", "-o", bin, ".")
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("go build: %v\n%s", err, out)
@@ -33,7 +33,7 @@ func TestReleaseLdflagsStampTheVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.TrimSpace(string(out)); got != "ghud 1.2.3" {
-		t.Errorf("--version printed %q, want %q", got, "ghud 1.2.3")
+	if got := strings.TrimSpace(string(out)); got != "visor 1.2.3" {
+		t.Errorf("--version printed %q, want %q", got, "visor 1.2.3")
 	}
 }

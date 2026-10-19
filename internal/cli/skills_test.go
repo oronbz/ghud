@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/oronbz/ghud/internal/cli"
-	"github.com/oronbz/ghud/internal/version"
+	"github.com/oronbz/visor/internal/cli"
+	"github.com/oronbz/visor/internal/version"
 )
 
-var bundled = []string{"ghud-configure", "ghud-make-plugin"}
+var bundled = []string{"visor-configure", "visor-make-plugin"}
 
 // skillMD reads the SKILL.md of the skill folder dir.
 func skillMD(t *testing.T, dir string) string {
@@ -35,8 +35,8 @@ func frontmatter(t *testing.T, md string) string {
 func stamped(t *testing.T, dir, v string) {
 	t.Helper()
 	fm := frontmatter(t, skillMD(t, dir))
-	if !strings.Contains(fm, "metadata:\n  ghud-version: \""+v+"\"\n") {
-		t.Errorf("%s isn't stamped with ghud-version %q:\n%s", dir, v, fm)
+	if !strings.Contains(fm, "metadata:\n  visor-version: \""+v+"\"\n") {
+		t.Errorf("%s isn't stamped with visor-version %q:\n%s", dir, v, fm)
 	}
 }
 
@@ -100,9 +100,9 @@ func TestSkillsInstallLinksThemIntoClaudesSkillsWhenClaudeIsSetUp(t *testing.T) 
 
 func TestSkillsInstallReplacesTheFoldersWhole(t *testing.T) {
 	s, home, _, stderr := sandbox(t, nil, "", "skills", "install")
-	dir := filepath.Join(home, ".agents", "skills", "ghud-configure")
-	writeFile(t, filepath.Join(dir, "SKILL.md"), "---\nname: ghud-configure\ndescription: old\n---\nold\n")
-	writeFile(t, filepath.Join(dir, "leftover.md"), "from an older ghud\n")
+	dir := filepath.Join(home, ".agents", "skills", "visor-configure")
+	writeFile(t, filepath.Join(dir, "SKILL.md"), "---\nname: visor-configure\ndescription: old\n---\nold\n")
+	writeFile(t, filepath.Join(dir, "leftover.md"), "from an older visor\n")
 
 	if code := cli.Run(s); code != 0 {
 		t.Fatalf("exit %d: %s", code, stderr)
@@ -124,13 +124,13 @@ func TestSkillsUninstallRemovesOnlyStampedFoldersAndTheirLinks(t *testing.T) {
 	}
 	agents := filepath.Join(home, ".agents", "skills")
 	other := filepath.Join(agents, "someone-elses")
-	writeFile(t, filepath.Join(other, "SKILL.md"), "---\nname: someone-elses\ndescription: Not ghud's.\n---\nHello.\n")
+	writeFile(t, filepath.Join(other, "SKILL.md"), "---\nname: someone-elses\ndescription: Not visor's.\n---\nHello.\n")
 	otherLink := filepath.Join(claudeSkills, "someone-elses")
 	if err := os.Symlink(other, otherLink); err != nil {
 		t.Fatal(err)
 	}
-	unstamped := filepath.Join(home, "elsewhere", "ghud-configure")
-	writeFile(t, filepath.Join(unstamped, "SKILL.md"), "---\nname: ghud-configure\ndescription: A copy from npx skills.\n---\n")
+	unstamped := filepath.Join(home, "elsewhere", "visor-configure")
+	writeFile(t, filepath.Join(unstamped, "SKILL.md"), "---\nname: visor-configure\ndescription: A copy from npx skills.\n---\n")
 
 	s.Args = []string{"skills", "uninstall"}
 	if code := cli.Run(s); code != 0 {
@@ -145,20 +145,20 @@ func TestSkillsUninstallRemovesOnlyStampedFoldersAndTheirLinks(t *testing.T) {
 	}
 	for _, p := range []string{filepath.Join(other, "SKILL.md"), otherLink, unstamped} {
 		if _, err := os.Lstat(p); err != nil {
-			t.Errorf("uninstall removed %s, which ghud didn't install: %v", p, err)
+			t.Errorf("uninstall removed %s, which visor didn't install: %v", p, err)
 		}
 	}
 }
 
 func TestSkillsUninstallLeavesAnUnstampedSkillOfTheSameName(t *testing.T) {
 	s, home, _, stderr := sandbox(t, nil, "", "skills", "uninstall")
-	dir := filepath.Join(home, ".agents", "skills", "ghud-configure")
-	writeFile(t, filepath.Join(dir, "SKILL.md"), "---\nname: ghud-configure\ndescription: From npx skills.\n---\n")
+	dir := filepath.Join(home, ".agents", "skills", "visor-configure")
+	writeFile(t, filepath.Join(dir, "SKILL.md"), "---\nname: visor-configure\ndescription: From npx skills.\n---\n")
 
 	if code := cli.Run(s); code != 0 {
 		t.Fatalf("exit %d: %s", code, stderr)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "SKILL.md")); err != nil {
-		t.Errorf("uninstall removed a skill ghud didn't stamp: %v", err)
+		t.Errorf("uninstall removed a skill visor didn't stamp: %v", err)
 	}
 }

@@ -1,4 +1,4 @@
-// Package cli is ghud's single entry point: the TUI and every subcommand run
+// Package cli is visor's single entry point: the TUI and every subcommand run
 // through Run, so tests drive them with a temp home and captured output.
 package cli
 
@@ -17,12 +17,12 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/oronbz/ghud/internal/closekey"
-	"github.com/oronbz/ghud/internal/config"
-	"github.com/oronbz/ghud/internal/host"
-	"github.com/oronbz/ghud/internal/paths"
-	"github.com/oronbz/ghud/internal/ports"
-	"github.com/oronbz/ghud/internal/version"
+	"github.com/oronbz/visor/internal/closekey"
+	"github.com/oronbz/visor/internal/config"
+	"github.com/oronbz/visor/internal/host"
+	"github.com/oronbz/visor/internal/paths"
+	"github.com/oronbz/visor/internal/ports"
+	"github.com/oronbz/visor/internal/version"
 )
 
 // System is everything Run takes from the process.
@@ -36,48 +36,48 @@ type System struct {
 	Ports *ports.Ports
 	// ProgramOptions are extra Bubble Tea options, such as a fixed window size in tests.
 	ProgramOptions []tea.ProgramOption
-	// Executable is ghud's own path; the Plugins ghud ships with sit next
+	// Executable is visor's own path; the Plugins visor ships with sit next
 	// to it. Empty ships none.
 	Executable string
 }
 
-const usage = `Usage: ghud [--config <path>] [--close-key <keys>]... [--version]
-       ghud config default   print the full commented config reference
-       ghud config init      write the reference to the config path, once
-       ghud auth jira        set up Jira: site, email and an API token,
+const usage = `Usage: visor [--config <path>] [--close-key <keys>]... [--version]
+       visor config default   print the full commented config reference
+       visor config init      write the reference to the config path, once
+       visor auth jira        set up Jira: site, email and an API token,
                              which goes only to the keyring
-       ghud plugin install <owner/repo[/subdir]> [--ref <ref>] [-y]
+       visor plugin install <owner/repo[/subdir]> [--ref <ref>] [-y]
                              fetch a Plugin from GitHub, show what it
                              runs, ask for trust, then build it
-       ghud plugin update [name...] [-y]
+       visor plugin update [name...] [-y]
                              rebuild installed Plugins that have new commits
-       ghud plugin uninstall <name>
-       ghud plugin list      installed and [[plugin]] path Plugins
-       ghud plugin schema    print the JSON Schema of Plugin manifests and
+       visor plugin uninstall <name>
+       visor plugin list      installed and [[plugin]] path Plugins
+       visor plugin schema    print the JSON Schema of Plugin manifests and
                              the protocol
-       ghud plugin check [--timeout 10s] <dir>
+       visor plugin check [--timeout 10s] <dir>
                              test the Plugin in <dir> against the protocol
-       ghud skills install   install the ghud-configure and ghud-make-plugin
+       visor skills install   install the visor-configure and visor-make-plugin
                              agent skills to ~/.agents/skills, linked into
                              Claude Code's skills when it's set up
-       ghud skills uninstall remove the skills ghud installed
+       visor skills uninstall remove the skills visor installed
 
-ghud draws a full-screen dashboard of your day. Press q to quit.
-The config is $XDG_CONFIG_HOME/ghud/config.toml (default ~/.config/ghud),
-or GHUD_CONFIG, or --config.
+visor draws a full-screen dashboard of your day. Press q to quit.
+The config is $XDG_CONFIG_HOME/visor/config.toml (default ~/.config/visor),
+or VISOR_CONFIG, or --config.
 
---close-key quits ghud on a key in herdr's syntax, a chord or a sequence
+--close-key quits visor on a key in herdr's syntax, a chord or a sequence
 of two: --close-key cmd+shift+g --close-key 'ctrl+b d'.
 `
 
 func Run(s System) int {
-	fs := flag.NewFlagSet("ghud", flag.ContinueOnError)
+	fs := flag.NewFlagSet("visor", flag.ContinueOnError)
 	fs.SetOutput(s.Stderr)
 	fs.Usage = func() { fmt.Fprint(s.Stderr, usage) }
 	showVersion := fs.Bool("version", false, "print the version and exit")
 	configFlag := fs.String("config", "", "path to config.toml")
 	var closeKeyFlags repeated
-	fs.Var(&closeKeyFlags, "close-key", "a key that quits ghud, in herdr's key syntax")
+	fs.Var(&closeKeyFlags, "close-key", "a key that quits visor, in herdr's key syntax")
 	if err := fs.Parse(s.Args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return 0
@@ -88,23 +88,23 @@ func Run(s System) int {
 	for _, k := range closeKeyFlags {
 		seq, err := closekey.Parse(k)
 		if err != nil {
-			fmt.Fprintf(s.Stderr, "ghud: --close-key %q: %v\n", k, err)
+			fmt.Fprintf(s.Stderr, "visor: --close-key %q: %v\n", k, err)
 			return 2
 		}
 		closeKeys = append(closeKeys, seq)
 	}
 	if *showVersion {
-		fmt.Fprintln(s.Stdout, "ghud", version.Version)
+		fmt.Fprintln(s.Stdout, "visor", version.Version)
 		return 0
 	}
 
 	p, err := paths.Resolve(s.Getenv, runtime.GOOS)
 	if err != nil {
-		fmt.Fprintln(s.Stderr, "ghud:", err)
+		fmt.Fprintln(s.Stderr, "visor:", err)
 		return 1
 	}
 	configFile := filepath.Join(p.Config, config.FileName)
-	if v := s.Getenv("GHUD_CONFIG"); v != "" {
+	if v := s.Getenv("VISOR_CONFIG"); v != "" {
 		configFile = v
 	}
 	if *configFlag != "" {
@@ -125,7 +125,7 @@ func Run(s System) int {
 	reference := func() string {
 		types, problems := host.Types(p, configFile, bundle, locale, s.Getenv)
 		for _, problem := range problems {
-			fmt.Fprintln(s.Stderr, "ghud:", problem)
+			fmt.Fprintln(s.Stderr, "visor:", problem)
 		}
 		return config.Reference(types, locale)
 	}
@@ -146,7 +146,7 @@ func Run(s System) int {
 		types, _ := host.Types(p, configFile, bundle, locale, s.Getenv)
 		return authJira(s, pp, config.NewEditor(configFile, p.Data, types, locale))
 	default:
-		fmt.Fprintf(s.Stderr, "ghud: unknown command %q\n\n%s", strings.Join(fs.Args(), " "), usage)
+		fmt.Fprintf(s.Stderr, "visor: unknown command %q\n\n%s", strings.Join(fs.Args(), " "), usage)
 		return 2
 	}
 	// Popups have no HERDR_PANE_ID, and right-click can't reach them anyway.
@@ -171,14 +171,14 @@ func Run(s System) int {
 	// Every copy of the model shares its Plugins, so this stops them however the program ends.
 	defer m.Close()
 	if _, err := tea.NewProgram(m, opts...).Run(); err != nil {
-		fmt.Fprintln(s.Stderr, "ghud:", err)
+		fmt.Fprintln(s.Stderr, "visor:", err)
 		return 1
 	}
 	return 0
 }
 
-// bundleDir is the directory ghud is installed in: the real file's, since
-// package managers may link ghud into a shared bin.
+// bundleDir is the directory visor is installed in: the real file's, since
+// package managers may link visor into a shared bin.
 func bundleDir(exe string) string {
 	if exe == "" {
 		return ""
@@ -199,8 +199,8 @@ func (r *repeated) Set(v string) error {
 	return nil
 }
 
-// herdrRightClick routes right-clicks in ghud's herdr pane to target: "pane"
-// for ghud, "herdr" for herdr's own menu. Failing leaves herdr as it was, so
+// herdrRightClick routes right-clicks in visor's herdr pane to target: "pane"
+// for visor, "herdr" for herdr's own menu. Failing leaves herdr as it was, so
 // errors are ignored.
 func herdrRightClick(getenv func(string) string, c ports.Commands, target string) {
 	bin := getenv("HERDR_BIN_PATH")
@@ -215,21 +215,21 @@ func herdrRightClick(getenv func(string) string, c ports.Commands, target string
 // configInit writes the reference to path, refusing to touch an existing file.
 func configInit(s System, path, ref string) int {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		fmt.Fprintln(s.Stderr, "ghud:", err)
+		fmt.Fprintln(s.Stderr, "visor:", err)
 		return 1
 	}
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 	if errors.Is(err, fs.ErrExist) {
-		fmt.Fprintf(s.Stderr, "ghud: %s already exists; see `ghud config default` for every option\n", path)
+		fmt.Fprintf(s.Stderr, "visor: %s already exists; see `visor config default` for every option\n", path)
 		return 1
 	}
 	if err != nil {
-		fmt.Fprintln(s.Stderr, "ghud:", err)
+		fmt.Fprintln(s.Stderr, "visor:", err)
 		return 1
 	}
 	_, werr := f.WriteString(ref)
 	if err := errors.Join(werr, f.Close()); err != nil {
-		fmt.Fprintln(s.Stderr, "ghud:", err)
+		fmt.Fprintln(s.Stderr, "visor:", err)
 		return 1
 	}
 	fmt.Fprintln(s.Stdout, "wrote", path)

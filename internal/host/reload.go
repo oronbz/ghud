@@ -6,13 +6,13 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/oronbz/ghud/internal/layout"
-	"github.com/oronbz/ghud/internal/theme"
+	"github.com/oronbz/visor/internal/layout"
+	"github.com/oronbz/visor/internal/theme"
 )
 
 type filesChangedMsg struct{ files []string }
 
-// watch points the file watcher at every file ghud reads: config.toml,
+// watch points the file watcher at every file visor reads: config.toml,
 // layout.json, the plugins directory and each Watcher Widget's files.
 func (m Model) watch() Model {
 	files := []string{m.configEditor.Path, m.layoutFile(), m.pluginsDir()}

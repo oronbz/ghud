@@ -11,10 +11,10 @@ import (
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/oronbz/ghud/internal/theme"
+	"github.com/oronbz/visor/internal/theme"
 )
 
-// colorWait is how long ghud waits for the terminal to answer its colour
+// colorWait is how long visor waits for the terminal to answer its colour
 // queries before settling on what it has.
 const colorWait = 500 * time.Millisecond
 
@@ -26,8 +26,8 @@ type colors struct {
 	over   theme.Overrides
 	term   theme.Terminal
 	// asking is true until the terminal has answered or colorWait passed;
-	// ghud leaves the terminal background alone meanwhile so the query
-	// doesn't read back ghud's own colour.
+	// visor leaves the terminal background alone meanwhile so the query
+	// doesn't read back visor's own colour.
 	asking bool
 }
 
@@ -57,7 +57,7 @@ func (m Model) queryColors() tea.Cmd {
 	)
 }
 
-// background is the colour ghud sets as the terminal background, nil while
+// background is the colour visor sets as the terminal background, nil while
 // it leaves the terminal's own alone.
 func (m Model) background() color.Color {
 	if m.colors.asking || m.opts.Theme.FromTerminal() {

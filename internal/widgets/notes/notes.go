@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/oronbz/ghud/internal/theme"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/theme"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 var Type = widget.Type{
@@ -34,7 +34,7 @@ var Type = widget.Type{
 type notes struct {
 	file string
 	// lock makes a save's check for a newer version and its write one step
-	// across ghud instances.
+	// across visor instances.
 	lock string
 }
 
@@ -80,7 +80,7 @@ func (n notes) copyForEditor() (widget.Result, error) {
 	if err != nil {
 		return widget.Result{}, err
 	}
-	dir, err := os.MkdirTemp("", "ghud-edit-")
+	dir, err := os.MkdirTemp("", "visor-edit-")
 	if err != nil {
 		return widget.Result{}, err
 	}

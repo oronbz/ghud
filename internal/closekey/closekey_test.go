@@ -7,7 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 
-	"github.com/oronbz/ghud/internal/closekey"
+	"github.com/oronbz/visor/internal/closekey"
 )
 
 // press decodes the bytes a terminal sends for one key, as Bubble Tea does.

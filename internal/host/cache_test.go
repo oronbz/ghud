@@ -14,14 +14,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/oronbz/ghud/internal/cache"
-	"github.com/oronbz/ghud/internal/hosttest"
-	"github.com/oronbz/ghud/internal/paths"
-	"github.com/oronbz/ghud/internal/theme"
-	"github.com/oronbz/ghud/internal/widget"
-	"github.com/oronbz/ghud/internal/widgets/meetings"
-	"github.com/oronbz/ghud/internal/widgets/prs"
-	"github.com/oronbz/ghud/internal/widgets/reminders"
+	"github.com/oronbz/visor/internal/cache"
+	"github.com/oronbz/visor/internal/hosttest"
+	"github.com/oronbz/visor/internal/paths"
+	"github.com/oronbz/visor/internal/theme"
+	"github.com/oronbz/visor/internal/widget"
+	"github.com/oronbz/visor/internal/widgets/meetings"
+	"github.com/oronbz/visor/internal/widgets/prs"
+	"github.com/oronbz/visor/internal/widgets/reminders"
 )
 
 // upstream is an API that several hosts' News Widgets fetch from; every
@@ -257,7 +257,7 @@ func lockEntry(t *testing.T, root string, at time.Time) {
 func lockEntryByExited(t *testing.T, root string, at time.Time) {
 	t.Helper()
 	if runtime.GOOS == "windows" {
-		t.Skip("ghud can't tell an exited lock owner on Windows")
+		t.Skip("visor can't tell an exited lock owner on Windows")
 	}
 	exited := exec.Command("true")
 	if err := exited.Run(); err != nil {

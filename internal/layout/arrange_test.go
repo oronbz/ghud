@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/oronbz/ghud/internal/layout"
+	"github.com/oronbz/visor/internal/layout"
 )
 
 // grid builds a Layout of weight-1 rows and Widgets from ids per row.

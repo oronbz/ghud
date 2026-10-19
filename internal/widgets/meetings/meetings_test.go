@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/oronbz/ghud/internal/hosttest"
-	"github.com/oronbz/ghud/internal/ports"
-	"github.com/oronbz/ghud/internal/theme"
-	"github.com/oronbz/ghud/internal/widget"
-	"github.com/oronbz/ghud/internal/widgets/meetings"
+	"github.com/oronbz/visor/internal/hosttest"
+	"github.com/oronbz/visor/internal/ports"
+	"github.com/oronbz/visor/internal/theme"
+	"github.com/oronbz/visor/internal/widget"
+	"github.com/oronbz/visor/internal/widgets/meetings"
 )
 
 // at is a time on the harness's day, Sunday 18 October 2026, in UTC, which

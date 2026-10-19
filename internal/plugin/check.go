@@ -14,8 +14,8 @@ import (
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
-	"github.com/oronbz/ghud/internal/ports"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/ports"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 type CheckOptions struct {
@@ -26,10 +26,10 @@ type CheckOptions struct {
 
 // checkAction is the Action the check invokes: no Plugin has it, so the
 // round-trip runs none of a Plugin's real Actions.
-const checkAction = "ghud-plugin-check"
+const checkAction = "visor-plugin-check"
 
-// Check is `ghud plugin check`: it runs the Plugin in dir through the same
-// host code ghud uses, checks every message against the shipped schema and
+// Check is `visor plugin check`: it runs the Plugin in dir through the same
+// host code visor uses, checks every message against the shipped schema and
 // prints a line per step to out.
 func Check(dir string, o CheckOptions, out io.Writer) bool {
 	if o.Timeout <= 0 {
@@ -43,7 +43,7 @@ func Check(dir string, o CheckOptions, out io.Writer) bool {
 			return "", err
 		}
 		if m.Protocol != Protocol {
-			return "", fmt.Errorf("declares protocol %d, but this ghud speaks %d", m.Protocol, Protocol)
+			return "", fmt.Errorf("declares protocol %d, but this visor speaks %d", m.Protocol, Protocol)
 		}
 		var types []string
 		for _, w := range m.Widgets {
@@ -232,7 +232,7 @@ func (c *checker) tap(out bool, raw []byte) {
 	_ = json.Unmarshal(raw, &env)
 	what := "the Plugin's message"
 	if out {
-		what = "ghud's message"
+		what = "visor's message"
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -267,7 +267,7 @@ var resultDefs = map[string]string{
 	"action/invoke":  "invokeResult",
 }
 
-// pushed records a pushed update ghud couldn't use.
+// pushed records a pushed update visor couldn't use.
 func (c *checker) pushed(push widget.Push) {
 	if push.Err == nil {
 		return

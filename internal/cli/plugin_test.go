@@ -10,11 +10,11 @@ import (
 
 	"github.com/gofrs/flock"
 
-	"github.com/oronbz/ghud/internal/cli"
-	"github.com/oronbz/ghud/internal/plugin/plugintest"
+	"github.com/oronbz/visor/internal/cli"
+	"github.com/oronbz/visor/internal/plugin/plugintest"
 )
 
-// installs is a home for `ghud plugin` commands, with GitHub faked.
+// installs is a home for `visor plugin` commands, with GitHub faked.
 type installs struct {
 	t    *testing.T
 	home string
@@ -26,8 +26,8 @@ func newInstalls(t *testing.T) *installs {
 	return &installs{t: t, home: t.TempDir(), gh: plugintest.NewGitHub(t), env: map[string]string{}}
 }
 
-// ghud runs ghud with args and stdin, returning the exit code and output.
-func (in *installs) ghud(stdin string, args ...string) (int, string, string) {
+// visor runs visor with args and stdin, returning the exit code and output.
+func (in *installs) visor(stdin string, args ...string) (int, string, string) {
 	in.t.Helper()
 	getenv := func(k string) string {
 		if k == "HOME" {
@@ -43,7 +43,7 @@ func (in *installs) ghud(stdin string, args ...string) (int, string, string) {
 }
 
 func (in *installs) plugins() string {
-	return filepath.Join(in.home, ".local", "share", "ghud", "plugins")
+	return filepath.Join(in.home, ".local", "share", "visor", "plugins")
 }
 
 // installed lists the entries of the plugins directory.
@@ -61,8 +61,8 @@ func (in *installs) installed() []string {
 func greetPlugin(t *testing.T, dir string, extra map[string]string) map[string]string {
 	t.Helper()
 	files := map[string]string{
-		dir + "ghud-plugin.toml": plugintest.Manifest(t, plugintest.Options{Name: "greet", Command: []string{"./fixture"}, Build: [][]string{{"sh", "build.sh"}}}),
-		dir + "build.sh":         fmt.Sprintf("cp %q fixture\n", plugintest.Binary(t)),
+		dir + "visor-plugin.toml": plugintest.Manifest(t, plugintest.Options{Name: "greet", Command: []string{"./fixture"}, Build: [][]string{{"sh", "build.sh"}}}),
+		dir + "build.sh":          fmt.Sprintf("cp %q fixture\n", plugintest.Binary(t)),
 	}
 	for k, v := range extra {
 		files[dir+k] = v
@@ -83,7 +83,7 @@ func TestPluginInstallFetchesBuildsAndMakesTheWidgetTypeAvailable(t *testing.T) 
 	in := newInstalls(t)
 	sha := in.gh.Push("octo/greet", "main", greetPlugin(t, "", nil))
 
-	code, stdout, stderr := in.ghud("", "plugin", "install", "octo/greet", "-y")
+	code, stdout, stderr := in.visor("", "plugin", "install", "octo/greet", "-y")
 	if code != 0 {
 		t.Fatalf("exit %d, stderr:\n%s", code, stderr)
 	}
@@ -91,7 +91,7 @@ func TestPluginInstallFetchesBuildsAndMakesTheWidgetTypeAvailable(t *testing.T) 
 	if _, err := os.Stat(filepath.Join(in.plugins(), "greet", "fixture")); err != nil {
 		t.Errorf("the build didn't run in the Plugin's directory: %v", err)
 	}
-	_, ref, _ := in.ghud("", "config", "default")
+	_, ref, _ := in.visor("", "config", "default")
 	contains(t, "config default", ref, `type = "greet"`)
 }
 
@@ -102,7 +102,7 @@ func TestPluginInstallFromASubdirectoryAtARefAsksForTrust(t *testing.T) {
 	files["README.md"] = "a Plugin in a subdirectory"
 	sha := in.gh.Push("octo/tools", "v1", files)
 
-	code, stdout, stderr := in.ghud("y\n", "plugin", "install", "octo/tools/plugins/greet", "--ref", "v1")
+	code, stdout, stderr := in.visor("y\n", "plugin", "install", "octo/tools/plugins/greet", "--ref", "v1")
 	if code != 0 {
 		t.Fatalf("exit %d, stderr:\n%s", code, stderr)
 	}
@@ -128,7 +128,7 @@ func TestDecliningTrustInstallsNothing(t *testing.T) {
 	in.gh.Push("octo/greet", "main", greetPlugin(t, "", map[string]string{"build.sh": "touch built\n"}))
 
 	for _, answer := range []string{"n\n", "\n", ""} {
-		code, stdout, stderr := in.ghud(answer, "plugin", "install", "octo/greet")
+		code, stdout, stderr := in.visor(answer, "plugin", "install", "octo/greet")
 		if code != 1 {
 			t.Errorf("answer %q: exit %d, want 1", answer, code)
 		}
@@ -144,7 +144,7 @@ func TestAFailingBuildInstallsNothing(t *testing.T) {
 	in := newInstalls(t)
 	in.gh.Push("octo/greet", "main", greetPlugin(t, "", map[string]string{"build.sh": "touch half-built\necho compiler says no >&2\nexit 3\n"}))
 
-	code, _, stderr := in.ghud("", "plugin", "install", "-y", "octo/greet")
+	code, _, stderr := in.visor("", "plugin", "install", "-y", "octo/greet")
 	if code != 1 {
 		t.Errorf("exit %d, want 1", code)
 	}
@@ -160,10 +160,10 @@ func TestAFailingBuildInstallsNothing(t *testing.T) {
 func TestBuildStepsRunWithoutAShellOrStdin(t *testing.T) {
 	in := newInstalls(t)
 	files := greetPlugin(t, "", map[string]string{"build.sh": fmt.Sprintf("cp %q fixture\nprintf %%s \"$1\" > arg\ncat > stdin\n", plugintest.Binary(t))})
-	files["ghud-plugin.toml"] = plugintest.Manifest(t, plugintest.Options{Name: "greet", Command: []string{"./fixture"}, Build: [][]string{{"sh", "build.sh", "$HOME; echo hi"}}})
+	files["visor-plugin.toml"] = plugintest.Manifest(t, plugintest.Options{Name: "greet", Command: []string{"./fixture"}, Build: [][]string{{"sh", "build.sh", "$HOME; echo hi"}}})
 	in.gh.Push("octo/greet", "main", files)
 
-	if code, _, stderr := in.ghud("y\nmore input\n", "plugin", "install", "octo/greet"); code != 0 {
+	if code, _, stderr := in.visor("y\nmore input\n", "plugin", "install", "octo/greet"); code != 0 {
 		t.Fatalf("exit %d, stderr:\n%s", code, stderr)
 	}
 	dir := filepath.Join(in.plugins(), "greet")
@@ -178,13 +178,13 @@ func TestBuildStepsRunWithoutAShellOrStdin(t *testing.T) {
 func TestInstallingAnInstalledPluginPointsToUpdate(t *testing.T) {
 	in := newInstalls(t)
 	in.gh.Push("octo/greet", "main", greetPlugin(t, "", nil))
-	in.ghud("", "plugin", "install", "-y", "octo/greet")
+	in.visor("", "plugin", "install", "-y", "octo/greet")
 
-	code, _, stderr := in.ghud("", "plugin", "install", "-y", "octo/greet")
+	code, _, stderr := in.visor("", "plugin", "install", "-y", "octo/greet")
 	if code != 1 {
 		t.Errorf("exit %d, want 1", code)
 	}
-	contains(t, "stderr", stderr, "already installed", "ghud plugin update greet")
+	contains(t, "stderr", stderr, "already installed", "visor plugin update greet")
 }
 
 // counting is greetPlugin with a build that appends a line to builds.log
@@ -206,9 +206,9 @@ func (in *installs) builds() int {
 func TestPluginUpdateRebuildsOnlyAfterANewCommit(t *testing.T) {
 	in := newInstalls(t)
 	first := in.gh.Push("octo/greet", "main", counting(t, in, "1"))
-	in.ghud("", "plugin", "install", "-y", "octo/greet")
+	in.visor("", "plugin", "install", "-y", "octo/greet")
 
-	code, stdout, stderr := in.ghud("", "plugin", "update", "greet")
+	code, stdout, stderr := in.visor("", "plugin", "update", "greet")
 	if code != 0 {
 		t.Fatalf("exit %d, stderr:\n%s", code, stderr)
 	}
@@ -218,7 +218,7 @@ func TestPluginUpdateRebuildsOnlyAfterANewCommit(t *testing.T) {
 	}
 
 	second := in.gh.Push("octo/greet", "main", counting(t, in, "2"))
-	code, stdout, stderr = in.ghud("y\n", "plugin", "update")
+	code, stdout, stderr = in.visor("y\n", "plugin", "update")
 	if code != 0 {
 		t.Fatalf("exit %d, stderr:\n%s", code, stderr)
 	}
@@ -237,20 +237,20 @@ func TestPluginUpdateRebuildsOnlyAfterANewCommit(t *testing.T) {
 func TestAFailedUpdateKeepsThePluginAsItWas(t *testing.T) {
 	in := newInstalls(t)
 	first := in.gh.Push("octo/greet", "main", counting(t, in, "1"))
-	in.ghud("", "plugin", "install", "-y", "octo/greet")
+	in.visor("", "plugin", "install", "-y", "octo/greet")
 	in.gh.Push("octo/greet", "main", greetPlugin(t, "", map[string]string{"build.sh": "exit 1\n", "VERSION": "2"}))
 
-	if code, _, _ := in.ghud("", "plugin", "update", "-y", "greet"); code != 1 {
+	if code, _, _ := in.visor("", "plugin", "update", "-y", "greet"); code != 1 {
 		t.Errorf("exit %d, want 1", code)
 	}
-	if code, _, _ := in.ghud("n\n", "plugin", "update", "greet"); code != 1 {
+	if code, _, _ := in.visor("n\n", "plugin", "update", "greet"); code != 1 {
 		t.Errorf("declined update: exit %d, want 1", code)
 	}
 	dir := filepath.Join(in.plugins(), "greet")
 	if v, _ := os.ReadFile(filepath.Join(dir, "VERSION")); string(v) != "1" {
 		t.Errorf("VERSION is %q after failed updates, want 1", v)
 	}
-	if _, stdout, _ := in.ghud("", "plugin", "list"); !strings.Contains(stdout, first[:7]) {
+	if _, stdout, _ := in.visor("", "plugin", "list"); !strings.Contains(stdout, first[:7]) {
 		t.Errorf("list doesn't show the commit still installed:\n%s", stdout)
 	}
 }
@@ -258,12 +258,12 @@ func TestAFailedUpdateKeepsThePluginAsItWas(t *testing.T) {
 func TestPluginListShowsSourceCommitAndWidgetTypes(t *testing.T) {
 	in := newInstalls(t)
 	sha := in.gh.Push("octo/greet", "v2", greetPlugin(t, "", nil))
-	in.ghud("", "plugin", "install", "-y", "octo/greet", "--ref", "v2")
+	in.visor("", "plugin", "install", "-y", "octo/greet", "--ref", "v2")
 	plugintest.Write(t, filepath.Join(in.plugins(), "byhand"), plugintest.Options{Name: "byhand"})
 	dev := plugintest.Write(t, filepath.Join(in.home, "dev", "wip"), plugintest.Options{Name: "wip"})
-	writeFile(t, filepath.Join(in.home, ".config", "ghud", "config.toml"), "[[plugin]]\npath = \"~/dev/wip\"\n")
+	writeFile(t, filepath.Join(in.home, ".config", "visor", "config.toml"), "[[plugin]]\npath = \"~/dev/wip\"\n")
 
-	code, stdout, stderr := in.ghud("", "plugin", "list")
+	code, stdout, stderr := in.visor("", "plugin", "list")
 	if code != 0 {
 		t.Fatalf("exit %d, stderr:\n%s", code, stderr)
 	}
@@ -287,9 +287,9 @@ func TestPluginListShowsSourceCommitAndWidgetTypes(t *testing.T) {
 func TestPluginUninstallDeletesTheFolder(t *testing.T) {
 	in := newInstalls(t)
 	in.gh.Push("octo/greet", "main", greetPlugin(t, "", nil))
-	in.ghud("", "plugin", "install", "-y", "octo/greet")
+	in.visor("", "plugin", "install", "-y", "octo/greet")
 
-	code, stdout, stderr := in.ghud("", "plugin", "uninstall", "greet")
+	code, stdout, stderr := in.visor("", "plugin", "uninstall", "greet")
 	if code != 0 {
 		t.Fatalf("exit %d, stderr:\n%s", code, stderr)
 	}
@@ -297,12 +297,12 @@ func TestPluginUninstallDeletesTheFolder(t *testing.T) {
 	if got := in.installed(); strings.Join(got, " ") != ".staging .uninstalled" {
 		t.Errorf("plugins directory holds %v after uninstall", got)
 	}
-	code, _, stderr = in.ghud("", "plugin", "uninstall", "greet")
+	code, _, stderr = in.visor("", "plugin", "uninstall", "greet")
 	if code != 1 {
 		t.Errorf("uninstalling again: exit %d, want 1", code)
 	}
 	contains(t, "stderr", stderr, "Plugin `greet` isn't installed")
-	if _, _, stderr := in.ghud("", "plugin", "uninstall", "../../.."); !strings.Contains(stderr, "isn't a Plugin name") {
+	if _, _, stderr := in.visor("", "plugin", "uninstall", "../../.."); !strings.Contains(stderr, "isn't a Plugin name") {
 		t.Errorf("a path as the name: %s", stderr)
 	}
 }
@@ -310,10 +310,10 @@ func TestPluginUninstallDeletesTheFolder(t *testing.T) {
 func TestPluginCommandsRefuseToRunWhileAnotherHoldsThePluginsLock(t *testing.T) {
 	in := newInstalls(t)
 	in.gh.Push("octo/greet", "main", greetPlugin(t, "", nil))
-	in.ghud("", "plugin", "install", "-y", "octo/greet")
+	in.visor("", "plugin", "install", "-y", "octo/greet")
 
-	// Another `ghud plugin` command, in another process, holds the lock.
-	locks := filepath.Join(in.home, ".local", "share", "ghud", "locks")
+	// Another `visor plugin` command, in another process, holds the lock.
+	locks := filepath.Join(in.home, ".local", "share", "visor", "locks")
 	if err := os.MkdirAll(locks, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -326,23 +326,23 @@ func TestPluginCommandsRefuseToRunWhileAnotherHoldsThePluginsLock(t *testing.T) 
 		{"plugin", "update", "-y"},
 		{"plugin", "uninstall", "greet"},
 	} {
-		code, _, stderr := in.ghud("", args...)
+		code, _, stderr := in.visor("", args...)
 		if code != 1 {
 			t.Errorf("%v: exit %d, want 1", args, code)
 		}
-		contains(t, strings.Join(args, " ")+" stderr", stderr, "another `ghud plugin` command is running")
+		contains(t, strings.Join(args, " ")+" stderr", stderr, "another `visor plugin` command is running")
 	}
 	if got := in.installed(); !strings.Contains(strings.Join(got, " "), "greet") {
 		t.Errorf("plugins directory holds %v, want greet untouched", got)
 	}
-	if code, stdout, _ := in.ghud("", "plugin", "list"); code != 0 || !strings.Contains(stdout, "greet") {
+	if code, stdout, _ := in.visor("", "plugin", "list"); code != 0 || !strings.Contains(stdout, "greet") {
 		t.Errorf("plugin list: exit %d, stdout %q; listing needs no lock", code, stdout)
 	}
 
 	if err := other.Unlock(); err != nil {
 		t.Fatal(err)
 	}
-	if code, _, stderr := in.ghud("", "plugin", "uninstall", "greet"); code != 0 {
+	if code, _, stderr := in.visor("", "plugin", "uninstall", "greet"); code != 0 {
 		t.Errorf("once the lock is free: exit %d, stderr:\n%s", code, stderr)
 	}
 }
@@ -350,7 +350,7 @@ func TestPluginCommandsRefuseToRunWhileAnotherHoldsThePluginsLock(t *testing.T) 
 func TestInstallSendsTheGitHubTokenWhenThereIsOne(t *testing.T) {
 	in := newInstalls(t)
 	in.gh.Push("octo/greet", "main", greetPlugin(t, "", nil))
-	in.ghud("", "plugin", "install", "-y", "octo/greet")
+	in.visor("", "plugin", "install", "-y", "octo/greet")
 	for _, a := range in.gh.Auth() {
 		if a != "" {
 			t.Errorf("sent Authorization %q with no token around", a)
@@ -360,7 +360,7 @@ func TestInstallSendsTheGitHubTokenWhenThereIsOne(t *testing.T) {
 	in = newInstalls(t)
 	in.env["GH_TOKEN"] = "ghp_secret"
 	in.gh.Push("octo/greet", "main", greetPlugin(t, "", nil))
-	in.ghud("", "plugin", "install", "-y", "octo/greet")
+	in.visor("", "plugin", "install", "-y", "octo/greet")
 	if auth := in.gh.Auth(); len(auth) == 0 || auth[0] != "Bearer ghp_secret" {
 		t.Errorf("Authorization headers %q, want the GH_TOKEN", auth)
 	}
@@ -370,10 +370,10 @@ func TestInstallingFromAMissingRepositoryOrRefSaysSo(t *testing.T) {
 	in := newInstalls(t)
 	in.gh.Push("octo/greet", "main", greetPlugin(t, "", nil))
 
-	_, _, stderr := in.ghud("", "plugin", "install", "-y", "octo/nope")
+	_, _, stderr := in.visor("", "plugin", "install", "-y", "octo/nope")
 	contains(t, "stderr", stderr, "GitHub has no repository octo/nope")
-	_, _, stderr = in.ghud("", "plugin", "install", "-y", "octo/greet", "--ref", "v9")
+	_, _, stderr = in.visor("", "plugin", "install", "-y", "octo/greet", "--ref", "v9")
 	contains(t, "stderr", stderr, "octo/greet has no branch, tag or commit `v9`")
-	_, _, stderr = in.ghud("", "plugin", "install", "-y", "octo/greet/nested")
+	_, _, stderr = in.visor("", "plugin", "install", "-y", "octo/greet/nested")
 	contains(t, "stderr", stderr, "octo/greet has no directory `nested`")
 }

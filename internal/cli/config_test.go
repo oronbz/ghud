@@ -11,12 +11,12 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	toml "github.com/pelletier/go-toml/v2"
 
-	"github.com/oronbz/ghud/internal/cli"
-	"github.com/oronbz/ghud/internal/config"
-	"github.com/oronbz/ghud/internal/host"
-	"github.com/oronbz/ghud/internal/plugin/plugintest"
-	"github.com/oronbz/ghud/internal/weather"
-	"github.com/oronbz/ghud/internal/weather/weathertest"
+	"github.com/oronbz/visor/internal/cli"
+	"github.com/oronbz/visor/internal/config"
+	"github.com/oronbz/visor/internal/host"
+	"github.com/oronbz/visor/internal/plugin/plugintest"
+	"github.com/oronbz/visor/internal/weather"
+	"github.com/oronbz/visor/internal/weather/weathertest"
 )
 
 // sandbox is a temp home with env on top of HOME. The cache is kept outside
@@ -61,7 +61,7 @@ func titledClock(title string) string {
 
 func TestConfigDefaultDocumentsInstalledPluginTypes(t *testing.T) {
 	s, home, stdout, stderr := sandbox(t, nil, "", "config", "default")
-	plugintest.Write(t, filepath.Join(home, ".local", "share", "ghud", "plugins", "fixture"), plugintest.Options{})
+	plugintest.Write(t, filepath.Join(home, ".local", "share", "visor", "plugins", "fixture"), plugintest.Options{})
 	if code := cli.Run(s); code != 0 {
 		t.Fatalf("exit %d: %s", code, stderr)
 	}
@@ -72,19 +72,19 @@ func TestConfigDefaultDocumentsInstalledPluginTypes(t *testing.T) {
 	}
 }
 
-// Package managers install ghud and ghud-weather side by side and link
-// ghud into a shared bin, which may hold no ghud-weather link of its own.
-func TestConfigDefaultDocumentsTheWeatherPluginInstalledBesideGhud(t *testing.T) {
+// Package managers install visor and visor-weather side by side and link
+// visor into a shared bin, which may hold no visor-weather link of its own.
+func TestConfigDefaultDocumentsTheWeatherPluginInstalledBesideVisor(t *testing.T) {
 	cellar, bin := t.TempDir(), t.TempDir()
 	if err := os.Symlink(filepath.Join(weathertest.Dir(t), weather.Binary), filepath.Join(cellar, weather.Binary)); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, filepath.Join(cellar, "ghud"), "")
-	if err := os.Symlink(filepath.Join(cellar, "ghud"), filepath.Join(bin, "ghud")); err != nil {
+	writeFile(t, filepath.Join(cellar, "visor"), "")
+	if err := os.Symlink(filepath.Join(cellar, "visor"), filepath.Join(bin, "visor")); err != nil {
 		t.Fatal(err)
 	}
 	s, _, stdout, stderr := sandbox(t, nil, "", "config", "default")
-	s.Executable = filepath.Join(bin, "ghud")
+	s.Executable = filepath.Join(bin, "visor")
 	if code := cli.Run(s); code != 0 {
 		t.Fatalf("exit %d: %s", code, stderr)
 	}
@@ -97,20 +97,20 @@ func TestConfigDefaultDocumentsTheWeatherPluginInstalledBesideGhud(t *testing.T)
 
 func TestConfigDefaultHasNoWeatherWithoutTheBundledPlugin(t *testing.T) {
 	s, _, stdout, stderr := sandbox(t, nil, "", "config", "default")
-	s.Executable = filepath.Join(t.TempDir(), "ghud")
+	s.Executable = filepath.Join(t.TempDir(), "visor")
 	if code := cli.Run(s); code != 0 {
 		t.Fatalf("exit %d: %s", code, stderr)
 	}
 	if strings.Contains(stdout.String(), `type = "weather"`) {
-		t.Error("reference documents weather with no ghud-weather installed")
+		t.Error("reference documents weather with no visor-weather installed")
 	}
 }
 
 func TestConfigIsReadFromXDGConfigHome(t *testing.T) {
 	s, home, stdout, stderr := sandbox(t, map[string]string{"XDG_CONFIG_HOME": "$HOME/xdg"}, "q")
-	writeFile(t, filepath.Join(home, "xdg", "ghud", "config.toml"), titledClock("From XDG"))
-	writeFile(t, filepath.Join(home, "Library", "Application Support", "ghud", "config.toml"), titledClock("From Library"))
-	writeFile(t, filepath.Join(home, ".config", "ghud", "config.toml"), titledClock("From dot config"))
+	writeFile(t, filepath.Join(home, "xdg", "visor", "config.toml"), titledClock("From XDG"))
+	writeFile(t, filepath.Join(home, "Library", "Application Support", "visor", "config.toml"), titledClock("From Library"))
+	writeFile(t, filepath.Join(home, ".config", "visor", "config.toml"), titledClock("From dot config"))
 
 	if code := run(t, s); code != 0 {
 		t.Fatalf("exit code %d, stderr: %s", code, stderr)
@@ -127,9 +127,9 @@ func TestConfigFlagAndEnvOverrideThePath(t *testing.T) {
 		args []string
 		want string
 	}{
-		{"GHUD_CONFIG", map[string]string{"GHUD_CONFIG": "$HOME/env.toml"}, nil, "From env"},
+		{"VISOR_CONFIG", map[string]string{"VISOR_CONFIG": "$HOME/env.toml"}, nil, "From env"},
 		{"--config", nil, []string{"--config", "flag.toml"}, "From flag"},
-		{"--config beats GHUD_CONFIG", map[string]string{"GHUD_CONFIG": "$HOME/env.toml"}, []string{"--config", "flag.toml"}, "From flag"},
+		{"--config beats VISOR_CONFIG", map[string]string{"VISOR_CONFIG": "$HOME/env.toml"}, []string{"--config", "flag.toml"}, "From flag"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -139,7 +139,7 @@ func TestConfigFlagAndEnvOverrideThePath(t *testing.T) {
 					s.Args[i] = filepath.Join(home, a)
 				}
 			}
-			writeFile(t, filepath.Join(home, ".config", "ghud", "config.toml"), titledClock("From default"))
+			writeFile(t, filepath.Join(home, ".config", "visor", "config.toml"), titledClock("From default"))
 			writeFile(t, filepath.Join(home, "env.toml"), titledClock("From env"))
 			writeFile(t, filepath.Join(home, "flag.toml"), titledClock("From flag"))
 
@@ -168,7 +168,7 @@ func TestConfigDefaultPrintsTheFullyCommentedReference(t *testing.T) {
 		t.Errorf("not everything is commented out, got keys %v", doc)
 	}
 	for _, want := range []string{
-		`#theme = "ghud"`,
+		`#theme = "visor"`,
 		`#time_format = "12h"`,
 		`#week_start = "sunday"`,
 		`#mouse = true`,
@@ -223,7 +223,7 @@ func TestConfigDefaultDocumentsTheThemeAndEveryColourToken(t *testing.T) {
 		t.Fatalf("exit code %d, stderr: %s", code, stderr)
 	}
 	ref := stdout.String()
-	for _, want := range []string{`#theme = "ghud"`, "#[colors.dark]", "#[colors.light]"} {
+	for _, want := range []string{`#theme = "visor"`, "#[colors.dark]", "#[colors.light]"} {
 		if !strings.Contains(ref, want+"\n") {
 			t.Errorf("reference lacks %q:\n%s", want, ref)
 		}
@@ -291,7 +291,7 @@ func TestConfigInitWritesTheReferenceOnce(t *testing.T) {
 	if code := run(t, s); code != 0 {
 		t.Fatalf("exit code %d, stderr: %s", code, stderr)
 	}
-	path := filepath.Join(home, ".config", "ghud", "config.toml")
+	path := filepath.Join(home, ".config", "visor", "config.toml")
 	written, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)

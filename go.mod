@@ -1,4 +1,4 @@
-module github.com/oronbz/ghud
+module github.com/oronbz/visor
 
 go 1.27.1
 

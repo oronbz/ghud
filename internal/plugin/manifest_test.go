@@ -12,9 +12,9 @@ import (
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
-	"github.com/oronbz/ghud/internal/plugin"
-	"github.com/oronbz/ghud/internal/plugin/plugintest"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/plugin"
+	"github.com/oronbz/visor/internal/plugin/plugintest"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 const goodManifest = `name = "demo"
@@ -151,7 +151,7 @@ func TestTheProtocolSchemaDescribesARealSession(t *testing.T) {
 }
 
 // The host refuses exactly the refreshes the shipped schema rejects, so
-// `ghud plugin check` passes a Plugin only if ghud can show what it sends.
+// `visor plugin check` passes a Plugin only if visor can show what it sends.
 func TestTheHostAndTheSchemaRejectTheSameRefreshes(t *testing.T) {
 	for mode, rejected := range map[string]bool{
 		"items": false, "lines": false, "setup": false, "error": false,

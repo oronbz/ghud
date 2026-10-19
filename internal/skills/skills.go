@@ -1,9 +1,9 @@
-// Package skills installs ghud's bundled agent skills where agents look for
-// them, and keeps the copies ghud installed in step with the binary.
+// Package skills installs visor's bundled agent skills where agents look for
+// them, and keeps the copies visor installed in step with the binary.
 //
 // Each installed SKILL.md carries a stamp in its frontmatter metadata: the
-// ghud version that wrote it and a digest of what it wrote. Only stamped
-// folders are ghud's to update or remove, and the digest tells an untouched
+// visor version that wrote it and a digest of what it wrote. Only stamped
+// folders are visor's to update or remove, and the digest tells an untouched
 // copy from one the user edited.
 package skills
 
@@ -21,8 +21,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/oronbz/ghud/internal/paths"
-	bundled "github.com/oronbz/ghud/skills"
+	"github.com/oronbz/visor/internal/paths"
+	bundled "github.com/oronbz/visor/skills"
 )
 
 // Installer writes the bundled skills for one home directory.
@@ -32,9 +32,9 @@ type Installer struct {
 	// Claude is Claude Code's skills folder, which gets a symlink per skill;
 	// "" when Claude Code isn't set up.
 	Claude string
-	// Version is the ghud version stamped into what Install writes.
+	// Version is the visor version stamped into what Install writes.
 	Version string
-	// Bundle holds one folder per skill; nil means the skills built into ghud.
+	// Bundle holds one folder per skill; nil means the skills built into visor.
 	Bundle fs.FS
 }
 
@@ -62,7 +62,7 @@ type Report struct {
 	// Installed are the skill folders written; Linked, the symlinks to them.
 	Installed, Linked []string
 	Removed           []string
-	// Kept are notes on paths left alone because ghud didn't put them there.
+	// Kept are notes on paths left alone because visor didn't put them there.
 	Kept []string
 }
 
@@ -88,7 +88,7 @@ func (in Installer) Install() (Report, error) {
 		case err != nil:
 			return r, err
 		case link == "":
-			r.Kept = append(r.Kept, fmt.Sprintf("left %s alone: ghud didn't put it there", filepath.Join(in.Claude, name)))
+			r.Kept = append(r.Kept, fmt.Sprintf("left %s alone: visor didn't put it there", filepath.Join(in.Claude, name)))
 		default:
 			r.Linked = append(r.Linked, link)
 		}
@@ -96,7 +96,7 @@ func (in Installer) Install() (Report, error) {
 	return r, nil
 }
 
-// Uninstall removes every folder in Agents that ghud stamped, and the
+// Uninstall removes every folder in Agents that visor stamped, and the
 // symlinks in Claude's skills folder that point at them.
 func (in Installer) Uninstall() (Report, error) {
 	var r Report
@@ -135,9 +135,9 @@ func (in Installer) Uninstall() (Report, error) {
 	return r, nil
 }
 
-// Refresh brings the skills an older ghud installed up to this version,
+// Refresh brings the skills an older visor installed up to this version,
 // silently when nobody edited them since. For edited ones it returns a hint
-// to run `ghud skills install` instead of overwriting the edits.
+// to run `visor skills install` instead of overwriting the edits.
 func (in Installer) Refresh() (hint string, err error) {
 	set, err := in.skills()
 	if err != nil {
@@ -170,9 +170,9 @@ func (in Installer) Refresh() (hint string, err error) {
 	case 0:
 		return "", nil
 	case 1:
-		return "Run `ghud skills install` to update the edited skill " + edited[0], nil
+		return "Run `visor skills install` to update the edited skill " + edited[0], nil
 	}
-	return "Run `ghud skills install` to update the edited skills " + strings.Join(edited, ", "), nil
+	return "Run `visor skills install` to update the edited skills " + strings.Join(edited, ", "), nil
 }
 
 // skills reads the bundle as skill name → path in its folder → content.
@@ -255,7 +255,7 @@ func (in Installer) write(name string, files map[string][]byte) (string, error) 
 }
 
 // link points Claude's skills folder entry for name at dest. It replaces an
-// older symlink or a folder ghud stamped, and returns "" for anything else,
+// older symlink or a folder visor stamped, and returns "" for anything else,
 // which it leaves alone.
 func (in Installer) link(name, dest string) (string, error) {
 	if err := os.MkdirAll(in.Claude, 0o755); err != nil {
@@ -323,14 +323,14 @@ func digest(files map[string][]byte) string {
 }
 
 // stampRe matches the stamp exactly as stamp writes it, last in the frontmatter.
-var stampRe = regexp.MustCompile(`\nmetadata:\n  ghud-version: "([^"\n]*)"\n  ghud-digest: "([^"\n]*)"\n---\n`)
+var stampRe = regexp.MustCompile(`\nmetadata:\n  visor-version: "([^"\n]*)"\n  visor-digest: "([^"\n]*)"\n---\n`)
 
 func stamp(md []byte, version, digest string) ([]byte, error) {
 	end := frontmatterEnd(md)
 	if end < 0 {
 		return nil, errors.New("SKILL.md has no frontmatter")
 	}
-	s := fmt.Sprintf("metadata:\n  ghud-version: %s\n  ghud-digest: %s\n", strconv.Quote(version), strconv.Quote(digest))
+	s := fmt.Sprintf("metadata:\n  visor-version: %s\n  visor-digest: %s\n", strconv.Quote(version), strconv.Quote(digest))
 	return slices.Concat(md[:end], []byte(s), md[end:]), nil
 }
 

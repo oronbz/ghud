@@ -3,7 +3,7 @@ package config_test
 import (
 	"testing"
 
-	"github.com/oronbz/ghud/internal/config"
+	"github.com/oronbz/visor/internal/config"
 )
 
 func TestDetectLocalePrefersLCTimeThenTheSystemThenLANG(t *testing.T) {

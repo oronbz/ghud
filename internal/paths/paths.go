@@ -1,4 +1,4 @@
-// Package paths resolves ghud's config, data and cache directories. ghud does
+// Package paths resolves visor's config, data and cache directories. visor does
 // XDG itself on every OS because os.UserConfigDir ignores XDG_CONFIG_HOME on macOS.
 package paths
 
@@ -17,9 +17,9 @@ type Paths struct {
 // Under puts all three directories inside root, for tests and sandboxes.
 func Under(root string) Paths {
 	return Paths{
-		Config: filepath.Join(root, "config", "ghud"),
-		Data:   filepath.Join(root, "data", "ghud"),
-		Cache:  filepath.Join(root, "cache", "ghud"),
+		Config: filepath.Join(root, "config", "visor"),
+		Data:   filepath.Join(root, "data", "visor"),
+		Cache:  filepath.Join(root, "cache", "visor"),
 	}
 }
 
@@ -53,7 +53,7 @@ func Expand(p, home string) string {
 func Resolve(getenv func(string) string, goos string) (Paths, error) {
 	dir := func(xdg, unixDefault, winVar, winSub string) (string, error) {
 		if v := getenv(xdg); filepath.IsAbs(v) {
-			return filepath.Join(v, "ghud"), nil
+			return filepath.Join(v, "visor"), nil
 		}
 		if goos == "windows" {
 			base := getenv(winVar)
@@ -63,13 +63,13 @@ func Resolve(getenv func(string) string, goos string) (Paths, error) {
 			if base == "" {
 				return "", errors.New("paths: %AppData% is not set")
 			}
-			return filepath.Join(base, "ghud", winSub), nil
+			return filepath.Join(base, "visor", winSub), nil
 		}
 		home := Home(getenv)
 		if home == "" {
 			return "", errors.New("paths: $HOME is not set")
 		}
-		return filepath.Join(home, unixDefault, "ghud"), nil
+		return filepath.Join(home, unixDefault, "visor"), nil
 	}
 	var p Paths
 	var err error

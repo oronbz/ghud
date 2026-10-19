@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/oronbz/ghud/internal/hosttest"
+	"github.com/oronbz/visor/internal/hosttest"
 )
 
 const (
@@ -15,7 +15,7 @@ const (
 	setupHint      = "Set up Jira"
 	apiToken       = "test-jira-api-token"
 	handWritten    = `# my dashboard
-theme = "ghud"   # keep it
+theme = "visor"   # keep it
 
 [[widget]]
 type = "clock"
@@ -80,11 +80,11 @@ func TestSetUpJiraPromptsForSiteEmailAndTokenThenLoads(t *testing.T) {
 	}
 	h.Press("enter")
 
-	if got, err := h.Keyring.Get("ghud", ghudAccount); err != nil || got != apiToken {
+	if got, err := h.Keyring.Get("visor", visorAccount); err != nil || got != apiToken {
 		t.Fatalf("keyring holds %q (%v), want the token", got, err)
 	}
 	want := `# my dashboard
-theme = "ghud"   # keep it
+theme = "visor"   # keep it
 
 [[widget]]
 type = "clock"
@@ -126,7 +126,7 @@ func TestAnExpiredTokenOffersSetUpJiraAgainAndANewTokenLoads(t *testing.T) {
 		return 0, nil, ""
 	}
 	h := withJira(t, j, hosttest.Options{Width: 100, Height: 10, Env: map[string]string{},
-		Keyring: keyring(t, map[string]string{"ghud " + ghudAccount: "old-token"})})
+		Keyring: keyring(t, map[string]string{"visor " + visorAccount: "old-token"})})
 	if s := h.Screen(); !strings.Contains(s, "needs setup") || !strings.Contains(s, setupHint) {
 		t.Fatalf("want needs setup offering %q:\n%s", setupHint, s)
 	}
@@ -144,7 +144,7 @@ func TestAnExpiredTokenOffersSetUpJiraAgainAndANewTokenLoads(t *testing.T) {
 	h.Type("new-token")
 	h.Press("enter")
 
-	if got, _ := h.Keyring.Get("ghud", ghudAccount); got != "new-token" {
+	if got, _ := h.Keyring.Get("visor", visorAccount); got != "new-token" {
 		t.Fatalf("keyring holds %q, want the new token", got)
 	}
 	if got := configText(t, h); got != before {

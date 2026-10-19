@@ -9,11 +9,11 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/oronbz/ghud/internal/cli"
-	"github.com/oronbz/ghud/internal/hosttest"
+	"github.com/oronbz/visor/internal/cli"
+	"github.com/oronbz/visor/internal/hosttest"
 )
 
-// inHerdr is a ghud run with env set and herdr faked.
+// inHerdr is a visor run with env set and herdr faked.
 func inHerdr(t *testing.T, stdin string, env map[string]string, args ...string) (cli.System, *hosttest.Commands) {
 	s, _, _ := system(t, stdin, args...)
 	home := s.Getenv("HOME")
@@ -28,7 +28,7 @@ func inHerdr(t *testing.T, stdin string, env map[string]string, args ...string) 
 	return s, cmds
 }
 
-// herdrCalls are the herdr command lines ghud ran, leaving out the ones the
+// herdrCalls are the herdr command lines visor ran, leaving out the ones the
 // default Layout's Widgets run, such as `gh auth token`.
 func herdrCalls(cmds *hosttest.Commands) [][]string {
 	var calls [][]string
@@ -40,7 +40,7 @@ func herdrCalls(cmds *hosttest.Commands) [][]string {
 	return calls
 }
 
-func TestCloseKeysQuitGhud(t *testing.T) {
+func TestCloseKeysQuitVisor(t *testing.T) {
 	for _, tc := range []struct{ name, stdin string }{
 		{"kitty cmd+shift+g", "\x1b[103;10u"},
 		{"ctrl+b d", "\x02d"},
@@ -106,7 +106,7 @@ func TestOutsideAHerdrPaneHerdrIsNeverRun(t *testing.T) {
 	}
 }
 
-func TestRightClickIsRestoredWhenGhudIsKilled(t *testing.T) {
+func TestRightClickIsRestoredWhenVisorIsKilled(t *testing.T) {
 	s, cmds := inHerdr(t, "", map[string]string{"HERDR_PANE_ID": "w1-3"})
 	// A cancelled context kills the program, as a signal does.
 	ctx, cancel := context.WithCancel(context.Background())
@@ -114,7 +114,7 @@ func TestRightClickIsRestoredWhenGhudIsKilled(t *testing.T) {
 	s.ProgramOptions = append(s.ProgramOptions, tea.WithContext(ctx))
 
 	if code := run(t, s); code == 0 {
-		t.Error("a killed ghud exited 0")
+		t.Error("a killed visor exited 0")
 	}
 	if calls := herdrCalls(cmds); len(calls) != 2 || calls[1][5] != "herdr" {
 		t.Errorf("herdr calls %q, want the restore last", calls)

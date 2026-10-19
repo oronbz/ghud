@@ -1,6 +1,6 @@
 # Go + Bubble Tea v2; Apple sources are darwin-only built-ins via go-eventkit
 
-ghud is written in Go on Bubble Tea v2 (with Lip Gloss v2 and bubbles v2). Once plugins became out-of-process data producers ([ADR 0001](0001-host-drawn-out-of-process-plugins.md)), the framework only had to serve the approved Panels design, and Bubble Tea v2 ships what it needs: layer hit-testing for drag and resize, synchronized output, OSC 8, kitty keyboard flag 8 for lone Shift/Ctrl, a multi-line `textarea`, and `tea.ExecProcess` for the `$EDITOR` handoff. Reminders and Meetings read EventKit through `BRO3886/go-eventkit` (cgo) in files behind `//go:build darwin`, so those Widget types exist only in the macOS binary; the TCC grant goes to the host terminal. This route already ships in `oronbz/nag`.
+visor is written in Go on Bubble Tea v2 (with Lip Gloss v2 and bubbles v2). Once plugins became out-of-process data producers ([ADR 0001](0001-host-drawn-out-of-process-plugins.md)), the framework only had to serve the approved Panels design, and Bubble Tea v2 ships what it needs: layer hit-testing for drag and resize, synchronized output, OSC 8, kitty keyboard flag 8 for lone Shift/Ctrl, a multi-line `textarea`, and `tea.ExecProcess` for the `$EDITOR` handoff. Reminders and Meetings read EventKit through `BRO3886/go-eventkit` (cgo) in files behind `//go:build darwin`, so those Widget types exist only in the macOS binary; the TCC grant goes to the host terminal. This route already ships in `oronbz/nag`.
 
 ## Considered Options
 

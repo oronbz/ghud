@@ -1,7 +1,7 @@
 name = "weather"
 description = "Weather from Open-Meteo, for a city or where your IP address places you"
 protocol = 1
-command = "ghud-weather"
+command = "visor-weather"
 
 [[widget]]
 type = "weather"

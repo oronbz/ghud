@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/oronbz/ghud/internal/hosttest"
-	"github.com/oronbz/ghud/internal/paths"
-	"github.com/oronbz/ghud/internal/theme"
+	"github.com/oronbz/visor/internal/hosttest"
+	"github.com/oronbz/visor/internal/paths"
+	"github.com/oronbz/visor/internal/theme"
 )
 
 const oneTasksWidget = `
@@ -166,7 +166,7 @@ func TestAAddsATaskThroughTheHostPromptWithARelativeDueDate(t *testing.T) {
 
 	typeText(h, "Call bank quickly due tue")
 	if h.Quit() {
-		t.Fatal("typing q into the prompt quit ghud")
+		t.Fatal("typing q into the prompt quit visor")
 	}
 	if _, _, ok := h.Find("› Call bank quickly due tue"); !ok {
 		t.Errorf("prompt doesn't echo the typed text:\n%s", h.Screen())
@@ -380,7 +380,7 @@ file = "lists/today.md"
 	}
 }
 
-func TestATildeFileIsUnderTheHomeGhudIsGiven(t *testing.T) {
+func TestATildeFileIsUnderTheHomeVisorIsGiven(t *testing.T) {
 	home := t.TempDir()
 	h := hosttest.New(t, hosttest.Options{Width: 50, Height: 7, Env: map[string]string{"HOME": home}, Config: `
 [[widget]]
@@ -399,7 +399,7 @@ file = "~/lists/today.md"
 	}
 }
 
-func TestEditingTasksMdOutsideGhudUpdatesTheWidget(t *testing.T) {
+func TestEditingTasksMdOutsideVisorUpdatesTheWidget(t *testing.T) {
 	h := withTasks(t, "- [ ] Call the bank\n", hosttest.Options{Width: 40, Height: 7})
 
 	writeTasks(t, h.Root, "- [ ] Call the bank\n- [ ] Water plants\n")

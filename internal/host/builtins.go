@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/oronbz/ghud/internal/widget"
-	"github.com/oronbz/ghud/internal/widgets/meetings"
-	"github.com/oronbz/ghud/internal/widgets/reminders"
+	"github.com/oronbz/visor/internal/widget"
+	"github.com/oronbz/visor/internal/widgets/meetings"
+	"github.com/oronbz/visor/internal/widgets/reminders"
 )
 
 // macOnly are the built-in Widget types that read EventKit, so they're

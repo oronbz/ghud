@@ -3,8 +3,8 @@ package render
 import (
 	"strings"
 
-	"github.com/oronbz/ghud/internal/theme"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/theme"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 // glyphs are 5-dot-tall bitmaps, one string per dot row. Half-block digits

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/oronbz/ghud/internal/config"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/config"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 var editTypes = []widget.Type{
@@ -41,7 +41,7 @@ func read(t *testing.T, path string) string {
 }
 
 const handWritten = `# my dashboard
-theme = "ghud"   # keep this
+theme = "visor"   # keep this
 
 [[widget]]
 type = "weather"   # home
@@ -219,14 +219,14 @@ func TestLocateFindsTheBlockLine(t *testing.T) {
 }
 
 func TestLocatingADefaultWidgetWritesTheDefaultBlocksFirst(t *testing.T) {
-	e, path := editorFor(t, "theme = \"ghud\"\n")
+	e, path := editorFor(t, "theme = \"visor\"\n")
 
 	line, err := e.Locate(config.Ref{ID: "weather"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	got := read(t, path)
-	want := "theme = \"ghud\"\n\n[[widget]]\ntype = \"clock\"\nid = \"clock\"\n\n[[widget]]\ntype = \"weather\"\nid = \"weather\"\n"
+	want := "theme = \"visor\"\n\n[[widget]]\ntype = \"clock\"\nid = \"clock\"\n\n[[widget]]\ntype = \"weather\"\nid = \"weather\"\n"
 	if got != want {
 		t.Errorf("config after locating a default Widget:\n%s\nwant:\n%s", got, want)
 	}

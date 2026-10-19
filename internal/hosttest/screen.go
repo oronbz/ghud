@@ -7,9 +7,9 @@ import (
 	tea "charm.land/bubbletea/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 
-	"github.com/oronbz/ghud/internal/host"
-	"github.com/oronbz/ghud/internal/layout"
-	"github.com/oronbz/ghud/internal/theme"
+	"github.com/oronbz/visor/internal/host"
+	"github.com/oronbz/visor/internal/layout"
+	"github.com/oronbz/visor/internal/theme"
 )
 
 // View is the app's current tea.View, for the terminal state it declares

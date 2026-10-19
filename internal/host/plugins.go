@@ -7,12 +7,12 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/oronbz/ghud/internal/config"
-	"github.com/oronbz/ghud/internal/layout"
-	"github.com/oronbz/ghud/internal/paths"
-	"github.com/oronbz/ghud/internal/plugin"
-	"github.com/oronbz/ghud/internal/ports"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/config"
+	"github.com/oronbz/visor/internal/layout"
+	"github.com/oronbz/visor/internal/paths"
+	"github.com/oronbz/visor/internal/plugin"
+	"github.com/oronbz/visor/internal/ports"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 // pushedMsg is an update Widget from sent unasked; from tells it from a

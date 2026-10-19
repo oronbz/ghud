@@ -5,12 +5,12 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/oronbz/ghud/internal/plugin"
-	"github.com/oronbz/ghud/internal/weather"
+	"github.com/oronbz/visor/internal/plugin"
+	"github.com/oronbz/visor/internal/weather"
 )
 
-// bundled are the manifests of the Plugins ghud ships with whose
-// executables sit in BundleDir. Weather is the only one; it gets ghud's
+// bundled are the manifests of the Plugins visor ships with whose
+// executables sit in BundleDir. Weather is the only one; it gets visor's
 // cache dir and the HTTP endpoints through its environment.
 func (m Model) bundled() []plugin.Manifest {
 	if m.opts.BundleDir == "" {

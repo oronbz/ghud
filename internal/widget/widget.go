@@ -9,8 +9,8 @@ import (
 	"slices"
 	"time"
 
-	"github.com/oronbz/ghud/internal/ports"
-	"github.com/oronbz/ghud/internal/theme"
+	"github.com/oronbz/visor/internal/ports"
+	"github.com/oronbz/visor/internal/theme"
 )
 
 // Type is a kind of Widget, placed on the dashboard as one or more Widgets.
@@ -76,7 +76,7 @@ type Ticker interface {
 	Next(now time.Time) time.Time
 }
 
-// Source is a Widget whose data lives outside ghud, such as in a file or
+// Source is a Widget whose data lives outside visor, such as in a file or
 // behind an API. The host calls Refresh off the UI thread and draws the last
 // Payload it returned.
 type Source interface {
@@ -161,7 +161,7 @@ type Choice struct {
 	ID    string
 	Label string
 	// Target, when set, is a page the host opens instead of running the
-	// Action, for a choice ghud can't complete itself.
+	// Action, for a choice visor can't complete itself.
 	Target string
 }
 

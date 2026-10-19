@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/oronbz/ghud/internal/hosttest"
-	"github.com/oronbz/ghud/internal/paths"
+	"github.com/oronbz/visor/internal/hosttest"
+	"github.com/oronbz/visor/internal/paths"
 )
 
 const oneNotesWidget = `

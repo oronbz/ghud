@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/oronbz/ghud/internal/ports"
-	"github.com/oronbz/ghud/internal/theme"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/ports"
+	"github.com/oronbz/visor/internal/theme"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 // DefaultJQL is my unresolved assigned issues, most recently updated first.
@@ -27,12 +27,12 @@ var Type = widget.Type{
 		{
 			Name: "site", Kind: widget.String, Default: "",
 			Description: "Your Jira site, such as \"acme.atlassian.net\".",
-			Why:         "ghud needs it to know which Jira to sign in to.",
+			Why:         "visor needs it to know which Jira to sign in to.",
 		},
 		{
 			Name: "email", Kind: widget.String, Default: "",
 			Description: "The email you sign in to Jira with; leave it empty for a Data Center personal access token.",
-			Why:         "With an API token it signs ghud in as you.",
+			Why:         "With an API token it signs visor in as you.",
 		},
 		{
 			Name: "jql", Kind: widget.String, Default: DefaultJQL,
@@ -72,7 +72,7 @@ func host(site string) string {
 	return strings.TrimSuffix(site, "/")
 }
 
-// Credential is the account of ghud's keyring item, jira:<site>:<email>,
+// Credential is the account of visor's keyring item, jira:<site>:<email>,
 // which also names the token every Widget on that site and account shares.
 func (w jira) Credential() string { return account(w.site, w.email) }
 
@@ -96,7 +96,7 @@ func (w jira) client(ctx context.Context, now time.Time) (client, error) {
 	return client{http: w.ports.HTTP, site: site, api: api, route: w.route, email: w.email, token: tok, now: now}, nil
 }
 
-// needsSetup is the Status of a Widget ghud can't sign in with, fixed by
+// needsSetup is the Status of a Widget visor can't sign in with, fixed by
 // the Set up Jira flow.
 func (w jira) needsSetup(hint string) *widget.SetupError {
 	a := Setup{}.Start(w.site, w.email)

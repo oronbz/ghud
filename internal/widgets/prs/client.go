@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/oronbz/ghud/internal/ports"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/ports"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 // client talks to GitHub's GraphQL and REST APIs with one token.
@@ -47,7 +47,7 @@ func (c client) graphQL(ctx context.Context, query string, vars map[string]any, 
 		} `json:"errors"`
 	}
 	if err := json.Unmarshal(res.body, &reply); err != nil {
-		return fmt.Errorf("GitHub sent a reply ghud can't read: %w", err)
+		return fmt.Errorf("GitHub sent a reply visor can't read: %w", err)
 	}
 	if len(reply.Errors) > 0 {
 		var msgs []string

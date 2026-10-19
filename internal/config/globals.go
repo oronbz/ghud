@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 // Locale holds the defaults for options that follow the system locale.
@@ -26,8 +26,8 @@ func Globals(loc Locale) []widget.Setting {
 	}
 	return []widget.Setting{
 		{
-			Name: "theme", Kind: widget.String, Default: "ghud", Choices: []string{"ghud", "terminal"},
-			Description: `Colour theme: "ghud" is the built-in palette, light or dark to match your terminal's background; "terminal" derives colours from your terminal's own, falling back to "ghud" when the terminal doesn't answer.`,
+			Name: "theme", Kind: widget.String, Default: "visor", Choices: []string{"visor", "terminal"},
+			Description: `Colour theme: "visor" is the built-in palette, light or dark to match your terminal's background; "terminal" derives colours from your terminal's own, falling back to "visor" when the terminal doesn't answer.`,
 			Why:         `Pick "terminal" to match a terminal colour scheme you already like.`,
 		},
 		{

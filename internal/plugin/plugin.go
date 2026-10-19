@@ -22,9 +22,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/oronbz/ghud/internal/ports"
-	"github.com/oronbz/ghud/internal/version"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/ports"
+	"github.com/oronbz/visor/internal/version"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 const Protocol = 1
@@ -40,7 +40,7 @@ const (
 	exitWait         = time.Second
 )
 
-// Registry is every Plugin ghud found, keyed by directory, so finding them
+// Registry is every Plugin visor found, keyed by directory, so finding them
 // again after a config change keeps the processes already running.
 type Registry struct {
 	mu      sync.Mutex
@@ -113,7 +113,7 @@ func (r *Registry) Discover(dirs []string, taken []string) ([]widget.Type, []str
 	return types, problems
 }
 
-// Bundled returns the Widget types of the Plugins ghud ships with. A type
+// Bundled returns the Widget types of the Plugins visor ships with. A type
 // name in taken is left out quietly, so an installed or path-listed Plugin
 // of the same name takes its place.
 func (r *Registry) Bundled(ms []Manifest, taken []string) []widget.Type {
@@ -212,7 +212,7 @@ type process struct {
 	stdin   io.Closer
 	started time.Time
 	stderr  *tail
-	// stopping marks a process ghud stopped on purpose, which isn't a crash.
+	// stopping marks a process visor stopped on purpose, which isn't a crash.
 	stopping atomic.Bool
 	exited   chan struct{}
 }
@@ -306,7 +306,7 @@ func (p *Plugin) handshake(ctx context.Context, proc *process) error {
 	ctx, cancel := context.WithTimeout(ctx, handshakeTimeout)
 	defer cancel()
 	var res initializeResult
-	if err := proc.conn.Call(ctx, "initialize", initializeParams{Protocol: Protocol, Ghud: version.Version}, &res); err != nil {
+	if err := proc.conn.Call(ctx, "initialize", initializeParams{Protocol: Protocol, Visor: version.Version}, &res); err != nil {
 		proc.stop()
 		<-proc.exited
 		return p.withName(fmt.Errorf("failed its handshake: %w", proc.exitReason(err)))
@@ -319,7 +319,7 @@ func (p *Plugin) handshake(ctx context.Context, proc *process) error {
 }
 
 func (p *Plugin) versionErr(verb string, v int) error {
-	return &widget.SetupError{Hint: fmt.Sprintf("Plugin `%s` %s protocol %d, but this ghud speaks %d. Update ghud or the Plugin.", p.name, verb, v, Protocol)}
+	return &widget.SetupError{Hint: fmt.Sprintf("Plugin `%s` %s protocol %d, but this visor speaks %d. Update visor or the Plugin.", p.name, verb, v, Protocol)}
 }
 
 // restart takes the Plugin as it now is on disk: the running process stops,
@@ -413,7 +413,7 @@ func (p *Plugin) notified(method string, params json.RawMessage) {
 	w.deliver(widget.Push{Payload: payload, Err: p.withName(err)})
 }
 
-// withName puts the Plugin's name in front of errors ghud found; ones the
+// withName puts the Plugin's name in front of errors visor found; ones the
 // Plugin reported itself already read right.
 func (p *Plugin) withName(err error) error {
 	var f failure

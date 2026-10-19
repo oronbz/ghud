@@ -9,10 +9,10 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/oronbz/ghud/internal/plugin"
-	"github.com/oronbz/ghud/internal/plugin/plugintest"
-	"github.com/oronbz/ghud/internal/ports"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/plugin"
+	"github.com/oronbz/visor/internal/plugin/plugintest"
+	"github.com/oronbz/visor/internal/ports"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 var t0 = time.Date(2026, 10, 18, 14, 5, 9, 0, time.UTC)

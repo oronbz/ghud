@@ -6,15 +6,15 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/oronbz/ghud/internal/config"
-	"github.com/oronbz/ghud/internal/paths"
-	"github.com/oronbz/ghud/internal/plugin"
-	"github.com/oronbz/ghud/internal/ports"
+	"github.com/oronbz/visor/internal/config"
+	"github.com/oronbz/visor/internal/paths"
+	"github.com/oronbz/visor/internal/plugin"
+	"github.com/oronbz/visor/internal/ports"
 )
 
 func pluginCommand(s System, pp ports.Ports, p paths.Paths, configFile string, locale config.Locale, args []string) int {
 	if len(args) == 0 {
-		fmt.Fprint(s.Stderr, "ghud: plugin needs a command\n\n", usage)
+		fmt.Fprint(s.Stderr, "visor: plugin needs a command\n\n", usage)
 		return 2
 	}
 	switch args[0] {
@@ -26,12 +26,12 @@ func pluginCommand(s System, pp ports.Ports, p paths.Paths, configFile string, l
 	case "install", "update", "uninstall", "list":
 		return pluginManage(s, pp, p, configFile, locale, args)
 	}
-	fmt.Fprintf(s.Stderr, "ghud: unknown command \"plugin %s\"\n\n%s", args[0], usage)
+	fmt.Fprintf(s.Stderr, "visor: unknown command \"plugin %s\"\n\n%s", args[0], usage)
 	return 2
 }
 
 func pluginCheck(s System, pp ports.Ports, args []string) int {
-	fs := flag.NewFlagSet("ghud plugin check", flag.ContinueOnError)
+	fs := flag.NewFlagSet("visor plugin check", flag.ContinueOnError)
 	fs.SetOutput(s.Stderr)
 	fs.Usage = func() { fmt.Fprint(s.Stderr, usage) }
 	timeout := fs.Duration("timeout", 10*time.Second, "how long each step waits on the Plugin")
@@ -42,7 +42,7 @@ func pluginCheck(s System, pp ports.Ports, args []string) int {
 		return 2
 	}
 	if fs.NArg() != 1 {
-		fmt.Fprint(s.Stderr, "ghud: plugin check needs the Plugin's directory\n\n", usage)
+		fmt.Fprint(s.Stderr, "visor: plugin check needs the Plugin's directory\n\n", usage)
 		return 2
 	}
 	if !plugin.Check(fs.Arg(0), plugin.CheckOptions{Clock: pp.Clock, Timeout: *timeout}, s.Stdout) {

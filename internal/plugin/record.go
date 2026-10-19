@@ -9,13 +9,13 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/widget"
 )
 
 // RecordFile, in an installed Plugin's directory, says where it came from.
-const RecordFile = ".ghud-source.json"
+const RecordFile = ".visor-source.json"
 
-// Record is where `ghud plugin install` got a Plugin.
+// Record is where `visor plugin install` got a Plugin.
 type Record struct {
 	// Source is owner/repo or owner/repo/subdir on GitHub.
 	Source string `json:"source"`
@@ -41,10 +41,10 @@ func (r Record) Write(dir string) error {
 	return os.WriteFile(filepath.Join(dir, RecordFile), append(b, '\n'), 0o644)
 }
 
-// buried is hidden so ghud doesn't read it as a Plugin.
+// buried is hidden so visor doesn't read it as a Plugin.
 const buried = ".uninstalled"
 
-// Tombstone is what ghud keeps of an uninstalled Plugin, so its Widgets can
+// Tombstone is what visor keeps of an uninstalled Plugin, so its Widgets can
 // name the install command in instances started after the uninstall.
 type Tombstone struct {
 	Name    string         `json:"name"`
@@ -111,7 +111,7 @@ func missing(name string, rec Record) string {
 }
 
 func (r Record) InstallCommand() string {
-	cmd := "ghud plugin install " + r.Source
+	cmd := "visor plugin install " + r.Source
 	if r.Ref != "" {
 		cmd += " --ref " + r.Ref
 	}

@@ -9,8 +9,8 @@ import (
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
-	"github.com/oronbz/ghud/internal/cli"
-	"github.com/oronbz/ghud/internal/plugin/plugintest"
+	"github.com/oronbz/visor/internal/cli"
+	"github.com/oronbz/visor/internal/plugin/plugintest"
 )
 
 // compile compiles the JSON Schema document src and returns the schema at ref within it.
@@ -97,8 +97,8 @@ func TestPluginCheckFailsTheStepThatBreaksTheProtocol(t *testing.T) {
 		// answers needs it short, so a slow machine can't fail earlier steps.
 		timeout string
 	}{
-		"invalid manifest": {manifest: "name = \"broken\"\nprotocol = 1\n", step: "manifest", want: []string{"ghud-plugin.toml: missing properties 'command', 'widget'"}},
-		"newer protocol":   {o: plugintest.Options{Protocol: 2}, step: "manifest", want: []string{"declares protocol 2, but this ghud speaks 1"}},
+		"invalid manifest": {manifest: "name = \"broken\"\nprotocol = 1\n", step: "manifest", want: []string{"visor-plugin.toml: missing properties 'command', 'widget'"}},
+		"newer protocol":   {o: plugintest.Options{Protocol: 2}, step: "manifest", want: []string{"declares protocol 2, but this visor speaks 1"}},
 		"no handshake":     {o: plugintest.Options{Args: []string{"-handshake", "silent"}}, step: "handshake", want: []string{"failed its handshake: didn't answer initialize"}, timeout: "300ms"},
 		"empty handshake":  {o: plugintest.Options{Args: []string{"-handshake", "empty"}}, step: "handshake", want: []string{"speaks protocol 0", "answer to initialize breaks the schema: result: missing property 'protocol'"}},
 		"malformed":        {o: plugintest.Options{Mode: "malformed"}, step: "refresh fixture", want: []string{"sent a malformed message"}},
@@ -108,7 +108,7 @@ func TestPluginCheckFailsTheStepThatBreaksTheProtocol(t *testing.T) {
 			s, home, stdout, stderr := sandbox(t, nil, "")
 			dir := filepath.Join(home, "fixture")
 			if c.manifest != "" {
-				writeFile(t, filepath.Join(dir, "ghud-plugin.toml"), c.manifest)
+				writeFile(t, filepath.Join(dir, "visor-plugin.toml"), c.manifest)
 			} else {
 				plugintest.Write(t, dir, c.o)
 			}

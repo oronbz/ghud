@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/oronbz/ghud/internal/ports"
+	"github.com/oronbz/visor/internal/ports"
 )
 
 // sky fakes Open-Meteo's forecast and geocoding APIs and ipapi.is, in the

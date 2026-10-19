@@ -54,7 +54,7 @@ func (p place) header() string {
 const (
 	// fresh is how long an IP location is trusted before asking again.
 	fresh = 3 * time.Hour
-	// locationFile, under ghud's cache dir, is shared by every instance.
+	// locationFile, under visor's cache dir, is shared by every instance.
 	locationFile = "weather/location.json"
 )
 
@@ -304,7 +304,7 @@ func getJSON(ctx context.Context, cfg config, service, u string, v any) (int, er
 		return res.StatusCode, &failure{msg: service + ": " + why, reason: reason}
 	}
 	if err := json.NewDecoder(res.Body).Decode(v); err != nil {
-		return res.StatusCode, &failure{msg: fmt.Sprintf("%s sent an answer ghud-weather can't read: %v", service, err), reason: service + " error"}
+		return res.StatusCode, &failure{msg: fmt.Sprintf("%s sent an answer visor-weather can't read: %v", service, err), reason: service + " error"}
 	}
 	return res.StatusCode, nil
 }

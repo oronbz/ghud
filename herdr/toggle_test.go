@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// toggleMachine runs toggle-ghud.sh against a stub herdr whose live panes are
+// toggleMachine runs toggle-visor.sh against a stub herdr whose live panes are
 // "pane_id tab_id" lines in a file, and which logs every call it gets.
 type toggleMachine struct {
 	*machine
@@ -62,11 +62,11 @@ func (m *toggleMachine) remembered() string {
 // press runs the action the way herdr does for a key pressed in tab.
 func (m *toggleMachine) press(tab string) result {
 	m.t.Helper()
-	cmd := exec.Command("/bin/bash", "toggle-ghud.sh")
+	cmd := exec.Command("/bin/bash", "toggle-visor.sh")
 	cmd.Env = []string{
 		"PATH=" + m.path + ":/usr/bin:/bin",
 		"HERDR_BIN_PATH=" + m.herdr,
-		"HERDR_PLUGIN_ID=ghud",
+		"HERDR_PLUGIN_ID=visor",
 		"HERDR_PLUGIN_STATE_DIR=" + m.state,
 		"HERDR_TAB_ID=" + tab,
 	}
@@ -85,7 +85,7 @@ func (m *toggleMachine) press(tab string) result {
 	return r
 }
 
-const openedP9 = `{"result":{"plugin_pane":{"entrypoint":"ghud","pane":{"pane_id":"w1:p9","tab_id":"w1:t1"}},"type":"plugin_pane_opened"}}`
+const openedP9 = `{"result":{"plugin_pane":{"entrypoint":"visor","pane":{"pane_id":"w1:p9","tab_id":"w1:t1"}},"type":"plugin_pane_opened"}}`
 
 func wantCalls(t *testing.T, r result, want ...string) {
 	t.Helper()
@@ -97,18 +97,18 @@ func wantCalls(t *testing.T, r result, want ...string) {
 	}
 }
 
-func TestToggleOpensGhudWhenNoneIsOpen(t *testing.T) {
+func TestToggleOpensVisorWhenNoneIsOpen(t *testing.T) {
 	m := newToggleMachine(t, openedP9)
 
 	r := m.press("w1:t1")
 
-	wantCalls(t, r, "plugin pane open --plugin ghud --entrypoint ghud")
+	wantCalls(t, r, "plugin pane open --plugin visor --entrypoint visor")
 	if got := m.remembered(); got != "w1:p9" {
 		t.Errorf("remembered pane %q, want w1:p9", got)
 	}
 }
 
-func TestToggleClosesGhudOpenInThisTab(t *testing.T) {
+func TestToggleClosesVisorOpenInThisTab(t *testing.T) {
 	m := newToggleMachine(t, openedP9)
 	m.remember("w1:p4")
 	m.live("w1:p4", "w1:t1")
@@ -121,27 +121,27 @@ func TestToggleClosesGhudOpenInThisTab(t *testing.T) {
 	}
 }
 
-func TestToggleBringsGhudFromAnotherTab(t *testing.T) {
+func TestToggleBringsVisorFromAnotherTab(t *testing.T) {
 	m := newToggleMachine(t, openedP9)
 	m.remember("w2:p4")
 	m.live("w2:p4", "w2:t3")
 
 	r := m.press("w1:t1")
 
-	wantCalls(t, r, "pane get w2:p4", "plugin pane close w2:p4", "plugin pane open --plugin ghud --entrypoint ghud")
+	wantCalls(t, r, "pane get w2:p4", "plugin pane close w2:p4", "plugin pane open --plugin visor --entrypoint visor")
 	if got := m.remembered(); got != "w1:p9" {
 		t.Errorf("remembered pane %q, want w1:p9", got)
 	}
 }
 
-// Quitting ghud with q closes its pane without the action knowing.
-func TestToggleOpensGhudAfterItQuitByItself(t *testing.T) {
+// Quitting visor with q closes its pane without the action knowing.
+func TestToggleOpensVisorAfterItQuitByItself(t *testing.T) {
 	m := newToggleMachine(t, openedP9)
 	m.remember("w1:p4")
 
 	r := m.press("w1:t1")
 
-	wantCalls(t, r, "pane get w1:p4", "plugin pane open --plugin ghud --entrypoint ghud")
+	wantCalls(t, r, "pane get w1:p4", "plugin pane open --plugin visor --entrypoint visor")
 	if got := m.remembered(); got != "w1:p9" {
 		t.Errorf("remembered pane %q, want w1:p9", got)
 	}

@@ -6,7 +6,7 @@ package ports
 #cgo CFLAGS: -x objective-c -fobjc-arc
 #cgo LDFLAGS: -framework EventKit -framework Foundation
 #import <EventKit/EventKit.h>
-static int ghud_ek_status(int entity) {
+static int visor_ek_status(int entity) {
 	return (int)[EKEventStore authorizationStatusForEntityType:(EKEntityType)entity];
 }
 */
@@ -35,7 +35,7 @@ func newEventKit() EventKit { return &macEventKit{} }
 
 func (k *macEventKit) Status(e Entity) Access {
 	// EKEntityTypeEvent is 0 and EKEntityTypeReminder 1, like Entity.
-	return accessOf(int(C.ghud_ek_status(C.int(e))))
+	return accessOf(int(C.visor_ek_status(C.int(e))))
 }
 
 // accessOf maps an EKAuthorizationStatus; write-only access can't read, so

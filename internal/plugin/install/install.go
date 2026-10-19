@@ -17,7 +17,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/oronbz/ghud/internal/plugin"
+	"github.com/oronbz/visor/internal/plugin"
 )
 
 type Fetcher interface {
@@ -95,7 +95,7 @@ func (i Installer) Install(ctx context.Context, src Source, ref string, trust fu
 	defer os.RemoveAll(staged)
 	if _, err := os.Stat(plan.Dir); err == nil {
 		name := plan.Manifest.Name
-		return plan, fmt.Errorf("Plugin `%s` is already installed; run `ghud plugin update %s`, or `ghud plugin uninstall %s` first", name, name, name)
+		return plan, fmt.Errorf("Plugin `%s` is already installed; run `visor plugin update %s`, or `visor plugin uninstall %s` first", name, name, name)
 	}
 	if err := i.build(ctx, plan, staged, trust); err != nil {
 		return plan, err
@@ -198,7 +198,7 @@ func (i Installer) dir(name string) (string, error) {
 
 // staging is where Plugins are fetched and built, and old ones wait to be
 // deleted: inside the plugins directory, so moves are renames on one disk,
-// and hidden, so ghud doesn't read them as Plugins.
+// and hidden, so visor doesn't read them as Plugins.
 func (i Installer) staging() (string, error) {
 	dir := filepath.Join(i.Dir, ".staging")
 	return dir, os.MkdirAll(dir, 0o755)

@@ -5,14 +5,14 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/oronbz/ghud/internal/hosttest"
-	"github.com/oronbz/ghud/internal/paths"
-	"github.com/oronbz/ghud/internal/plugin/install"
-	"github.com/oronbz/ghud/internal/plugin/plugintest"
-	"github.com/oronbz/ghud/internal/widget"
+	"github.com/oronbz/visor/internal/hosttest"
+	"github.com/oronbz/visor/internal/paths"
+	"github.com/oronbz/visor/internal/plugin/install"
+	"github.com/oronbz/visor/internal/plugin/plugintest"
+	"github.com/oronbz/visor/internal/widget"
 )
 
-// installs is ghud running from root while `ghud plugin` commands change
+// installs is visor running from root while `visor plugin` commands change
 // its plugins directory, with GitHub faked.
 type installs struct {
 	t   *testing.T
@@ -34,8 +34,8 @@ func newInstalls(t *testing.T) *installs {
 
 func greetRepo(t *testing.T, version string) map[string]string {
 	return map[string]string{
-		"ghud-plugin.toml": plugintest.Manifest(t, plugintest.Options{Name: "greet"}),
-		"VERSION":          version,
+		"visor-plugin.toml": plugintest.Manifest(t, plugintest.Options{Name: "greet"}),
+		"VERSION":           version,
 	}
 }
 
@@ -69,7 +69,7 @@ func TestUninstallingPutsTheWidgetsInNeedsSetupNamingTheInstallCommand(t *testin
 		t.Fatal(err)
 	}
 	in.changed()
-	shows(t, in.h, "needs setup", "Plugin `greet` isn't installed", "ghud plugin install octo/greet")
+	shows(t, in.h, "needs setup", "Plugin `greet` isn't installed", "visor plugin install octo/greet")
 	hides(t, in.h, "hello alpha", "unknown Widget type")
 }
 
@@ -84,7 +84,7 @@ func TestAnInstanceStartedAfterAnUninstallStillNamesTheInstallCommand(t *testing
 		return hosttest.New(t, hosttest.Options{Root: in.h.Root, Width: 100, Height: 12, Types: []widget.Type{}})
 	}
 	later := started()
-	shows(t, later, "needs setup", "Plugin `greet` isn't installed", "ghud plugin install octo/greet")
+	shows(t, later, "needs setup", "Plugin `greet` isn't installed", "visor plugin install octo/greet")
 	hides(t, later, "unknown Widget type")
 
 	in.install()

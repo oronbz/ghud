@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/oronbz/ghud/internal/closekey"
+	"github.com/oronbz/visor/internal/closekey"
 	"github.com/pelletier/go-toml/v2"
 )
 
@@ -96,13 +96,13 @@ func TestReadmeHerdrPopupBindsCloseThePopupTheyOpen(t *testing.T) {
 	}
 }
 
-// closeKeysOf parses `ghud --close-key a --close-key 'b c'` the way /bin/sh
+// closeKeysOf parses `visor --close-key a --close-key 'b c'` the way /bin/sh
 // would for these simple words.
 func closeKeysOf(t *testing.T, command string) []closekey.Seq {
 	t.Helper()
 	words := regexp.MustCompile(`'[^']*'|\S+`).FindAllString(command, -1)
-	if len(words) == 0 || words[0] != "ghud" {
-		t.Fatalf("command %q doesn't run ghud", command)
+	if len(words) == 0 || words[0] != "visor" {
+		t.Fatalf("command %q doesn't run visor", command)
 	}
 	var seqs []closekey.Seq
 	for i := 1; i < len(words); i += 2 {
@@ -131,12 +131,12 @@ func TestReadmeCoversInstallAndSkills(t *testing.T) {
 	text := readme(t)
 	for _, want := range []string{
 		"god's-eye HUD for your day",
-		"brew install oronbz/tap/ghud",
+		"brew install oronbz/tap/visor",
 		"Intel",
-		"herdr plugin install oronbz/ghud/herdr",
-		"ghud skills install",
-		"npx skills add oronbz/ghud#vX.Y.Z -g",
-		"ghud plugin install",
+		"herdr plugin install oronbz/visor/herdr",
+		"visor skills install",
+		"npx skills add oronbz/visor#vX.Y.Z -g",
+		"visor plugin install",
 		"[colors.dark]",
 	} {
 		if !strings.Contains(text, want) {

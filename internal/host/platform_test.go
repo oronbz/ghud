@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/oronbz/ghud/internal/hosttest"
+	"github.com/oronbz/visor/internal/hosttest"
 )
 
 func TestMeetingsIsBuiltInOnMacOSOnly(t *testing.T) {
