@@ -19,7 +19,6 @@ type github struct {
 	mu        sync.Mutex
 	viewer    string
 	requested []pr
-	involved  []pr
 	requests  []request
 	// reply, when set, answers a request instead of the fixtures; status 0 falls through.
 	reply func(r request) (status int, header http.Header, body string)
@@ -45,8 +44,6 @@ type pr struct {
 	// requests are the PR's pending review requests: a login, or "team:<slug>";
 	// a trailing "!" marks a code owner request.
 	requests []string
-	// reviews are latest reviews: "<login>" or "<login> for <team slug>".
-	reviews []string
 }
 
 func newGitHub(t *testing.T) *github {
@@ -90,7 +87,7 @@ func (g *github) serve(w http.ResponseWriter, r *http.Request) {
 }
 
 // search answers the Widget's one GraphQL request: the viewer, plus each
-// search whose query string asks for review requests or review involvement.
+// search whose query string asks for review requests.
 func (g *github) search(w http.ResponseWriter, body []byte) {
 	var q struct {
 		Variables map[string]any `json:"variables"`
@@ -104,11 +101,8 @@ func (g *github) search(w http.ResponseWriter, body []byte) {
 	data := map[string]any{"viewer": map[string]any{"login": g.viewer}}
 	for name, v := range q.Variables {
 		s, _ := v.(string)
-		switch {
-		case strings.Contains(s, "review-requested:@me"):
+		if strings.Contains(s, "review-requested:@me") {
 			data[name] = results(g.requested)
-		case strings.Contains(s, "review-involves:@me"):
-			data[name] = results(g.involved)
 		}
 	}
 	json.NewEncoder(w).Encode(map[string]any{"data": data})
@@ -137,18 +131,6 @@ func (p pr) node() map[string]any {
 		}
 		requests = append(requests, map[string]any{"asCodeOwner": owner, "requestedReviewer": reviewer})
 	}
-	var reviews []any
-	for _, r := range p.reviews {
-		login, team, _ := strings.Cut(r, " for ")
-		var teams []any
-		if team != "" {
-			teams = append(teams, map[string]any{"slug": team, "name": team})
-		}
-		reviews = append(reviews, map[string]any{
-			"author": map[string]any{"login": login}, "state": "APPROVED",
-			"onBehalfOf": map[string]any{"nodes": teams},
-		})
-	}
 	return map[string]any{
 		"number": p.number, "title": p.title, "isDraft": false,
 		"url":       "https://github.com/" + p.repo + "/pull/" + itoa(p.number),
@@ -158,7 +140,6 @@ func (p pr) node() map[string]any {
 		"author":         map[string]any{"login": p.author},
 		"commits":        map[string]any{"nodes": []any{map[string]any{"commit": map[string]any{"statusCheckRollup": rollup}}}},
 		"reviewRequests": map[string]any{"nodes": requests},
-		"latestReviews":  map[string]any{"nodes": reviews},
 	}
 }
 

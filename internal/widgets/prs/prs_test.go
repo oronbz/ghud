@@ -18,8 +18,8 @@ type = "prs"
 
 var now = hosttest.DefaultNow
 
-// team is a GitHub with three PRs waiting on me (directly, via my team and
-// as a code owner) and one a teammate already reviewed for my team.
+// team is a GitHub with three PRs waiting on me: directly, via my team and
+// as a code owner.
 func team(t *testing.T) *github {
 	g := newGitHub(t)
 	g.requested = []pr{
@@ -29,14 +29,6 @@ func team(t *testing.T) *github {
 			adds: 3, dels: 940, ci: "FAILURE", created: now.Add(-3 * time.Hour), requests: []string{"team:platform"}},
 		{repo: "acme/infra", number: 7, title: "Pin the runner image", author: "noa", branch: "pin-runner",
 			adds: 2, dels: 2, ci: "PENDING", created: now.Add(-45 * time.Minute), requests: []string{"team:sre!"}},
-	}
-	g.involved = []pr{
-		g.requested[0],
-		{repo: "acme/api", number: 400, title: "Rate limit search", author: "eli", branch: "eli/search-limit",
-			adds: 40, dels: 2, ci: "SUCCESS", created: now.Add(-26 * time.Hour), reviews: []string{"noa for platform"}},
-		// Reviewed by me: not something a teammate handled.
-		{repo: "acme/web", number: 80, title: "Theme tokens", author: "dana", branch: "tokens",
-			adds: 1, dels: 1, ci: "SUCCESS", created: now.Add(-72 * time.Hour), reviews: []string{"oronbz", "noa for platform"}},
 	}
 	return g
 }
@@ -59,7 +51,7 @@ func tile(h *hosttest.Host) string {
 	return strings.Join(lines[:len(lines)-1], "\n")
 }
 
-func TestPRsShowsRequestedPRsThenOnesATeammateHandled(t *testing.T) {
+func TestPRsShowsRequestedPRs(t *testing.T) {
 	g := team(t)
 	h := withPRs(t, g, hosttest.Options{Width: 90, Height: 9})
 
@@ -68,8 +60,8 @@ func TestPRsShowsRequestedPRsThenOnesATeammateHandled(t *testing.T) {
 		"│ ✓ api#412 Retry webhook deliveries                          +120 −14 dana @you      2d │",
 		"│ ✗ web#88  Drop the legacy router                             +3 −940 eli  platform  3h │",
 		"│ ● infra#7 Pin the runner image                                 +2 −2 noa  owner    45m │",
-		"│ Handled by a teammate ──────────────────────────────────────────────────────────────── │",
-		"│ ✓ api#400 Rate limit search                                   +40 −2 eli  ✓ noa     1d │",
+		"│                                                                                        │",
+		"│                                                                                        │",
 		"│                                                                                        │",
 		"╰────────────────────────────────────────────────────────────────────────────────────────╯",
 	}, "\n")
@@ -266,8 +258,8 @@ func TestTheDraftsSettingHidesDraftsInTheSearch(t *testing.T) {
 	if strings.Contains(reqs[0].Body, "draft:false") {
 		t.Errorf("by default the search hides drafts: %s", reqs[0].Body)
 	}
-	if strings.Count(reqs[1].Body, "draft:false") != 2 {
-		t.Errorf("with drafts = false both searches should say draft:false: %s", reqs[1].Body)
+	if !strings.Contains(reqs[1].Body, "draft:false") {
+		t.Errorf("with drafts = false the search should say draft:false: %s", reqs[1].Body)
 	}
 }
 

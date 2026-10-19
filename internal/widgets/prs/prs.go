@@ -1,5 +1,5 @@
 // Package prs is the GitHub PRs Widget type: open pull requests waiting for
-// my review, and the ones a teammate already reviewed for my team.
+// my review.
 package prs
 
 import (
@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -32,9 +31,6 @@ var Type = widget.Type{
 	New:     newPRs,
 }
 
-// handled is the group of PRs a teammate already reviewed for my team.
-const handled = "Handled by a teammate"
-
 func newPRs(c widget.Config) widget.Widget {
 	return prs{ports: c.Ports, drafts: c.Settings.Bool("drafts")}
 }
@@ -57,11 +53,10 @@ func (w prs) client(ctx context.Context, now time.Time) (client, error) {
 	return client{http: w.ports.HTTP, endpoints: w.ports.Endpoints, token: tok, from: from, now: now}, nil
 }
 
-// query fetches the viewer and both searches in one request.
-const query = `query($requested: String!, $involved: String!) {
+// query fetches the viewer and the search in one request.
+const query = `query($requested: String!) {
   viewer { login }
   requested: search(query: $requested, type: ISSUE, first: 50) { nodes { ...pr } }
-  involved: search(query: $involved, type: ISSUE, first: 50) { nodes { ...pr } }
 }
 fragment pr on PullRequest {
   number title url createdAt additions deletions headRefName
@@ -71,13 +66,11 @@ fragment pr on PullRequest {
   reviewRequests(first: 20) {
     nodes { asCodeOwner requestedReviewer { __typename ... on User { login } ... on Team { slug } } }
   }
-  latestReviews(first: 20) { nodes { author { login } onBehalfOf(first: 5) { nodes { slug } } } }
 }`
 
 type searchData struct {
 	Viewer    struct{ Login string }
 	Requested struct{ Nodes []node }
-	Involved  struct{ Nodes []node }
 }
 
 type node struct {
@@ -107,12 +100,6 @@ type node struct {
 			}
 		}
 	}
-	LatestReviews struct {
-		Nodes []struct {
-			Author     struct{ Login string }
-			OnBehalfOf struct{ Nodes []struct{ Slug string } }
-		}
-	}
 }
 
 func (w prs) Refresh(ctx context.Context, now time.Time) (widget.Payload, error) {
@@ -130,7 +117,6 @@ func (w prs) Refresh(ctx context.Context, now time.Time) (widget.Payload, error)
 	var d searchData
 	err = c.graphQL(ctx, query, map[string]any{
 		"requested": filter + " review-requested:@me",
-		"involved":  filter + " review-involves:@me",
 	}, &d)
 	if auth := (authError{}); errors.As(err, &auth) {
 		return widget.Payload{}, rejected(w.ports, c.from, auth)
@@ -150,26 +136,13 @@ func payload(d searchData, now time.Time) widget.Payload {
 		Empty: "No reviews waiting on you.",
 	}
 	me := d.Viewer.Login
-	seen := map[string]bool{}
 	for _, n := range d.Requested.Nodes {
-		if n.Number == 0 || seen[n.id()] {
+		if n.Number == 0 {
 			continue
 		}
-		seen[n.id()] = true
 		p.Items = append(p.Items, n.item("", reason(n, me), now, me))
 	}
 	p.Count = len(p.Items)
-	for _, n := range d.Involved.Nodes {
-		if n.Number == 0 || seen[n.id()] || n.Author.Login == me {
-			continue
-		}
-		who := teammates(n, me)
-		if len(who) == 0 {
-			continue
-		}
-		seen[n.id()] = true
-		p.Items = append(p.Items, n.item(handled, []widget.Span{{Text: "✓ " + strings.Join(who, ", "), Token: theme.Ok}}, now, me))
-	}
 	return p
 }
 
@@ -256,20 +229,6 @@ func (n node) removal(me string) string {
 		}
 	}
 	return team
-}
-
-// teammates are those who reviewed the PR for a team, unless I reviewed it myself.
-func teammates(n node, me string) []string {
-	var who []string
-	for _, r := range n.LatestReviews.Nodes {
-		if r.Author.Login == me {
-			return nil
-		}
-		if len(r.OnBehalfOf.Nodes) > 0 && !slices.Contains(who, r.Author.Login) {
-			who = append(who, r.Author.Login)
-		}
-	}
-	return who
 }
 
 // age is how long ago something happened in its largest whole unit: 45m, 3h, 2d.
