@@ -13,7 +13,7 @@ import (
 const (
 	cloudTokenPage = "https://id.atlassian.com/manage-profile/security/api-tokens"
 	setupHint      = "Set up Jira"
-	apiToken       = "ATATT3xFfGF0-pAsTeD-jIrA-tOkEn"
+	apiToken       = "test-jira-api-token"
 	handWritten    = `# my dashboard
 theme = "ghud"   # keep it
 
