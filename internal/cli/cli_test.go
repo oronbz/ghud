@@ -37,6 +37,7 @@ func hermetic(t *testing.T, getenv func(string) string) (*ports.Ports, *hosttest
 	pp.EventKit = &hosttest.EventKit{}
 	pp.Keyring = &hosttest.Keyring{}
 	pp.Opener = &hosttest.Opener{}
+	pp.Locale = func() ports.SystemLocale { return ports.SystemLocale{} }
 	e := reflect.ValueOf(&pp.Endpoints).Elem()
 	for i := range e.NumField() {
 		e.Field(i).SetString(srv.URL)

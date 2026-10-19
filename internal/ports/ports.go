@@ -24,6 +24,16 @@ type Ports struct {
 	HTTP      *http.Client
 	Endpoints Endpoints
 	Getenv    func(key string) string
+	Locale    func() SystemLocale
+}
+
+// SystemLocale is the clock style ("12h" or "24h") and first weekday
+// ("sunday") the OS is set to, each "" where the OS doesn't say. On macOS it
+// follows the region and the 24-hour time toggle, which a terminal's LANG
+// doesn't carry.
+type SystemLocale struct {
+	TimeFormat string
+	WeekStart  string
 }
 
 // Clock is the only source of time. Timers go through After so that a fake

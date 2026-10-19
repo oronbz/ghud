@@ -34,6 +34,7 @@ func System(getenv func(string) string) Ports {
 		HTTP:      &http.Client{Timeout: 30 * time.Second},
 		Endpoints: DefaultEndpoints(),
 		Getenv:    getenv,
+		Locale:    systemLocale,
 	}
 }
 

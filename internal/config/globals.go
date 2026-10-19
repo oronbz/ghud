@@ -1,6 +1,7 @@
 package config
 
 import (
+	"cmp"
 	"slices"
 	"strings"
 
@@ -47,16 +48,14 @@ func Globals(loc Locale) []widget.Setting {
 	}
 }
 
-// LocaleFromEnv reads the region from LC_ALL, LC_TIME or LANG ("en_US.UTF-8")
-// and picks its clock style and first weekday, following CLDR. Unknown
-// regions get 24h and Monday.
-func LocaleFromEnv(getenv func(string) string) Locale {
-	var tag string
-	for _, k := range []string{"LC_ALL", "LC_TIME", "LANG"} {
-		if tag = getenv(k); tag != "" {
-			break
-		}
-	}
+// DetectLocale picks the clock style and first weekday. LC_ALL or LC_TIME
+// win, being set on purpose; then system, what the OS says ("" where it
+// doesn't), since terminals fill LANG in as en_US whatever the region; then
+// LANG. A region ("en_US.UTF-8") maps to its defaults following CLDR, and
+// unknown regions get 24h and Monday.
+func DetectLocale(getenv func(string) string, system Locale) Locale {
+	explicit := cmp.Or(getenv("LC_ALL"), getenv("LC_TIME"))
+	tag := cmp.Or(explicit, getenv("LANG"))
 	tag, _, _ = strings.Cut(tag, ".")
 	tag, _, _ = strings.Cut(tag, "@")
 	_, region, _ := strings.Cut(strings.ReplaceAll(tag, "-", "_"), "_")
@@ -71,6 +70,10 @@ func LocaleFromEnv(getenv func(string) string) Locale {
 		loc.WeekStart = "sunday"
 	case slices.Contains(saturdayFirst, region):
 		loc.WeekStart = "saturday"
+	}
+	if explicit == "" {
+		loc.TimeFormat = cmp.Or(system.TimeFormat, loc.TimeFormat)
+		loc.WeekStart = cmp.Or(system.WeekStart, loc.WeekStart)
 	}
 	return loc
 }

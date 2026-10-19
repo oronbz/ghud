@@ -110,11 +110,16 @@ func Run(s System) int {
 	if *configFlag != "" {
 		configFile = *configFlag
 	}
-	locale := config.LocaleFromEnv(s.Getenv)
 	pp := ports.System(s.Getenv)
 	if s.Ports != nil {
 		pp = *s.Ports
 	}
+	var system config.Locale
+	if pp.Locale != nil {
+		sys := pp.Locale()
+		system = config.Locale{TimeFormat: sys.TimeFormat, WeekStart: sys.WeekStart}
+	}
+	locale := config.DetectLocale(s.Getenv, system)
 
 	bundle := bundleDir(s.Executable)
 	reference := func() string {
