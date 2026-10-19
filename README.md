@@ -1,12 +1,17 @@
 # ghud
 
-**ghud: a god's-eye HUD for your day.**
+**A god's-eye HUD for your day, right in your terminal.**
 
 ![ghud: clock, calendar, meetings, tasks, notes, CPU and memory, GitHub review requests, Jira issues and the weather in one terminal dashboard](docs/screenshot.png)
 
-ghud is one Go binary that draws a full-screen dashboard of boxed Widgets in your terminal: clock, calendar, today's meetings, tasks, notes, CPU and memory, GitHub review requests, Jira issues and the weather. You can rearrange it with the mouse or with vim keys, act on what you see (approve a PR, move a ticket, finish a task) and add your own Widgets with Plugins.
+Stop jumping between Calendar, GitHub, Jira and your notes to figure out what's next. ghud shows your next meeting, the PRs waiting for your review, your Jira tickets, your tasks and the weather on one screen, and keeps it fresh while you work.
 
-It runs on its own in Ghostty (or any Ghostty-class terminal) and as a 100% popup inside [herdr](https://herdr.dev).
+And you can act on it, not just look at it. Approve a PR, move a ticket along, check off a task or open a meeting straight from the dashboard, without going to the browser.
+
+- **Make it yours.** Drag Widgets around with the mouse or move them with vim keys, resize them, and hide what you don't need.
+- **Works with the tools you already use.** GitHub, Jira, your macOS calendar and reminders, and any shell command. Missing something? Write a Plugin in any language.
+- **Always one key away.** Run it in Ghostty, or open it as a full-screen popup in [herdr](https://herdr.dev) and close it with the same key.
+- **Nothing to host.** It's a single app on your machine, and your tokens stay in your system keyring.
 
 ## Install
 

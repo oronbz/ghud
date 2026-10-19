@@ -99,7 +99,7 @@ func containsSeq(seqs []closekey.Seq, want closekey.Seq) bool {
 func TestReadmeCoversInstallAndSkills(t *testing.T) {
 	text := readme(t)
 	for _, want := range []string{
-		"ghud: a god's-eye HUD for your day",
+		"god's-eye HUD for your day",
 		"brew install oronbz/tap/ghud",
 		"Intel",
 		"herdr plugin install oronbz/ghud/herdr",
