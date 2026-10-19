@@ -200,6 +200,23 @@ func TestApproveAsksFirstThenApprovesTheSelectedPRAndRefreshes(t *testing.T) {
 	}
 }
 
+func TestAnApprovedPRStaysGoneWhileSearchStillListsItUnlessIAmAskedAgain(t *testing.T) {
+	g := team(t)
+	h := withPRs(t, g, hosttest.Options{Width: 90, Height: 12})
+	h.Press("1", "a", "enter")
+	if strings.Contains(tile(h), "Retry webhook deliveries") || !strings.Contains(tile(h), "Review requests 2") {
+		t.Fatalf("the approved PR came back with the refresh:\n%s", h.Screen())
+	}
+
+	g.mu.Lock()
+	g.requested[0].requests = append(g.requested[0].requests, "oronbz")
+	g.mu.Unlock()
+	h.Advance(3 * time.Minute)
+	if !strings.Contains(tile(h), "Retry webhook deliveries") {
+		t.Errorf("asked by name again, the PR stayed hidden:\n%s", h.Screen())
+	}
+}
+
 func TestRemoveMeWithdrawsMyOwnRequestOrMyTeams(t *testing.T) {
 	g := team(t)
 	h := withPRs(t, g, hosttest.Options{Width: 90, Height: 12})
@@ -227,6 +244,28 @@ func TestRemoveMeWithdrawsMyOwnRequestOrMyTeams(t *testing.T) {
 	}
 	if n := g.searches(); n != 3 {
 		t.Errorf("searched %d times, want a refresh after each removal", n)
+	}
+}
+
+func TestAPRIRemovedMyselfFromStaysOnlyWhileItStillAsksMe(t *testing.T) {
+	g := team(t)
+	h := withPRs(t, g, hosttest.Options{Width: 90, Height: 12})
+	h.Press("1", "r", "enter")
+	if !strings.Contains(tile(h), "Retry webhook deliveries") {
+		t.Fatalf("removed by name, the PR my team is still asked on went away:\n%s", h.Screen())
+	}
+
+	h.Press("j", "r", "enter")
+	if strings.Contains(tile(h), "Drop the legacy router") || !strings.Contains(tile(h), "Review requests 2") {
+		t.Fatalf("the PR I removed my team from came back with the refresh:\n%s", h.Screen())
+	}
+
+	g.mu.Lock()
+	g.requested[1].requests = []string{"oronbz"}
+	g.mu.Unlock()
+	h.Advance(3 * time.Minute)
+	if !strings.Contains(tile(h), "Drop the legacy router") {
+		t.Errorf("asked by name again, the PR stayed hidden:\n%s", h.Screen())
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -76,13 +77,50 @@ func (g *github) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	switch {
 	case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/reviews"):
+		g.reviewed(r.URL.Path)
 		w.WriteHeader(http.StatusOK)
 		io.WriteString(w, `{"id": 1, "state": "APPROVED"}`)
 	case r.Method == http.MethodDelete && strings.HasSuffix(r.URL.Path, "/requested_reviewers"):
+		g.withdrawn(r.URL.Path, b)
 		w.WriteHeader(http.StatusOK)
 		io.WriteString(w, `{}`)
 	default:
 		http.NotFound(w, r)
+	}
+}
+
+// reviewed fulfils my review request on the PR at path, as GitHub does when I
+// review; search keeps listing the PR, as GitHub's index does for a while.
+func (g *github) reviewed(path string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	for i, p := range g.requested {
+		if path == "/repos/"+p.repo+"/pulls/"+itoa(p.number)+"/reviews" {
+			g.requested[i].requests = slices.DeleteFunc(slices.Clone(p.requests), func(r string) bool { return r == g.viewer })
+		}
+	}
+}
+
+// withdrawn drops the review requests body names from the PR at path; search
+// keeps listing the PR, as GitHub's index does for a while.
+func (g *github) withdrawn(path string, body []byte) {
+	var raw struct {
+		Reviewers     []string `json:"reviewers"`
+		TeamReviewers []string `json:"team_reviewers"`
+	}
+	json.Unmarshal(body, &raw)
+	drop := raw.Reviewers
+	for _, t := range raw.TeamReviewers {
+		drop = append(drop, "team:"+t)
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	for i, p := range g.requested {
+		if path == "/repos/"+p.repo+"/pulls/"+itoa(p.number)+"/requested_reviewers" {
+			g.requested[i].requests = slices.DeleteFunc(slices.Clone(p.requests), func(r string) bool {
+				return slices.Contains(drop, strings.TrimSuffix(r, "!"))
+			})
+		}
 	}
 }
 

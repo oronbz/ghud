@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/oronbz/ghud/internal/ports"
@@ -32,12 +33,51 @@ var Type = widget.Type{
 }
 
 func newPRs(c widget.Config) widget.Widget {
-	return prs{ports: c.Ports, drafts: c.Settings.Bool("drafts")}
+	return prs{ports: c.Ports, drafts: c.Settings.Bool("drafts"), acted: &acted{}}
 }
 
 type prs struct {
 	ports  ports.Ports
 	drafts bool
+	acted  *acted
+}
+
+// acted remembers the PRs I approved or removed myself from while GitHub's
+// search still lists them, which it does for a few seconds after, so the
+// refresh after the Action doesn't bring them back.
+type acted struct {
+	mu  sync.Mutex
+	ids map[string]stays
+}
+
+// stays is whether a PR I acted on still waits on me by its fresh review
+// requests, which search reports correctly even while its index lags.
+type stays func(n node, me string) bool
+
+func (a *acted) add(id string, s stays) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.ids == nil {
+		a.ids = map[string]stays{}
+	}
+	a.ids[id] = s
+}
+
+// settle drops the PRs I acted on that search still lists but that no
+// longer wait on me, and forgets the rest.
+func (a *acted) settle(d *searchData) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	listed := map[string]stays{}
+	kept := d.Requested.Nodes[:0]
+	for _, n := range d.Requested.Nodes {
+		if id := n.id(); a.ids[id] != nil && !a.ids[id](n, d.Viewer.Login) {
+			listed[id] = a.ids[id]
+			continue
+		}
+		kept = append(kept, n)
+	}
+	a.ids, d.Requested.Nodes = listed, kept
 }
 
 func (prs) Credential() string { return credential }
@@ -124,6 +164,7 @@ func (w prs) Refresh(ctx context.Context, now time.Time) (widget.Payload, error)
 	if err != nil {
 		return widget.Payload{}, err
 	}
+	w.acted.settle(&d)
 	return payload(d, now), nil
 }
 
@@ -214,21 +255,35 @@ func reason(n node, me string) widget.Field {
 	return widget.F(theme.Info, team)
 }
 
+// asks is whether login is asked by name to review the PR.
+func (n node) asks(login string) bool {
+	for _, r := range n.ReviewRequests.Nodes {
+		if rv := r.RequestedReviewer; rv.Typename == "User" && rv.Login == login {
+			return true
+		}
+	}
+	return false
+}
+
+// awaits is whether the PR still asks me by name or through any team, as
+// one I removed myself from stays listed through another of my requests.
+func (n node) awaits(me string) bool {
+	return n.asks(me) || n.removal(me) != ""
+}
+
 // removal is the review request "remove me" withdraws: "user:<login>" when
 // I was asked directly, else "team:<slug>" for the team I was asked through.
 // It's carried in the Action's Value so a cached payload can still run it.
 func (n node) removal(me string) string {
-	var team string
+	if n.asks(me) {
+		return "user:" + me
+	}
 	for _, r := range n.ReviewRequests.Nodes {
-		rv := r.RequestedReviewer
-		if rv.Typename == "User" && rv.Login == me {
-			return "user:" + me
-		}
-		if rv.Typename == "Team" && team == "" {
-			team = "team:" + rv.Slug
+		if rv := r.RequestedReviewer; rv.Typename == "Team" {
+			return "team:" + rv.Slug
 		}
 	}
-	return team
+	return ""
 }
 
 // age is how long ago something happened in its largest whole unit: 45m, 3h, 2d.
@@ -264,6 +319,7 @@ func (w prs) Invoke(ctx context.Context, inv widget.Invocation) (widget.Result, 
 		if err := c.rest(ctx, http.MethodPost, pull+"/reviews", map[string]any{"event": "APPROVE"}); err != nil {
 			return widget.Result{}, err
 		}
+		w.acted.add(inv.Item, node.asks)
 		return widget.Result{Toast: "Approved " + short}, nil
 	case "remove":
 		body := map[string]any{"reviewers": []string{}, "team_reviewers": []string{}}
@@ -279,6 +335,7 @@ func (w prs) Invoke(ctx context.Context, inv widget.Invocation) (widget.Result, 
 		if err := c.rest(ctx, http.MethodDelete, pull+"/requested_reviewers", body); err != nil {
 			return widget.Result{}, err
 		}
+		w.acted.add(inv.Item, node.awaits)
 		return widget.Result{Toast: "Removed you from the reviewers of " + short}, nil
 	}
 	return widget.Result{}, fmt.Errorf("PRs has no Action %q", inv.Action)
