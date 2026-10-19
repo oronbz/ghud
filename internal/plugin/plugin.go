@@ -230,7 +230,6 @@ func (p *Plugin) widget(typ string, schema []widget.Setting, c widget.Config) *p
 	return w
 }
 
-// connect returns the running process, started if need be, with w open on it.
 func (p *Plugin) connect(ctx context.Context, w *pluginWidget) (*process, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -470,7 +469,6 @@ func (p *Plugin) shutdown() {
 	}
 }
 
-// stop asks the process to quit by closing stdin, then makes sure with a kill.
 func (proc *process) stop() {
 	proc.stopping.Store(true)
 	proc.conn.Close()

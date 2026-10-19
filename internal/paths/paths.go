@@ -23,8 +23,7 @@ func Under(root string) Paths {
 	}
 }
 
-// Home is the home directory getenv gives: HOME, else USERPROFILE (Windows
-// sets only that), else "".
+// Home is HOME, else USERPROFILE (Windows sets only that).
 func Home(getenv func(string) string) string {
 	if getenv == nil {
 		return ""
@@ -35,8 +34,7 @@ func Home(getenv func(string) string) string {
 	return getenv("USERPROFILE")
 }
 
-// Expand resolves a leading `~` or `~/` in p against home. Any other p, or
-// an empty home, leaves p as it is.
+// Expand resolves only a leading `~` or `~/`, and nothing with no home.
 func Expand(p, home string) string {
 	if home == "" {
 		return p

@@ -87,7 +87,6 @@ func (m Model) fetchCached(id string, src widget.Source, now time.Time, force bo
 	}
 }
 
-// record is entry e after a fetch or push at now gave p or err.
 func record(e cache.Entry, p widget.Payload, err error, now time.Time) cache.Entry {
 	e.CheckedAt, e.Status = now, statusOf(err)
 	var setup *widget.SetupError
@@ -103,9 +102,8 @@ func record(e cache.Entry, p widget.Payload, err error, now time.Time) cache.Ent
 	return e
 }
 
-// cachePush shares what s's Source pushed at now through its entry, as a
-// fetch would. Updates about this instance alone, and ones that change
-// nothing, aren't written.
+// cachePush leaves out updates about this instance alone, and ones that
+// change nothing.
 func (m Model) cachePush(s sched, push widget.Push, now time.Time) (sched, tea.Cmd) {
 	if s.key == "" || push.Lost || local(push.Err) || push.Payload == nil && push.Err == nil {
 		return s, nil
@@ -134,8 +132,7 @@ func (m Model) cachePush(s sched, push widget.Push, now time.Time) (sched, tea.C
 	}
 }
 
-// same reports whether a and b hold the same data and Status, whenever
-// they were fetched or checked.
+// same ignores when the entries were fetched or checked.
 func same(a, b cache.Entry) bool {
 	a.FetchedAt, a.CheckedAt, a.Fails = b.FetchedAt, b.CheckedAt, b.Fails
 	x, errX := json.Marshal(a)

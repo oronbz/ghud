@@ -47,8 +47,8 @@ const buried = ".uninstalled"
 // Tombstone is what ghud keeps of an uninstalled Plugin, so its Widgets can
 // name the install command in instances started after the uninstall.
 type Tombstone struct {
-	Name    string `json:"name"`
-	Record  Record `json:"record"`
+	Name    string         `json:"name"`
+	Record  Record         `json:"record"`
 	Widgets []BuriedWidget `json:"widgets"`
 }
 

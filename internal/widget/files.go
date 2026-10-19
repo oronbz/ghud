@@ -67,13 +67,11 @@ func (c Config) EditLock(kind, file string) string {
 	return LockFile(filepath.Join(c.DataDir, "locks"), kind, file)
 }
 
-// LockFile is the lock file in dir serialising edits of file, named for kind.
 func LockFile(dir, kind, file string) string {
 	sum := sha256.Sum256([]byte(file))
 	return filepath.Join(dir, kind+"-"+hex.EncodeToString(sum[:8])+".lock")
 }
 
-// Lock blocks until it holds the lock file at path.
 func Lock(path string) (unlock func(), err error) {
 	l, err := lockAt(path)
 	if err != nil {
@@ -85,8 +83,7 @@ func Lock(path string) (unlock func(), err error) {
 	return func() { _ = l.Unlock() }, nil
 }
 
-// TryLock takes the lock file at path if no one holds it; ok is false when
-// someone does.
+// TryLock never waits: ok is false while someone else holds the lock.
 func TryLock(path string) (unlock func(), ok bool, err error) {
 	l, err := lockAt(path)
 	if err != nil {
@@ -105,7 +102,7 @@ func lockAt(path string) (*flock.Flock, error) {
 	return flock.New(path), nil
 }
 
-// ReadFile reads path as text; a missing file is empty.
+// ReadFile reads a missing file as empty.
 func ReadFile(path string) (string, error) {
 	b, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
