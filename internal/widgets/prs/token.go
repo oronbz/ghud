@@ -22,7 +22,7 @@ const tokenPage = "https://github.com/settings/tokens/new?scopes=repo&descriptio
 const pasteToken = "paste-token"
 
 // fromKeyring is how setup hints name the token pasted into ghud.
-const fromKeyring = "the saved token"
+const fromKeyring = "The saved token"
 
 var (
 	errNoToken   = errors.New("no GitHub token")
@@ -72,9 +72,15 @@ func needsToken(err error) *widget.SetupError {
 }
 
 // unusable is the Status of a Widget whose token can't be used, problem
-// saying why; it offers the same setup Action as having no token.
-func unusable(p ports.Ports, problem string) *widget.SetupError {
-	if !canStore(p) {
+// saying why. Only a token pasted into ghud can be replaced by pasting
+// another: one borrowed from the environment or gh always wins over it.
+func unusable(p ports.Ports, from, problem string) *widget.SetupError {
+	switch {
+	case from == github.FromGh:
+		return &widget.SetupError{Hint: problem + ". Run `gh auth login` again"}
+	case from != fromKeyring:
+		return &widget.SetupError{Hint: problem + ". Unset it or set a classic token with repo scope"}
+	case !canStore(p):
 		return &widget.SetupError{Hint: problem + ". Set GH_TOKEN to a classic token with repo scope"}
 	}
 	return &widget.SetupError{
@@ -83,12 +89,12 @@ func unusable(p ports.Ports, problem string) *widget.SetupError {
 	}
 }
 
-func rejected(p ports.Ports, from string) *widget.SetupError {
-	return unusable(p, "GitHub rejected "+from)
+func rejected(p ports.Ports, from string, err authError) *widget.SetupError {
+	return unusable(p, from, from+" was rejected by GitHub: "+err.msg)
 }
 
 func refused(p ports.Ports, from string) *widget.SetupError {
-	return unusable(p, from+" is a fine-grained token. Use a classic token with repo scope")
+	return unusable(p, from, from+" is a fine-grained token, which can't search other organizations' PRs")
 }
 
 func pasteAction() *widget.Action {

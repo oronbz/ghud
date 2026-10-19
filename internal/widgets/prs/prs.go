@@ -132,8 +132,8 @@ func (w prs) Refresh(ctx context.Context, now time.Time) (widget.Payload, error)
 		"requested": filter + " review-requested:@me",
 		"involved":  filter + " review-involves:@me",
 	}, &d)
-	if errors.As(err, new(authError)) {
-		return widget.Payload{}, rejected(w.ports, c.from)
+	if auth := (authError{}); errors.As(err, &auth) {
+		return widget.Payload{}, rejected(w.ports, c.from, auth)
 	}
 	if err != nil {
 		return widget.Payload{}, err

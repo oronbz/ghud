@@ -335,30 +335,41 @@ func TestA403WithNoRequestsLeftPausesUntilTheRateLimitResets(t *testing.T) {
 }
 
 // tokenSources stages one GitHub token in each place PRs reads one from.
+// fix is what needs setup says to do about an unusable token there, and
+// paste whether it offers to paste one: only a pasted token can replace it.
 var tokenSources = []struct {
-	name string
-	from string
-	o    func(tok string) hosttest.Options
+	name, fix string
+	paste     bool
+	o         func(tok string) hosttest.Options
 }{
-	{"GH_TOKEN", "GH_TOKEN", func(tok string) hosttest.Options {
+	{"GH_TOKEN", "Unset it or set a classic token with repo scope", false, func(tok string) hosttest.Options {
 		return hosttest.Options{Env: map[string]string{"GH_TOKEN": tok}}
 	}},
-	{"GITHUB_TOKEN", "GITHUB_TOKEN", func(tok string) hosttest.Options {
+	{"GITHUB_TOKEN", "Unset it or set a classic token with repo scope", false, func(tok string) hosttest.Options {
 		return hosttest.Options{Env: map[string]string{"GITHUB_TOKEN": tok}}
 	}},
-	{"gh", "`gh auth token`", func(tok string) hosttest.Options {
+	{"`gh auth token`", "Run `gh auth login` again", false, func(tok string) hosttest.Options {
 		c := &hosttest.Commands{}
 		c.Script(tok+"\n", nil, "gh", "auth", "token")
 		return hosttest.Options{Env: map[string]string{}, Commands: c}
 	}},
-	{"keyring", "the saved token", func(tok string) hosttest.Options {
+	{"The saved token", "Run `gh auth login`, or press Enter to paste a classic token", true, func(tok string) hosttest.Options {
 		kr := &hosttest.Keyring{}
 		_ = kr.Set("ghud", "github:github.com", tok)
 		return hosttest.Options{Env: map[string]string{}, Keyring: kr}
 	}},
 }
 
-func TestARejectedTokenFromAnySourceNeedsSetupWithThePasteAction(t *testing.T) {
+// offersPaste reports whether enter on the focused PRs Widget opens the
+// paste prompt.
+func offersPaste(h *hosttest.Host) bool {
+	h.Press("1", "enter")
+	opened := strings.Contains(h.Screen(), "INPUT")
+	h.Press("esc")
+	return opened
+}
+
+func TestARejectedTokenNeedsSetupNamingItsSourceAndGitHubsMessage(t *testing.T) {
 	for _, src := range tokenSources {
 		t.Run(src.name, func(t *testing.T) {
 			g := team(t)
@@ -366,37 +377,39 @@ func TestARejectedTokenFromAnySourceNeedsSetupWithThePasteAction(t *testing.T) {
 				return http.StatusUnauthorized, nil, `{"message": "Bad credentials"}`
 			}
 			o := src.o("ghp_expired")
-			o.Width, o.Height = 140, 12
+			o.Width, o.Height = 160, 12
 			h := withPRs(t, g, o)
 			screen := h.Screen()
-			for _, want := range []string{"needs setup", "rejected", src.from, "press Enter to paste a classic token"} {
+			for _, want := range []string{"needs setup", src.name + " was rejected by GitHub: Bad credentials", src.fix} {
 				if !strings.Contains(screen, want) {
 					t.Errorf("screen lacks %q:\n%s", want, screen)
 				}
 			}
-			h.Press("1", "enter")
-			if !strings.Contains(h.Screen(), "INPUT") {
-				t.Errorf("enter didn't open the paste prompt:\n%s", h.Screen())
+			if got := offersPaste(h); got != src.paste {
+				t.Errorf("enter opens the paste prompt: %v, want %v", got, src.paste)
 			}
 		})
 	}
 }
 
-func TestAFineGrainedTokenFromAnySourceNeedsSetupAndIsNeverSent(t *testing.T) {
+func TestAFineGrainedTokenNeedsSetupNamingItsSourceAndIsNeverSent(t *testing.T) {
 	for _, src := range tokenSources {
 		t.Run(src.name, func(t *testing.T) {
 			g := team(t)
-			o := src.o("github_pat_11ABCDEFG0123456789_abcdefghijklmnop")
-			o.Width, o.Height = 140, 12
+			o := src.o("github_pat_fake")
+			o.Width, o.Height = 160, 12
 			h := withPRs(t, g, o)
 			screen := h.Screen()
-			for _, want := range []string{"needs setup", "Use a classic token with repo scope", src.from} {
+			for _, want := range []string{"needs setup", src.name + " is a fine-grained token", src.fix} {
 				if !strings.Contains(screen, want) {
 					t.Errorf("screen lacks %q:\n%s", want, screen)
 				}
 			}
 			if reqs := g.Requests(); len(reqs) != 0 {
 				t.Errorf("GitHub got %v", reqs)
+			}
+			if got := offersPaste(h); got != src.paste {
+				t.Errorf("enter opens the paste prompt: %v, want %v", got, src.paste)
 			}
 		})
 	}

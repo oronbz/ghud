@@ -168,7 +168,7 @@ func TestARejectedStoredTokenReturnsTheWidgetToNeedsSetup(t *testing.T) {
 		}
 		return 0, nil, ""
 	}
-	h := withPRs(t, g, hosttest.Options{Width: 100, Height: 12, Env: map[string]string{}, Keyring: kr})
+	h := withPRs(t, g, hosttest.Options{Width: 140, Height: 12, Env: map[string]string{}, Keyring: kr})
 	screen := h.Screen()
 	for _, want := range []string{"needs setup", "rejected", "press Enter to paste a classic token"} {
 		if !strings.Contains(screen, want) {

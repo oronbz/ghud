@@ -8,6 +8,9 @@ import (
 	"github.com/oronbz/ghud/internal/ports"
 )
 
+// FromGh is Token's from for a token gh gave.
+const FromGh = "`gh auth token`"
+
 // Token borrows the token from GH_TOKEN, GITHUB_TOKEN or `gh auth token`, in
 // that order, the way gh itself does; from names where it came from. Both
 // are empty when there's none.
@@ -25,7 +28,7 @@ func Token(ctx context.Context, getenv func(string) string, c ports.Commands) (t
 	}
 	if out, err := c.Output(ctx, "gh", "auth", "token"); err == nil {
 		if t := strings.TrimSpace(string(out)); t != "" {
-			return t, "`gh auth token`"
+			return t, FromGh
 		}
 	}
 	return "", ""
