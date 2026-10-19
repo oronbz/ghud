@@ -17,10 +17,13 @@ type forecast struct {
 		Code     int     `json:"weather_code"`
 		Wind     float64 `json:"wind_speed_10m"`
 		WindDir  float64 `json:"wind_direction_10m"`
+		IsDay    int     `json:"is_day"`
 	} `json:"current"`
 	Hourly struct {
-		Time []string   `json:"time"`
-		Temp []*float64 `json:"temperature_2m"`
+		Time  []string   `json:"time"`
+		Temp  []*float64 `json:"temperature_2m"`
+		Code  []*int     `json:"weather_code"`
+		IsDay []*int     `json:"is_day"`
 	} `json:"hourly"`
 	Daily struct {
 		Max []*float64 `json:"temperature_2m_max"`
@@ -34,8 +37,8 @@ func fetchForecast(ctx context.Context, cfg config, at place, units string) (for
 	q := url.Values{
 		"latitude":      {strconv.FormatFloat(at.Lat, 'f', -1, 64)},
 		"longitude":     {strconv.FormatFloat(at.Lon, 'f', -1, 64)},
-		"current":       {"temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m"},
-		"hourly":        {"temperature_2m"},
+		"current":       {"temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,is_day"},
+		"hourly":        {"temperature_2m,weather_code,is_day"},
 		"daily":         {"temperature_2m_max,temperature_2m_min"},
 		"timezone":      {"auto"},
 		"forecast_days": {"2"},
@@ -64,4 +67,24 @@ var conditions = map[int]string{
 	80: "Light showers", 81: "Showers", 82: "Violent showers",
 	85: "Light snow showers", 86: "Snow showers",
 	95: "Thunderstorm", 96: "Thunderstorm, hail", 97: "Heavy thunderstorm", 99: "Thunderstorm, heavy hail",
+}
+
+// sky is the glyph for a WMO weather code, a moon for clear nights.
+func sky(code int, day bool) span {
+	switch {
+	case code <= 2:
+		if day {
+			return span{Text: "☼", Token: "warn"}
+		}
+		return span{Text: "☾", Token: "info"}
+	case code == 3:
+		return span{Text: "☁", Token: "dim"}
+	case code == 45 || code == 48:
+		return span{Text: "≡", Token: "faint"}
+	case code >= 71 && code <= 77, code == 85 || code == 86:
+		return span{Text: "❄", Token: "bright"}
+	case code >= 95:
+		return span{Text: "ϟ", Token: "warn"}
+	}
+	return span{Text: "☂", Token: "accent"}
 }

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/oronbz/ghud/internal/hosttest"
+	"github.com/oronbz/ghud/internal/theme"
 	"github.com/oronbz/ghud/internal/weather/weathertest"
 	"github.com/oronbz/ghud/internal/widget"
 )
@@ -58,14 +59,27 @@ func TestWithACityWeatherShowsTheForecastCreditedToOpenMeteo(t *testing.T) {
 	h := withWeather(t, s, weatherWidget+"city = \"Petah Tikva\"\n")
 	shows(t, h,
 		"Petah Tikva",
-		"21°C Partly cloudy",
+		"☾ 21°C Partly cloudy",
 		"high 26° · low 18° · feels 23°",
 		"wind 2 km/h E · humidity 74%",
 		"now  23   00   01",
-		"22°  21°  20°  19°",
+		"☾22° ☾21° ☂20° ☁19°",
 		"Weather data by Open-Meteo.com",
 	)
 	hides(t, h, "from IP")
+	for _, c := range []struct {
+		glyph string
+		want  theme.Token
+	}{{"☾", theme.Info}, {"☂", theme.Accent}, {"☁", theme.Dim}} {
+		x, y, ok := h.Find(c.glyph)
+		if !ok {
+			t.Errorf("%q not on screen", c.glyph)
+			continue
+		}
+		if got, _ := h.Fg(x, y); got != c.want {
+			t.Errorf("%q drawn in %v, want %v", c.glyph, got, c.want)
+		}
+	}
 	f := s.calls("forecast")
 	if len(f) != 1 || f[0].Get("latitude") != "32.0888" || f[0].Get("longitude") != "34.88666" {
 		t.Errorf("forecast requests = %v, want one for Petah Tikva's coordinates", f)

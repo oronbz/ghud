@@ -47,7 +47,8 @@ func (r *report) payload(sz size) map[string]any {
 	blocks := []block{
 		{0, []line{{[]span{header}}}},
 		{0, []line{{[]span{
-			{Text: temp(f.Current.Temp) + unit, Token: "bright", Bold: true},
+			sky(f.Current.Code, f.Current.IsDay == 1),
+			{Text: " " + temp(f.Current.Temp) + unit, Token: "bright", Bold: true},
 			{Text: " " + condition(f.Current.Code), Token: "fg"},
 		}}}},
 	}
@@ -78,7 +79,8 @@ func (r *report) payload(sz size) map[string]any {
 	}
 }
 
-// hourly is two rows, hours over temperatures, as many hours as fit width.
+// hourly is two rows, hours over each hour's sky and temperature, as
+// many hours as fit width.
 func (r *report) hourly(width int) []line {
 	n := 6
 	if width > 0 {
@@ -89,7 +91,8 @@ func (r *report) hourly(width int) []line {
 	if n <= 0 {
 		return nil
 	}
-	var when, temps strings.Builder
+	var when strings.Builder
+	var temps []span
 	for i := range n {
 		label := "now"
 		if i > 0 {
@@ -99,17 +102,25 @@ func (r *report) hourly(width int) []line {
 		if h.Temp[i] != nil {
 			t = temp(*h.Temp[i]) + "°"
 		}
+		glyph := span{Text: " ", Token: "faint"}
+		if i < len(h.Code) && h.Code[i] != nil {
+			glyph = sky(*h.Code[i], i >= len(h.IsDay) || h.IsDay[i] == nil || *h.IsDay[i] == 1)
+		}
+		if i < n-1 {
+			t = pad(glyph.Text + t)[len(glyph.Text):]
+		}
 		when.WriteString(pad(label))
-		temps.WriteString(pad(t))
+		temps = append(temps, glyph, span{Text: t, Token: "fg"})
 	}
 	return []line{
 		{[]span{{Text: strings.TrimRight(when.String(), " "), Token: "dim"}}},
-		{[]span{{Text: strings.TrimRight(temps.String(), " "), Token: "fg"}}},
+		{temps},
 	}
 }
 
+// pad fills s to hourWidth, keeping at least one space before the next hour.
 func pad(s string) string {
-	return s + strings.Repeat(" ", max(0, hourWidth-utf8.RuneCountInString(s)))
+	return s + strings.Repeat(" ", max(1, hourWidth-utf8.RuneCountInString(s)))
 }
 
 // shown keeps the blocks that fit height lines, dropping the highest

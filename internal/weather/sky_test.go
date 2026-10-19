@@ -131,7 +131,7 @@ func (s *sky) serveForecast(w http.ResponseWriter, r *http.Request) {
 		windUnit, wind = "mp/h", 1.4
 	}
 	var times []string
-	var precip, codes []int
+	var precip, codes, day []int
 	for i := range temps {
 		times = append(times, "2026-10-18T"+twoDigits((22+i)%24)+":00")
 		if i >= 2 {
@@ -139,7 +139,9 @@ func (s *sky) serveForecast(w http.ResponseWriter, r *http.Request) {
 		}
 		precip = append(precip, 0)
 		codes = append(codes, 2)
+		day = append(day, 0)
 	}
+	codes[2], codes[3], day[3] = 61, 3, 1
 	json.NewEncoder(w).Encode(map[string]any{
 		"latitude": 32.06273, "longitude": 34.85472, "utc_offset_seconds": 10800,
 		"timezone": "Asia/Jerusalem", "timezone_abbreviation": "GMT+3", "elevation": 61.0,
@@ -150,7 +152,7 @@ func (s *sky) serveForecast(w http.ResponseWriter, r *http.Request) {
 			"apparent_temperature": feels, "relative_humidity_2m": 74, "weather_code": 2,
 			"wind_speed_10m": wind, "wind_direction_10m": 90, "is_day": 0},
 		"hourly_units": map[string]any{"time": "iso8601", "temperature_2m": tempUnit, "precipitation_probability": "%", "weather_code": "wmo code"},
-		"hourly":       map[string]any{"time": times, "temperature_2m": temps, "precipitation_probability": precip, "weather_code": codes},
+		"hourly":       map[string]any{"time": times, "temperature_2m": temps, "precipitation_probability": precip, "weather_code": codes, "is_day": day},
 		"daily_units":  map[string]any{"time": "iso8601", "temperature_2m_max": tempUnit},
 		"daily": map[string]any{"time": []string{"2026-10-18"}, "weather_code": []int{3},
 			"temperature_2m_max": []float64{high}, "temperature_2m_min": []float64{low}},
