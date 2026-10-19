@@ -230,7 +230,6 @@ func (p *Plugin) widget(typ string, schema []widget.Setting, c widget.Config) *p
 	return w
 }
 
-// connect returns the running process, started if need be, with w open on it.
 func (p *Plugin) connect(ctx context.Context, w *pluginWidget) (*process, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -239,7 +238,7 @@ func (p *Plugin) connect(ctx context.Context, w *pluginWidget) (*process, error)
 	}
 	if p.proc == nil {
 		if p.closed {
-			return nil, p.withName(errClosed)
+			return nil, &widget.LocalError{Err: p.withName(errClosed)}
 		}
 		if now := p.clock.Now(); now.Before(p.retry) {
 			return nil, p.stoppedErr(now)
@@ -383,7 +382,7 @@ func restartDelay(fails int) time.Duration {
 // stoppedErr is what a stopped Plugin's Widgets show until it restarts.
 func (p *Plugin) stoppedErr(now time.Time) error {
 	hint := "Restarting it in " + widget.ShortDuration(p.retry.Sub(now).Round(time.Second))
-	return failure{msg: fmt.Sprintf("Plugin `%s` stopped: %v", p.name, p.stopped), reason: "plugin stopped", hint: hint}
+	return &widget.LocalError{Err: failure{msg: fmt.Sprintf("Plugin `%s` stopped: %v", p.name, p.stopped), reason: "plugin stopped", hint: hint}}
 }
 
 func (p *Plugin) listed() []*pluginWidget {
@@ -429,7 +428,7 @@ func (p *Plugin) withName(err error) error {
 
 func (p *Plugin) callErr(err error) error {
 	if errors.Is(err, io.EOF) || errors.Is(err, errClosed) {
-		return p.withName(errors.New("stopped"))
+		return &widget.LocalError{Err: p.withName(errors.New("stopped"))}
 	}
 	return p.withName(err)
 }
@@ -470,7 +469,6 @@ func (p *Plugin) shutdown() {
 	}
 }
 
-// stop asks the process to quit by closing stdin, then makes sure with a kill.
 func (proc *process) stop() {
 	proc.stopping.Store(true)
 	proc.conn.Close()

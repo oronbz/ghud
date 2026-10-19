@@ -7,35 +7,27 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/gofrs/flock"
+
+	"github.com/oronbz/ghud/internal/paths"
 )
 
 // DataFile resolves a Widget's `file` setting: empty means def in the data
 // dir, a relative path is under the data dir, and `~/` is the home dir
-// (the data dir when there's no HOME).
+// (the data dir when there's no home).
 func (c Config) DataFile(file, def string) string {
-	switch {
-	case file == "":
+	if file == "" {
 		return filepath.Join(c.DataDir, def)
-	case strings.HasPrefix(file, "~/"):
-		return filepath.Join(c.home(), file[2:])
-	case !filepath.IsAbs(file):
+	}
+	home := paths.Home(c.Ports.Getenv)
+	if home == "" {
+		home = c.DataDir
+	}
+	if file = paths.Expand(file, home); !filepath.IsAbs(file) {
 		return filepath.Join(c.DataDir, file)
 	}
 	return file
-}
-
-func (c Config) home() string {
-	if c.Ports.Getenv != nil {
-		for _, k := range []string{"HOME", "USERPROFILE"} {
-			if h := c.Ports.Getenv(k); h != "" {
-				return h
-			}
-		}
-	}
-	return c.DataDir
 }
 
 // WriteFile replaces path atomically (temp file plus rename), so a reader
@@ -72,23 +64,45 @@ func WriteFile(path string, data []byte) error {
 // instances, named for kind. It lives in the data dir so synced folders
 // don't collect lock files.
 func (c Config) EditLock(kind, file string) string {
-	sum := sha256.Sum256([]byte(file))
-	return filepath.Join(c.DataDir, "locks", kind+"-"+hex.EncodeToString(sum[:8])+".lock")
+	return LockFile(filepath.Join(c.DataDir, "locks"), kind, file)
 }
 
-// Lock blocks until it holds the lock file at path.
+func LockFile(dir, kind, file string) string {
+	sum := sha256.Sum256([]byte(file))
+	return filepath.Join(dir, kind+"-"+hex.EncodeToString(sum[:8])+".lock")
+}
+
 func Lock(path string) (unlock func(), err error) {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	l, err := lockAt(path)
+	if err != nil {
 		return nil, err
 	}
-	l := flock.New(path)
 	if err := l.Lock(); err != nil {
 		return nil, err
 	}
 	return func() { _ = l.Unlock() }, nil
 }
 
-// ReadFile reads path as text; a missing file is empty.
+// TryLock never waits: ok is false while someone else holds the lock.
+func TryLock(path string) (unlock func(), ok bool, err error) {
+	l, err := lockAt(path)
+	if err != nil {
+		return nil, false, err
+	}
+	if ok, err := l.TryLock(); !ok || err != nil {
+		return nil, false, err
+	}
+	return func() { _ = l.Unlock() }, true, nil
+}
+
+func lockAt(path string) (*flock.Flock, error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return nil, err
+	}
+	return flock.New(path), nil
+}
+
+// ReadFile reads a missing file as empty.
 func ReadFile(path string) (string, error) {
 	b, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {

@@ -30,3 +30,10 @@ func (e *RateLimitError) Unwrap() error { return e.Err }
 func (e *RateLimitError) Reason() string {
 	return "rate limited"
 }
+
+// LocalError is a Status of this instance alone, such as its Plugin process
+// stopping, so it isn't shared with other instances through the cache.
+type LocalError struct{ Err error }
+
+func (e *LocalError) Error() string { return e.Err.Error() }
+func (e *LocalError) Unwrap() error { return e.Err }

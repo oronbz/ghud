@@ -298,11 +298,15 @@ type wire struct {
 }
 
 func (w *wire) send(text string) {
+	p := widget.Payload{Lines: []widget.Line{widget.Text(theme.Fg, text)}}
+	w.deliver(widget.Push{Payload: &p})
+}
+
+func (w *wire) deliver(p widget.Push) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	p := widget.Payload{Lines: []widget.Line{widget.Text(theme.Fg, text)}}
 	for _, push := range w.push {
-		push(widget.Push{Payload: &p})
+		push(p)
 	}
 }
 
@@ -317,29 +321,78 @@ func (n liveNews) Listen(push func(widget.Push)) {
 	n.w.push = append(n.w.push, push)
 }
 
-func TestAPushIsWrittenToTheCacheForOtherInstances(t *testing.T) {
-	root, u, w := t.TempDir(), &upstream{}, &wire{}
+// liveNewsHost is newsHost with a News Widget that also takes pushes from w.
+func liveNewsHost(t *testing.T, u *upstream, w *wire, root string, now time.Time) *hosttest.Host {
+	t.Helper()
 	typ := newsType(u)
 	typ.New = func(c widget.Config) widget.Widget {
 		return liveNews{news{up: u, topic: c.Settings.String("topic")}, w}
 	}
-	at := func(now time.Time) *hosttest.Host {
-		return hosttest.New(t, hosttest.Options{Root: root, Now: now, Width: 60, Height: 8, Types: []widget.Type{typ}})
-	}
-	a := at(hosttest.DefaultNow)
+	return hosttest.New(t, hosttest.Options{Root: root, Now: now, Width: 60, Height: 8, Types: []widget.Type{typ}})
+}
+
+func TestAPushIsWrittenToTheCacheForOtherInstances(t *testing.T) {
+	root, u, w := t.TempDir(), &upstream{}, &wire{}
+	a := liveNewsHost(t, u, w, root, hosttest.DefaultNow)
 	w.send("breaking news")
 	a.Receive()
 	if !strings.Contains(a.Screen(), "breaking news") {
 		t.Fatalf("a shows:\n%s\nwant the pushed payload", a.Screen())
 	}
 
-	b := at(hosttest.DefaultNow.Add(time.Minute))
+	b := liveNewsHost(t, u, w, root, hosttest.DefaultNow.Add(time.Minute))
 	if !strings.Contains(b.Screen(), "breaking news") {
 		t.Errorf("an instance started after the push shows:\n%s\nwant the pushed payload from the cache", b.Screen())
 	}
 	if u.count() != 1 {
 		t.Errorf("fetched %d times, want 1: the push counts as fresh data", u.count())
 	}
+}
+
+// untouched backdates entry's mtime and returns a check that fails the test
+// if entry was written since.
+func untouched(t *testing.T, entry string) func(why string) {
+	t.Helper()
+	old := hosttest.DefaultNow.Add(-time.Hour)
+	if err := os.Chtimes(entry, old, old); err != nil {
+		t.Fatal(err)
+	}
+	return func(why string) {
+		t.Helper()
+		if fi, err := os.Stat(entry); err != nil || !fi.ModTime().Equal(old) {
+			t.Errorf("the cache entry was written: %s", why)
+		}
+	}
+}
+
+func TestAPushWhileAnotherInstanceFetchesLeavesTheEntryToThatFetch(t *testing.T) {
+	root, u, w := t.TempDir(), &upstream{}, &wire{}
+	a := liveNewsHost(t, u, w, root, hosttest.DefaultNow)
+	check := untouched(t, entryFile(t, root))
+	lockEntry(t, root, hosttest.DefaultNow)
+
+	w.send("breaking news")
+	a.Receive()
+	if !strings.Contains(a.Screen(), "breaking news") {
+		t.Fatalf("a shows:\n%s\nwant the pushed payload", a.Screen())
+	}
+	check("another instance holds the entry's lock, and its fetch writes it")
+}
+
+func TestAPushThatChangesNothingLeavesTheEntryAlone(t *testing.T) {
+	root, u, w := t.TempDir(), &upstream{}, &wire{}
+	a := liveNewsHost(t, u, w, root, hosttest.DefaultNow)
+	w.send("breaking news")
+	a.Receive()
+	check := untouched(t, entryFile(t, root))
+
+	a.Advance(time.Second)
+	w.send("breaking news")
+	a.Receive()
+	check("the push repeated the payload")
+	w.deliver(widget.Push{Retry: hosttest.DefaultNow.Add(time.Hour)})
+	a.Receive()
+	check("the push only asked for a retry")
 }
 
 func TestPRsMeetingsAndRemindersAreCachedWidgets(t *testing.T) {

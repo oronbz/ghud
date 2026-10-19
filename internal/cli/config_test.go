@@ -201,9 +201,9 @@ func TestConfigDefaultSaysWhichWidgetsAnEmptyConfigShows(t *testing.T) {
 	if strings.Contains(ref, "every type") {
 		t.Errorf("reference claims an empty config shows every type:\n%s", ref)
 	}
-	i := strings.Index(ref, "the built-in default Widgets")
+	i := strings.Index(ref, "the default Widgets")
 	if i < 0 {
-		t.Fatalf("reference doesn't say an empty config shows the built-in defaults:\n%s", ref)
+		t.Fatalf("reference doesn't say an empty config shows the default Widgets:\n%s", ref)
 	}
 	defaults, _, _ := strings.Cut(ref[i:], "\n# Every block")
 	for _, want := range []string{"Clock", "Calendar", "CPU + memory", "Review requests"} {

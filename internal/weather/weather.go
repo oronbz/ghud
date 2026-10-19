@@ -11,6 +11,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/oronbz/ghud/internal/paths"
 )
 
 // Manifest is the Plugin's ghud-plugin.toml, built into ghud, which reads
@@ -70,7 +72,7 @@ func cacheDir(getenv func(string) string) string {
 	if d := getenv("XDG_CACHE_HOME"); filepath.IsAbs(d) {
 		return filepath.Join(d, "ghud")
 	}
-	if home, err := os.UserHomeDir(); err == nil {
+	if home := paths.Home(getenv); home != "" {
 		return filepath.Join(home, ".cache", "ghud")
 	}
 	return filepath.Join(os.TempDir(), "ghud")

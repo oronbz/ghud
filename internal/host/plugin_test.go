@@ -159,6 +159,28 @@ func TestACrashedPluginShowsAnErrorAndRestartsWithGrowingDelays(t *testing.T) {
 	shows(t, h, "hello alpha")
 }
 
+func TestAPluginCrashStaysWithTheInstanceWhoseProcessStopped(t *testing.T) {
+	a := withPlugin(t, plugintest.Options{}, fixtureWidget)
+	a.Press("1")
+	a.Receive()
+	entry := entryFile(t, a.Root)
+	before, err := os.ReadFile(entry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.Press("x")
+	a.ReceiveUntil(func() bool { return strings.Contains(a.Screen(), "stopped:") })
+	a.Press("ctrl+r")
+	shows(t, a, "Restarting it in 1s")
+
+	if after, _ := os.ReadFile(entry); string(after) != string(before) {
+		t.Errorf("the crash changed the shared cache entry:\n%s\nwant it as before:\n%s", after, before)
+	}
+	b := hosttest.New(t, hosttest.Options{Root: a.Root, Width: 60, Height: 12, Types: []widget.Type{}, Config: fixtureWidget})
+	hides(t, b, "stopped")
+	shows(t, b, "pushed: focused")
+}
+
 func TestAnAddedPluginWidgetGetsItsPushes(t *testing.T) {
 	h := withPlugin(t, plugintest.Options{}, fixtureWidget)
 	h.Resize(60, 24)

@@ -8,13 +8,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
 	"time"
-
-	"github.com/gofrs/flock"
 
 	"github.com/oronbz/ghud/internal/config"
 	"github.com/oronbz/ghud/internal/github"
@@ -23,6 +20,7 @@ import (
 	"github.com/oronbz/ghud/internal/plugin"
 	"github.com/oronbz/ghud/internal/plugin/install"
 	"github.com/oronbz/ghud/internal/ports"
+	"github.com/oronbz/ghud/internal/widget"
 )
 
 const fetchTimeout = 5 * time.Minute
@@ -54,19 +52,14 @@ func pluginManage(s System, pp ports.Ports, p paths.Paths, configFile string, lo
 // lockPlugins keeps two `ghud plugin` commands from changing the plugins
 // directory at once; the second fails rather than waiting on a slow build.
 func lockPlugins(dataDir string) (unlock func(), err error) {
-	dir := filepath.Join(dataDir, "locks")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return nil, err
-	}
-	l := flock.New(filepath.Join(dir, "plugins.lock"))
-	ok, err := l.TryLock()
+	unlock, ok, err := widget.TryLock(filepath.Join(dataDir, "locks", "plugins.lock"))
 	switch {
 	case err != nil:
 		return nil, fmt.Errorf("can't lock the plugins directory: %w", err)
 	case !ok:
 		return nil, errors.New("another `ghud plugin` command is running; try again once it's done")
 	}
-	return func() { _ = l.Unlock() }, nil
+	return unlock, nil
 }
 
 func githubFetcher(getenv func(string) string, pp ports.Ports) install.GitHub {

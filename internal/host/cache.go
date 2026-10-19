@@ -1,7 +1,9 @@
 package host
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"path/filepath"
 	"slices"
@@ -77,13 +79,14 @@ func (m Model) fetchCached(id string, src widget.Source, now time.Time, force bo
 		ctx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
 		defer cancel()
 		p, err := src.Refresh(ctx, now)
-		// The cache only saves a fetch; failing to write it is no reason to drop the data.
-		_ = store.Save(key, record(e, p, err, now))
+		if !local(err) {
+			// The cache only saves a fetch; failing to write it is no reason to drop the data.
+			_ = store.Save(key, record(e, p, err, now))
+		}
 		return refreshedMsg{id: id, payload: p, err: err, at: now}
 	}
 }
 
-// record is entry e after a fetch or push at now gave p or err.
 func record(e cache.Entry, p widget.Payload, err error, now time.Time) cache.Entry {
 	e.CheckedAt, e.Status = now, statusOf(err)
 	var setup *widget.SetupError
@@ -99,26 +102,42 @@ func record(e cache.Entry, p widget.Payload, err error, now time.Time) cache.Ent
 	return e
 }
 
-// cachePush writes what Source id pushed at now to its entry, as a fetch would.
-func (m Model) cachePush(id string, push widget.Push, now time.Time) sched {
-	s := m.sched[id]
-	if s.key == "" {
-		return s
+// cachePush leaves out updates about this instance alone, and ones that
+// change nothing.
+func (m Model) cachePush(s sched, push widget.Push, now time.Time) (sched, tea.Cmd) {
+	if s.key == "" || push.Lost || local(push.Err) || push.Payload == nil && push.Err == nil {
+		return s, nil
 	}
-	e, _ := m.cache.Load(s.key)
-	if push.Lost {
-		e.Payload, e.FetchedAt = widget.Payload{}, time.Time{}
+	var p widget.Payload
+	if push.Payload != nil {
+		p = *push.Payload
 	}
-	if push.Payload != nil || push.Err != nil {
-		var p widget.Payload
-		if push.Payload != nil {
-			p = *push.Payload
+	s.checked = now
+	store, key := m.cache, s.key
+	return s, func() tea.Msg {
+		// A held lock is a fetch in flight in another instance, which writes the entry.
+		unlock, ok := store.Lock(key, now, fetchTimeout)
+		if !ok {
+			return nil
 		}
-		e = record(e, p, push.Err, now)
+		defer unlock()
+		e, _ := store.Load(key)
+		if e.CheckedAt.After(now) {
+			return nil
+		}
+		if n := record(e, p, push.Err, now); !same(e, n) {
+			_ = store.Save(key, n)
+		}
+		return nil
 	}
-	_ = m.cache.Save(s.key, e)
-	s.checked = e.CheckedAt
-	return s
+}
+
+// same ignores when the entries were fetched or checked.
+func same(a, b cache.Entry) bool {
+	a.FetchedAt, a.CheckedAt, a.Fails = b.FetchedAt, b.CheckedAt, b.Fails
+	x, errX := json.Marshal(a)
+	y, errY := json.Marshal(b)
+	return errX == nil && errY == nil && bytes.Equal(x, y)
 }
 
 // adopt takes Source id's data and Status from its cache entry: written by
@@ -181,6 +200,11 @@ func (f failure) Reason() string {
 }
 
 func (f failure) Hint() string { return f.hint }
+
+func local(err error) bool {
+	var l *widget.LocalError
+	return errors.As(err, &l)
+}
 
 func statusOf(err error) cache.Status {
 	if err == nil {

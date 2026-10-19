@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/oronbz/ghud/internal/paths"
 	bundled "github.com/oronbz/ghud/skills"
 )
 
@@ -41,10 +42,7 @@ type Installer struct {
 // Windows) and CLAUDE_CONFIG_DIR, whose skills folder is used only when the
 // Claude config folder exists.
 func For(getenv func(string) string, version string) (Installer, error) {
-	home := getenv("HOME")
-	if home == "" {
-		home = getenv("USERPROFILE")
-	}
+	home := paths.Home(getenv)
 	if home == "" {
 		return Installer{}, errors.New("can't find your home folder: HOME is not set")
 	}

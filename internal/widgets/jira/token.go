@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/oronbz/ghud/internal/paths"
 	"github.com/oronbz/ghud/internal/ports"
 )
 
@@ -37,10 +38,7 @@ func token(p ports.Ports, site, email, account string) (string, bool) {
 			}
 		}
 	}
-	home := getenv("HOME")
-	if home == "" {
-		home = getenv("USERPROFILE")
-	}
+	home := paths.Home(getenv)
 	if home == "" {
 		return "", false
 	}

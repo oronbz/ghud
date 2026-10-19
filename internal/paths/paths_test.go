@@ -53,6 +53,37 @@ func TestResolve(t *testing.T) {
 	}
 }
 
+func TestHomeIsHOMEElseUSERPROFILE(t *testing.T) {
+	for _, tt := range []struct {
+		env  map[string]string
+		want string
+	}{
+		{map[string]string{"HOME": "/home/me", "USERPROFILE": `C:\Users\me`}, "/home/me"},
+		{map[string]string{"USERPROFILE": `C:\Users\me`}, `C:\Users\me`},
+		{map[string]string{}, ""},
+	} {
+		if got := paths.Home(func(k string) string { return tt.env[k] }); got != tt.want {
+			t.Errorf("Home with %v = %q, want %q", tt.env, got, tt.want)
+		}
+	}
+}
+
+func TestExpandResolvesALeadingTildeOnly(t *testing.T) {
+	j := filepath.Join
+	for _, tt := range []struct{ p, home, want string }{
+		{"~", "/home/me", "/home/me"},
+		{"~/notes.md", "/home/me", j("/home/me", "notes.md")},
+		{"~other/notes.md", "/home/me", "~other/notes.md"},
+		{"a/~/b", "/home/me", "a/~/b"},
+		{"/abs", "/home/me", "/abs"},
+		{"~/notes.md", "", "~/notes.md"},
+	} {
+		if got := paths.Expand(tt.p, tt.home); got != tt.want {
+			t.Errorf("Expand(%q, %q) = %q, want %q", tt.p, tt.home, got, tt.want)
+		}
+	}
+}
+
 func TestResolveWithoutHomeFails(t *testing.T) {
 	if _, err := paths.Resolve(func(string) string { return "" }, "linux"); err == nil {
 		t.Error("resolved paths with no $HOME")
