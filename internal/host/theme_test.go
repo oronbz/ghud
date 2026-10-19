@@ -67,6 +67,40 @@ func TestADarkTerminalBackgroundKeepsTheDarkPalette(t *testing.T) {
 	}
 }
 
+func TestSettingTheBackgroundRedrawsTheWholeScreen(t *testing.T) {
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 40, Height: 9})
+
+	h.Send(tea.BackgroundColorMsg{Color: lipgloss.Color("#1e1e2e")})
+	if h.Clears() != 0 {
+		t.Fatalf("screen cleared %d times while ghud still leaves the background alone, want 0", h.Clears())
+	}
+	h.Send(answered)
+	if h.Clears() != 1 {
+		t.Errorf("screen cleared %d times once the dark background was set, want 1", h.Clears())
+	}
+
+	h.Send(tea.BackgroundColorMsg{Color: lipgloss.Color("#1e1e2e")})
+	if h.Clears() != 1 {
+		t.Errorf("screen cleared %d times after an answer that kept the background, want 1", h.Clears())
+	}
+	h.Send(tea.BackgroundColorMsg{Color: lipgloss.Color("#fdf6e3")})
+	if h.Clears() != 2 {
+		t.Errorf("screen cleared %d times after a late answer switched to the light background, want 2", h.Clears())
+	}
+}
+
+func TestTheTerminalThemeNeverClearsTheScreen(t *testing.T) {
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 40, Height: 9, Config: `theme = "terminal"`})
+
+	h.Send(tea.BackgroundColorMsg{Color: lipgloss.Color("#000000")})
+	h.Send(tea.ForegroundColorMsg{Color: lipgloss.Color("#ffffff")})
+	h.Send(answered)
+
+	if h.Clears() != 0 {
+		t.Errorf("screen cleared %d times, want 0: the terminal theme leaves the background alone", h.Clears())
+	}
+}
+
 // osc4 is a terminal's answer to an OSC 4 palette query.
 func osc4(index int, spec string) uv.UnknownOscEvent {
 	return uv.UnknownOscEvent(fmt.Sprintf("\x1b]4;%d;%s\x1b\\", index, spec))

@@ -225,8 +225,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if m, ok := m.colorAnswer(msg); ok {
-		return m, nil
+	if m, cmd, ok := m.colorAnswer(msg); ok {
+		return m, cmd
 	}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -311,9 +311,7 @@ func (m Model) nextTick() tea.Cmd {
 func (m Model) View() tea.View {
 	v := tea.NewView("")
 	v.AltScreen = true
-	if !m.colors.asking && !m.opts.Theme.FromTerminal() {
-		v.BackgroundColor = m.opts.Theme.Color(theme.Bg)
-	}
+	v.BackgroundColor = m.background()
 	// Report-all-keys and event types make lone modifier presses and releases
 	// arrive, for the modifier footer.
 	v.KeyboardEnhancements = tea.KeyboardEnhancements{

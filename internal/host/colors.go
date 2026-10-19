@@ -2,6 +2,7 @@ package host
 
 import (
 	"fmt"
+	"image/color"
 	"strconv"
 	"strings"
 	"time"
@@ -56,8 +57,32 @@ func (m Model) queryColors() tea.Cmd {
 	)
 }
 
+// background is the colour ghud sets as the terminal background, nil while
+// it leaves the terminal's own alone.
+func (m Model) background() color.Color {
+	if m.colors.asking || m.opts.Theme.FromTerminal() {
+		return nil
+	}
+	return m.opts.Theme.Color(theme.Bg)
+}
+
 // colorAnswer handles a reply to queryColors; ok is false for other messages.
-func (m Model) colorAnswer(msg tea.Msg) (Model, bool) {
+// When the answer changes the terminal background it clears the screen:
+// herdr applies a new default background only to cells drawn after it, so
+// without a full redraw the old colour lingers until each cell repaints.
+func (m Model) colorAnswer(msg tea.Msg) (Model, tea.Cmd, bool) {
+	before := m.background()
+	next, ok := m.applyColorAnswer(msg)
+	if !ok {
+		return m, nil, false
+	}
+	if sameColor(before, next.background()) {
+		return next, nil, true
+	}
+	return next, tea.ClearScreen, true
+}
+
+func (m Model) applyColorAnswer(msg tea.Msg) (Model, bool) {
 	switch msg := msg.(type) {
 	case tea.BackgroundColorMsg:
 		m.colors.term.Bg = msg.Color
@@ -74,6 +99,15 @@ func (m Model) colorAnswer(msg tea.Msg) (Model, bool) {
 		return m, false
 	}
 	return m.resolveTheme(), true
+}
+
+func sameColor(a, b color.Color) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	ar, ag, ab, aa := a.RGBA()
+	br, bg, bb, ba := b.RGBA()
+	return ar == br && ag == bg && ab == bb && aa == ba
 }
 
 func (m Model) resolveTheme() Model {

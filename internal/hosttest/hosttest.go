@@ -77,9 +77,10 @@ type Host struct {
 	Watcher   *Watcher
 	Inbox     *Inbox
 
-	model tea.Model
-	w, h  int
-	quit  bool
+	model  tea.Model
+	w, h   int
+	quit   bool
+	clears int
 }
 
 func New(t testing.TB, o Options) *Host {
@@ -285,7 +286,13 @@ func (h *Host) ReceiveUntil(done func() bool) {
 // Quit reports whether the app has asked Bubble Tea to quit.
 func (h *Host) Quit() bool { return h.quit }
 
-var cmdType = reflect.TypeFor[tea.Cmd]()
+// Clears counts the times the app has asked Bubble Tea to clear the screen.
+func (h *Host) Clears() int { return h.clears }
+
+var (
+	cmdType         = reflect.TypeFor[tea.Cmd]()
+	clearScreenType = reflect.TypeOf(tea.ClearScreen())
+)
 
 func (h *Host) run(cmd tea.Cmd) {
 	if cmd == nil || h.quit {
@@ -300,6 +307,10 @@ func (h *Host) run(cmd tea.Cmd) {
 			h.run(c)
 		}
 	default:
+		if reflect.TypeOf(msg) == clearScreenType {
+			h.clears++
+			return
+		}
 		// tea.Sequence returns an unexported []tea.Cmd; unpack it by reflection.
 		if v := reflect.ValueOf(msg); v.Kind() == reflect.Slice && v.Type().Elem() == cmdType {
 			for i := range v.Len() {
