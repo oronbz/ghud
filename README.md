@@ -10,7 +10,7 @@ And you can act on it, not just look at it. Approve a PR, move a ticket along, c
 
 - **Make it yours.** Drag Widgets around with the mouse or move them with vim keys, resize them, and hide what you don't need.
 - **Works with the tools you already use.** GitHub, Jira, your macOS calendar and reminders, and any shell command. Missing something? Write a Plugin in any language.
-- **Always one key away.** Run it in Ghostty, or open it as a full-screen popup in [herdr](https://herdr.dev) and close it with the same key.
+- **Always one key away.** Run it in Ghostty, or open it over your tab in [herdr](https://herdr.dev) and close it with the same key.
 - **Nothing to host.** It's a single app on your machine, and your tokens stay in your system keyring.
 
 ## Install
@@ -120,9 +120,33 @@ herdr plugin install oronbz/ghud/herdr
 
 When ghud is already on your `PATH` it does nothing. It never upgrades ghud and never asks anything. Without Homebrew it stops and prints the other ways to install. To upgrade later, use `brew upgrade ghud`.
 
+### Open ghud with one key
+
+The plugin above also gives herdr a `ghud.toggle` action. Bind it in herdr's `config.toml` (`~/.config/herdr/config.toml`) and run `herdr server reload-config`:
+
+```toml
+[[keys.command]]
+key = "cmd+shift+g"
+type = "plugin_action"
+command = "ghud.toggle"
+description = "ghud"
+
+[[keys.command]]
+key = "prefix+d"
+type = "plugin_action"
+command = "ghud.toggle"
+description = "ghud"
+```
+
+`cmd+shift+g` or `prefix+d` opens ghud over the whole tab you're in, and the same key closes it and brings your panes back. herdr's sidebar stays visible and clickable while ghud is open. If you switch to another tab and press the key, ghud moves to that tab. `q` quits ghud too.
+
+ghud runs in a real herdr pane here, so right-click opens ghud's Action menus, as it does in a tab.
+
+If you installed the plugin before it had this action, run `herdr plugin update ghud` first.
+
 ### Open ghud as a popup
 
-Add this to herdr's `config.toml` (`~/.config/herdr/config.toml`) and run `herdr server reload-config`:
+Without the plugin, a herdr popup works too, but it covers the sidebar and takes every click until it closes:
 
 ```toml
 [[keys.command]]
@@ -132,17 +156,9 @@ command = "ghud --close-key cmd+shift+g --close-key 'ctrl+b d'"
 description = "ghud"
 width = "100%"
 height = "100%"
-
-[[keys.command]]
-key = "prefix+d"
-type = "popup"
-command = "ghud --close-key cmd+shift+g --close-key 'ctrl+b d'"
-description = "ghud"
-width = "100%"
-height = "100%"
 ```
 
-`cmd+shift+g` or `prefix+d` opens ghud over whatever you're doing, and the same key closes it again. A herdr popup sends every key to ghud, so `--close-key` is how ghud knows which keys should close it. It takes herdr's key syntax, either a chord (`cmd+shift+g`) or a sequence of two (`'ctrl+b d'`), and you can pass it more than once. If you changed herdr's prefix, change `ctrl+b` to match.
+A herdr popup sends every key to ghud, so `--close-key` is how ghud knows which keys should close it. It takes herdr's key syntax, either a chord (`cmd+shift+g`) or a sequence of two (`'ctrl+b d'`), and you can pass it more than once. If you changed herdr's prefix, change `ctrl+b` to match.
 
 Right-click can't reach a popup, so everything in a right-click menu is on the keyboard too (`ctrl+k`).
 
@@ -150,7 +166,7 @@ Right-click can't reach a popup, so everything in a right-click menu is on the k
 
 You can also keep ghud open next to your agents. Open a new herdr tab, name it ghud and run `ghud` in it (no `--close-key` needed, `q` quits). The tab stays there when you detach and come back.
 
-In a tab, ghud turns on right-click for its pane when it starts, so right-click opens ghud's Action menus, and it gives right-click back to herdr when it quits. A popup and a tab can run at the same time, and they stay in sync.
+In a tab, ghud turns on right-click for its pane when it starts, so right-click opens ghud's Action menus, and it gives right-click back to herdr when it quits. ghud in a tab and ghud opened with a key can run at the same time, and they stay in sync.
 
 ## Agent skills
 

@@ -1,6 +1,6 @@
 ---
 name: ghud-configure
-description: Set up or change ghud, the terminal dashboard. Use when adding, removing or tuning ghud Widgets and their settings, changing its theme or colours, or binding a herdr key that opens ghud as a popup.
+description: Set up or change ghud, the terminal dashboard. Use when adding, removing or tuning ghud Widgets and their settings, changing its theme or colours, or binding a herdr key that opens ghud.
 ---
 
 # Configure ghud
@@ -36,9 +36,21 @@ Done when: the file parses as TOML, every key you wrote appears for its Widget t
 
 Running instances pick up the change at once. A key ghud can't use shows as a footer toast `config.toml:LINE: …` and puts that Widget in *needs setup*, which tells you what to fix.
 
-## herdr popup
+## herdr key
 
-When the user runs herdr and wants a key that opens ghud: append to herdr's `~/.config/herdr/config.toml`, after checking that file doesn't bind the key already:
+When the user runs herdr and wants a key that opens ghud: check `herdr plugin list` shows the `ghud` plugin, and have the user run `herdr plugin install oronbz/ghud/herdr` (or `herdr plugin update ghud` when `herdr plugin action list --plugin ghud` lacks `toggle`) if not. Then append to herdr's `~/.config/herdr/config.toml`, after checking that file doesn't bind the key already, and run `herdr server reload-config`:
+
+```toml
+[[keys.command]]
+key = "cmd+shift+g"
+type = "plugin_action"
+command = "ghud.toggle"
+description = "ghud"
+```
+
+The action opens ghud over the current tab and closes it on the next press, while herdr's sidebar stays clickable. herdr handles the key, so ghud needs no `--close-key` here.
+
+Only when the user wants no herdr plugin, bind a popup instead. It covers the sidebar and keeps all input until ghud exits, so `--close-key` must repeat the same key:
 
 ```toml
 [[keys.command]]
@@ -50,4 +62,4 @@ width = "100%"
 height = "100%"
 ```
 
-The popup keeps all input until ghud exits, so `--close-key` must repeat the same key: that is what makes one key both open and close it. `--close-key` takes herdr's key syntax and repeats; a two-key sequence such as `--close-key 'ctrl+b d'` also works.
+`--close-key` takes herdr's key syntax and repeats; a two-key sequence such as `--close-key 'ctrl+b d'` also works.

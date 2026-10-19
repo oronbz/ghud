@@ -11,7 +11,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
-// herdr's default prefix, which "prefix+d" in the snippet stands for.
+// herdr's default prefix, which "prefix+" in a snippet stands for.
 const herdrPrefix = "ctrl+b"
 
 func readme(t *testing.T) string {
@@ -23,45 +23,76 @@ func readme(t *testing.T) string {
 	return string(raw)
 }
 
-// Each bind in the README snippet must be one of the --close-keys it passes,
-// or the popup can be opened with a key that doesn't close it.
-func TestReadmeHerdrBindsCloseThePopupTheyOpen(t *testing.T) {
-	var snippet string
+type keyCommand struct {
+	Key, Type, Command, Description, Width, Height string
+}
+
+// readmeBinds returns the [[keys.command]] entries of every ```toml block in
+// the README, keyed by the block's type.
+func readmeBinds(t *testing.T) map[string][]keyCommand {
+	t.Helper()
+	binds := map[string][]keyCommand{}
 	for _, block := range regexp.MustCompile("(?s)```toml\n(.*?)```").FindAllStringSubmatch(readme(t), -1) {
-		if strings.Contains(block[1], "[[keys.command]]") {
-			snippet = block[1]
+		if !strings.Contains(block[1], "[[keys.command]]") {
+			continue
+		}
+		var cfg struct {
+			Keys struct{ Command []keyCommand }
+		}
+		if err := toml.Unmarshal([]byte(block[1]), &cfg); err != nil {
+			t.Fatalf("snippet isn't valid TOML: %v\n%s", err, block[1])
+		}
+		for _, c := range cfg.Keys.Command {
+			binds[c.Type] = append(binds[c.Type], c)
 		}
 	}
-	if snippet == "" {
-		t.Fatal("README has no ```toml block with [[keys.command]]")
+	return binds
+}
+
+// The README binds the toggle action this plugin's manifest declares.
+func TestReadmeHerdrBindsRunThePluginsToggle(t *testing.T) {
+	raw, err := os.ReadFile("herdr-plugin.toml")
+	if err != nil {
+		t.Fatal(err)
 	}
-	var cfg struct {
-		Keys struct {
-			Command []struct {
-				Key, Type, Command, Description, Width, Height string
-			}
-		}
+	var m struct {
+		ID      string
+		Actions []struct{ ID string }
 	}
-	if err := toml.Unmarshal([]byte(snippet), &cfg); err != nil {
-		t.Fatalf("snippet isn't valid TOML: %v", err)
+	if err := toml.Unmarshal(raw, &m); err != nil {
+		t.Fatal(err)
 	}
+	want := m.ID + "." + m.Actions[0].ID
 	var keys []string
-	for _, c := range cfg.Keys.Command {
+	for _, c := range readmeBinds(t)["plugin_action"] {
 		keys = append(keys, c.Key)
-		if c.Type != "popup" || c.Width != "100%" || c.Height != "100%" {
-			t.Errorf("%s: type %q %s×%s, want a 100%%×100%% popup", c.Key, c.Type, c.Width, c.Height)
+		if c.Command != want {
+			t.Errorf("%s: runs %q, want %q", c.Key, c.Command, want)
 		}
-		closeKeys := closeKeysOf(t, c.Command)
+	}
+	if want := []string{"cmd+shift+g", "prefix+d"}; !reflect.DeepEqual(keys, want) {
+		t.Errorf("plugin_action binds = %q, want %q", keys, want)
+	}
+}
+
+// Each popup bind must be one of the --close-keys it passes, or the popup can
+// be opened with a key that doesn't close it.
+func TestReadmeHerdrPopupBindsCloseThePopupTheyOpen(t *testing.T) {
+	popups := readmeBinds(t)["popup"]
+	if len(popups) == 0 {
+		t.Fatal("README has no popup bind")
+	}
+	for _, c := range popups {
+		if c.Width != "100%" || c.Height != "100%" {
+			t.Errorf("%s: %s×%s, want a 100%%×100%% popup", c.Key, c.Width, c.Height)
+		}
 		bind, err := closekey.Parse(strings.Replace(c.Key, "prefix+", herdrPrefix+" ", 1))
 		if err != nil {
 			t.Fatalf("%s: %v", c.Key, err)
 		}
-		if !containsSeq(closeKeys, bind) {
+		if !containsSeq(closeKeysOf(t, c.Command), bind) {
 			t.Errorf("%s: %q has no --close-key for it", c.Key, c.Command)
 		}
-	}
-	if want := []string{"cmd+shift+g", "prefix+d"}; !reflect.DeepEqual(keys, want) {
-		t.Errorf("binds = %q, want %q", keys, want)
 	}
 }
 

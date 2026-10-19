@@ -1,9 +1,22 @@
 id = "ghud"
 name = "ghud"
-version = "0.1.0"
+version = "0.2.0"
 min_herdr_version = "0.8.0"
-description = "Install ghud, a god's-eye HUD for your day, if it's missing."
+description = "Install ghud, a god's-eye HUD for your day, if it's missing, and open it over the current tab with one key."
 platforms = ["macos", "linux"]
 
 [[build]]
 command = ["bash", "install-ghud.sh"]
+
+[[panes]]
+id = "ghud"
+title = "ghud"
+placement = "overlay"
+command = ["ghud"]
+
+[[actions]]
+id = "toggle"
+title = "ghud: open or close"
+description = "Open ghud over the current tab, or close it when it's open there."
+contexts = ["global"]
+command = ["bash", "toggle-ghud.sh"]

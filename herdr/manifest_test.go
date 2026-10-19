@@ -11,7 +11,7 @@ import (
 
 // The rules herdr 0.9.5 applies when it installs a plugin (manifest.rs), so a
 // bad manifest fails here rather than on a user's herdr plugin install.
-func TestManifestIsAValidHerdrBuildOnlyPlugin(t *testing.T) {
+func TestManifestIsAValidHerdrPlugin(t *testing.T) {
 	raw, err := os.ReadFile("herdr-plugin.toml")
 	if err != nil {
 		t.Fatal(err)
@@ -21,6 +21,14 @@ func TestManifestIsAValidHerdrBuildOnlyPlugin(t *testing.T) {
 		MinHerdrVersion                string `toml:"min_herdr_version"`
 		Platforms                      []string
 		Build                          []struct{ Command []string }
+		Panes                          []struct {
+			ID, Title, Placement string
+			Command              []string
+		}
+		Actions []struct {
+			ID, Title, Description string
+			Contexts, Command      []string
+		}
 	}
 	if err := toml.NewDecoder(bytes.NewReader(raw)).DisallowUnknownFields().Decode(&m); err != nil {
 		t.Fatal(err)
@@ -52,5 +60,18 @@ func TestManifestIsAValidHerdrBuildOnlyPlugin(t *testing.T) {
 	}
 	if _, err := os.Stat(cmd[1]); err != nil {
 		t.Errorf("build script: %v", err)
+	}
+
+	localID := regexp.MustCompile(`^[A-Za-z0-9:_-]+$`)
+	if len(m.Panes) != 1 || m.Panes[0].ID != "ghud" || m.Panes[0].Placement != "overlay" {
+		t.Fatalf("panes = %+v, want one overlay pane with id ghud, which toggle-ghud.sh opens", m.Panes)
+	}
+	if len(m.Actions) != 1 || m.Actions[0].ID != "toggle" {
+		t.Fatalf("actions = %+v, want one action with id toggle, which the README binds", m.Actions)
+	}
+	if a := m.Actions[0]; !localID.MatchString(a.ID) || len(a.Command) != 2 || a.Command[0] != "bash" {
+		t.Errorf("action %q runs %q, want [\"bash\", <script>]", a.ID, a.Command)
+	} else if _, err := os.Stat(a.Command[1]); err != nil {
+		t.Errorf("action script: %v", err)
 	}
 }
