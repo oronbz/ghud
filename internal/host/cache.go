@@ -28,11 +28,11 @@ func cacheStore(o Options) cache.Store {
 
 // cacheKey is Widget p's cache key, or "" for Widgets that aren't cached:
 // only those that fetch are.
-func cacheKey(id string, p placed) string {
+func (m Model) cacheKey(id string, p placed) string {
 	if _, ok := p.widget.(widget.Source); !ok || !p.typ.Fetches {
 		return ""
 	}
-	return cache.Key(id, p.typ.Name, p.block.Settings)
+	return cache.Key(id, p.typ.Name, m.version(), p.block.Settings)
 }
 
 // freshUntil is when an entry last checked at checked, after fails failed

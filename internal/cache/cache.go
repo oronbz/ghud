@@ -44,14 +44,16 @@ type Status struct {
 // Store is the cache directory, ~/.cache/ghud/widgets.
 type Store struct{ Dir string }
 
-// Key names a Widget's entry: its id plus a hash of its type and settings,
-// so changing either starts a new entry.
-func Key(id, typ string, settings widget.Settings) string {
+// Key names a Widget's entry: its id plus a hash of its type, settings and
+// the ghud version, so changing any starts a new entry. An upgrade never shows
+// a payload the previous version built.
+func Key(id, typ, version string, settings widget.Settings) string {
 	b, _ := json.Marshal(struct {
 		ID       string
 		Type     string
+		Version  string
 		Settings widget.Settings
-	}{id, typ, settings})
+	}{id, typ, version, settings})
 	sum := sha256.Sum256(b)
 	safe := strings.Map(func(r rune) rune {
 		if r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '-' || r == '_' {

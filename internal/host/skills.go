@@ -19,11 +19,16 @@ type skillsMsg struct {
 	err     error
 }
 
-func (m Model) skillsInstaller() (skills.Installer, error) {
-	v := m.opts.Version
-	if v == "" {
-		v = version.Version
+// version is the ghud version this Model runs as.
+func (m Model) version() string {
+	if m.opts.Version != "" {
+		return m.opts.Version
 	}
+	return version.Version
+}
+
+func (m Model) skillsInstaller() (skills.Installer, error) {
+	v := m.version()
 	getenv := m.opts.Ports.Getenv
 	if getenv == nil {
 		getenv = func(string) string { return "" }

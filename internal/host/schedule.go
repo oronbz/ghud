@@ -416,7 +416,7 @@ func (m Model) schedule(id string, refresh time.Duration) (problem string) {
 		return ""
 	}
 	iv, problem := interval(p, refresh)
-	s := sched{interval: iv, key: cacheKey(id, p)}
+	s := sched{interval: iv, key: m.cacheKey(id, p)}
 	m.sched[id] = s
 	if e, ok := m.cache.Load(s.key); ok && s.key != "" {
 		m.adopt(id, e)

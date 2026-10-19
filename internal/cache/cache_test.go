@@ -27,12 +27,19 @@ func TestAnEntryReadsBackAsItWasSaved(t *testing.T) {
 		Fails:     2,
 		Status:    cache.Status{Error: "dial tcp: network is unreachable", Reason: "offline", Hint: "Check your connection"},
 	}
-	key := cache.Key("prs", "github-prs", widget.Settings{"query": "is:open"})
+	key := cache.Key("prs", "github-prs", "0.1.0", widget.Settings{"query": "is:open"})
 	if err := store.Save(key, want); err != nil {
 		t.Fatal(err)
 	}
 	got, ok := store.Load(key)
 	if !ok || !reflect.DeepEqual(got, want) {
 		t.Errorf("read back %+v, want %+v", got, want)
+	}
+}
+
+func TestAnUpgradeStartsANewEntry(t *testing.T) {
+	settings := widget.Settings{"query": "is:open"}
+	if cache.Key("prs", "prs", "0.1.0", settings) == cache.Key("prs", "prs", "0.1.1", settings) {
+		t.Error("two ghud versions share a cache entry")
 	}
 }
