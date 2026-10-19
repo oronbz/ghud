@@ -48,6 +48,9 @@ type sched struct {
 	checked time.Time
 	// cached is data read from the cache at start that no refresh has replaced yet.
 	cached bool
+	// waiting is a refresh another instance is making, spun here too until
+	// its entry lands or this instance tries again.
+	waiting bool
 }
 
 type refreshedMsg struct {
@@ -110,7 +113,7 @@ func (m Model) begin(id string, force bool) (Model, tea.Cmd) {
 	if !force && m.fresh(id, now) {
 		return m, m.plan(id, m.next(id, s.checked))
 	}
-	s.busy, s.due = true, time.Time{}
+	s.busy, s.waiting, s.due = true, false, time.Time{}
 	s.timer = m.nextTimer()
 	m.sched[id] = s
 	fetch := func() tea.Msg {
@@ -152,7 +155,7 @@ func (m Model) spun(msg spinMsg) (Model, tea.Cmd) {
 		return m, again()
 	}
 	for _, s := range m.sched {
-		if s.busy {
+		if s.busy || s.waiting {
 			return m, again()
 		}
 	}
@@ -269,6 +272,7 @@ func (m Model) refreshed(msg refreshedMsg) (Model, tea.Cmd) {
 	var limited *widget.RateLimitError
 	switch {
 	case msg.skipped:
+		s.waiting = true
 	case msg.entry != nil:
 		m.sched[msg.id] = s
 		m.adopt(msg.id, *msg.entry)

@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -107,8 +108,8 @@ func (s Store) Save(key string, e Entry) error {
 }
 
 // Lock takes key's fetch lock at now without waiting; ok is false while
-// another instance holds it. A lock taken timeout or more before now was
-// abandoned, and is taken over.
+// another instance holds it. A lock taken timeout or more before now, or by
+// a process that has since exited, was abandoned, and is taken over.
 func (s Store) Lock(key string, now time.Time, timeout time.Duration) (unlock func(), ok bool) {
 	if err := os.MkdirAll(s.Dir, 0o700); err != nil {
 		return nil, false
@@ -117,7 +118,7 @@ func (s Store) Lock(key string, now time.Time, timeout time.Duration) (unlock fu
 	for range 2 {
 		f, err := os.OpenFile(name, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 		if err == nil {
-			_, err = f.WriteString(now.Format(time.RFC3339Nano))
+			_, err = f.WriteString(now.Format(time.RFC3339Nano) + " " + strconv.Itoa(os.Getpid()))
 			f.Close()
 			if err != nil {
 				os.Remove(name)
@@ -132,13 +133,24 @@ func (s Store) Lock(key string, now time.Time, timeout time.Duration) (unlock fu
 		if err != nil {
 			continue
 		}
-		// A lock that doesn't parse is a write cut short, as old as it gets.
-		if at, err := time.Parse(time.RFC3339Nano, string(b)); err == nil && now.Sub(at) < timeout {
+		if held(string(b), now, timeout) {
 			return nil, false
 		}
 		os.Remove(name)
 	}
 	return nil, false
+}
+
+// held is whether a lock reading "<time> <pid>" is still held at now. A lock
+// that doesn't parse is a write cut short, as old as it gets.
+func held(lock string, now time.Time, timeout time.Duration) bool {
+	stamp, owner, _ := strings.Cut(lock, " ")
+	at, err := time.Parse(time.RFC3339Nano, stamp)
+	if err != nil || now.Sub(at) >= timeout {
+		return false
+	}
+	pid, err := strconv.Atoi(owner)
+	return err != nil || running(pid)
 }
 
 // Clean deletes what's in the cache directory that belongs to none of keep

@@ -149,7 +149,7 @@ func (m Model) adopt(id string, e cache.Entry) {
 		fetched = e.FetchedAt
 	}
 	s, _ = m.settle(id, s, e.Payload, fetched, errOf(e.Status))
-	s.checked, s.fails = e.CheckedAt, e.Fails
+	s.checked, s.fails, s.waiting = e.CheckedAt, e.Fails, false
 	m.sched[id] = s
 }
 

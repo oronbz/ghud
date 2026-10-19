@@ -45,12 +45,12 @@ func (m Model) status(id string) status {
 }
 
 // chrome is the Status drawn in Widget id's top border: a spinner while it
-// refreshes, reason and age while it's stale, and the age of data read
-// from the cache until a refresh replaces it.
+// or another instance refreshes it, reason and age while it's stale, and the
+// age of data read from the cache until a refresh replaces it.
 func (m Model) chrome(id string) render.Status {
 	var st render.Status
 	s := m.sched[id]
-	if s.busy {
+	if s.busy || s.waiting {
 		st.Spinner = m.spinner()
 	}
 	switch {

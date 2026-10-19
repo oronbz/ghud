@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -238,13 +241,56 @@ func TestStartRemovesEntriesOfNoConfiguredWidgetOnceTheyreOver30DaysOld(t *testi
 	}
 }
 
-// lockEntry takes root's one cache entry's fetch lock at at, as an instance that then died would.
+// lockEntry takes root's one cache entry's fetch lock at at, as an instance
+// that is still running but never finishes its fetch would.
 func lockEntry(t *testing.T, root string, at time.Time) {
 	t.Helper()
 	file := entryFile(t, root)
 	store := cache.Store{Dir: filepath.Dir(file)}
 	if _, ok := store.Lock(strings.TrimSuffix(filepath.Base(file), ".json"), at, time.Minute); !ok {
 		t.Fatal("the entry's lock is taken")
+	}
+}
+
+// lockEntryByExited leaves root's one cache entry's fetch lock taken at at by
+// a process that has exited, as an instance killed mid-fetch does.
+func lockEntryByExited(t *testing.T, root string, at time.Time) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("ghud can't tell an exited lock owner on Windows")
+	}
+	exited := exec.Command("true")
+	if err := exited.Run(); err != nil {
+		t.Fatal(err)
+	}
+	lock := strings.TrimSuffix(entryFile(t, root), ".json") + ".lock"
+	content := at.Format(time.RFC3339Nano) + " " + strconv.Itoa(exited.Process.Pid)
+	if err := os.WriteFile(lock, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestALockLeftByAnExitedInstanceIsTakenOverAtOnce(t *testing.T) {
+	root, u := t.TempDir(), &upstream{}
+	newsHost(t, u, root, hosttest.DefaultNow)
+	at := hosttest.DefaultNow.Add(2*time.Minute + 30*time.Second)
+	lockEntryByExited(t, root, at.Add(-time.Second))
+
+	h := newsHost(t, u, root, at)
+	if u.count() != 2 || !strings.Contains(h.Screen(), "world edition 2") {
+		t.Errorf("fetched %d times past a second-old lock whose owner exited, want 2; screen:\n%s", u.count(), h.Screen())
+	}
+}
+
+func TestAWidgetSpinsWhileAnotherInstanceFetchesIt(t *testing.T) {
+	root, u := t.TempDir(), &upstream{}
+	h := newsHost(t, u, root, hosttest.DefaultNow)
+	lockEntry(t, root, hosttest.DefaultNow.Add(2*time.Minute))
+	spinner := regexp.MustCompile(`[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏] ─╮$`)
+
+	h.Press("ctrl+r")
+	if !spinner.MatchString(h.Line(0)) {
+		t.Errorf("while another instance holds the lock, the top border is %q, want a spinner", h.Line(0))
 	}
 }
 
