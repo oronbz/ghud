@@ -1,0 +1,113 @@
+# Run through scripts/release.sh, never directly: it pins GoReleaser, verifies a
+# snapshot first and supplies GITHUB_TOKEN from the local gh login.
+version: 2
+
+project_name: ghud
+
+builds:
+  # cgo because go-eventkit (Calendar and Reminders) needs it.
+  - id: ghud-darwin
+    main: ./cmd/ghud
+    binary: ghud
+    env: [CGO_ENABLED=1]
+    goos: [darwin]
+    goarch: [arm64, amd64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X github.com/oronbz/ghud/internal/version.Version={{.Version}}
+
+  - id: ghud-other
+    main: ./cmd/ghud
+    binary: ghud
+    env: [CGO_ENABLED=0]
+    goos: [linux, windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X github.com/oronbz/ghud/internal/version.Version={{.Version}}
+
+  # The Weather Plugin ships beside ghud, which finds it there. Pure Go everywhere.
+  - id: ghud-weather-darwin
+    main: ./cmd/ghud-weather
+    binary: ghud-weather
+    env: [CGO_ENABLED=0]
+    goos: [darwin]
+    goarch: [arm64, amd64]
+    flags: [-trimpath]
+    ldflags: [-s -w]
+
+  - id: ghud-weather-other
+    main: ./cmd/ghud-weather
+    binary: ghud-weather
+    env: [CGO_ENABLED=0]
+    goos: [linux, windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: [-s -w]
+
+universal_binaries:
+  - id: ghud-universal
+    ids: [ghud-darwin]
+    name_template: ghud
+    replace: true
+  - id: ghud-weather-universal
+    ids: [ghud-weather-darwin]
+    name_template: ghud-weather
+    replace: true
+
+archives:
+  - id: ghud
+    ids: [ghud-universal, ghud-other, ghud-weather-universal, ghud-weather-other]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+nfpms:
+  - id: ghud
+    ids: [ghud-other, ghud-weather-other]
+    package_name: ghud
+    file_name_template: "{{ .ConventionalFileName }}"
+    formats: [deb, rpm, apk]
+    vendor: oronbz
+    homepage: https://github.com/oronbz/ghud
+    maintainer: Oron Ben Zvi <1288090+oronbz@users.noreply.github.com>
+    description: A god's-eye HUD for your day, in the terminal.
+    bindir: /usr/bin
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: "{{ .Version }}-snapshot"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^Merge "
+
+release:
+  github:
+    owner: oronbz
+    name: ghud
+  prerelease: auto
+
+# brews is deprecated in favour of homebrew_casks, but a cask would need signing
+# and notarization to avoid quarantine. GoReleaser v3 drops brews; see spec #24 debt.
+brews:
+  - name: ghud
+    ids: [ghud]
+    repository:
+      owner: oronbz
+      name: homebrew-tap
+      token: "{{ .Env.GITHUB_TOKEN }}"
+    homepage: https://github.com/oronbz/ghud
+    description: A god's-eye HUD for your day, in the terminal
+    commit_msg_template: "Update ghud to {{ .Version }}"
+    install: |
+      bin.install "ghud"
+      bin.install "ghud-weather"
+    test: |
+      assert_match version.to_s, shell_output("#{bin}/ghud --version")

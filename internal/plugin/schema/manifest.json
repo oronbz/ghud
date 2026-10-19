@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ghud.dev/schema/manifest.json",
+  "title": "ghud-plugin.toml",
+  "description": "A ghud Plugin's manifest, written in TOML at the root of the Plugin's directory. This schema checks it decoded to JSON.",
+  "type": "object",
+  "required": ["name", "protocol", "command", "widget"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "description": "The Plugin's name: lower-case letters, digits and dashes. Installed Plugins live in plugins/<name>/.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "description": { "type": "string" },
+    "protocol": {
+      "description": "The protocol version the Plugin speaks; ghud refuses other versions with needs setup.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "command": {
+      "description": "The program to run, with its arguments, never through a shell. A path with a slash is relative to the Plugin's directory, which is also its working directory; a bare name is looked up on PATH.",
+      "oneOf": [
+        { "type": "string", "minLength": 1 },
+        { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+      ]
+    },
+    "build": {
+      "description": "Steps `ghud plugin install` runs in the Plugin's directory, in order, with no stdin and no shell.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["run"],
+        "additionalProperties": false,
+        "properties": {
+          "run": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+        }
+      }
+    },
+    "widget": {
+      "description": "The Widget types the Plugin provides, as [[widget]] tables.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/widgetType" }
+    }
+  },
+  "$defs": {
+    "duration": {
+      "description": "A Go duration such as \"30s\", \"5m\" or \"1h30m\".",
+      "type": "string",
+      "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$"
+    },
+    "widgetType": {
+      "type": "object",
+      "required": ["type", "title", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "description": "The `type` a [[widget]] block in config.toml names; unique across ghud and every Plugin.",
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$"
+        },
+        "title": { "description": "The default title in the Widget's top border.", "type": "string", "minLength": 1 },
+        "description": { "description": "One line above the type's block in `ghud config default`.", "type": "string" },
+        "refresh": { "description": "How often ghud sends widget/refresh; omitted is only at start and after Actions.", "$ref": "#/$defs/duration" },
+        "floor": { "description": "The shortest `refresh` a user may set; shorter ones are clamped.", "$ref": "#/$defs/duration" },
+        "default": { "description": "Place a Widget of this type when config.toml places none.", "type": "boolean" },
+        "setting": {
+          "description": "The keys a [[widget]] block of this type takes, as [[widget.setting]] tables.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/setting" }
+        }
+      }
+    },
+    "setting": {
+      "type": "object",
+      "required": ["name", "kind", "default", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "The key, other than type, id, title and refresh, which every Widget takes.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "kind": { "enum": ["string", "bool", "int", "duration"] },
+        "default": { "type": ["string", "boolean", "integer"] },
+        "description": { "type": "string", "minLength": 1 },
+        "why": { "description": "When you'd change it; the config reference prints it.", "type": "string" },
+        "choices": { "description": "The only values a string setting accepts.", "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "required": { "description": "Add Widget writes the setting, at its default, into the block it appends.", "type": "boolean" }
+      },
+      "allOf": [
+        { "if": { "properties": { "kind": { "const": "string" } } }, "then": { "properties": { "default": { "type": "string" } } } },
+        { "if": { "properties": { "kind": { "const": "bool" } } }, "then": { "properties": { "default": { "type": "boolean" } } } },
+        { "if": { "properties": { "kind": { "const": "int" } } }, "then": { "properties": { "default": { "type": "integer" } } } },
+        { "if": { "properties": { "kind": { "const": "duration" } } }, "then": { "properties": { "default": { "$ref": "#/$defs/duration" } } } }
+      ]
+    }
+  }
+}
