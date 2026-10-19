@@ -194,16 +194,12 @@ func priority(p *struct{ Name string }) (string, theme.Token) {
 		return "·", theme.Faint
 	}
 	switch strings.ToLower(p.Name) {
-	case "highest", "blocker", "critical":
-		return "⇈", theme.Bad
-	case "high", "major":
-		return "↑", theme.Bad
+	case "highest", "blocker", "critical", "high", "major":
+		return "▲", theme.Bad
 	case "medium":
-		return "=", theme.Warn
-	case "low", "minor":
-		return "↓", theme.Info
-	case "lowest", "trivial":
-		return "⇊", theme.Info
+		return "■", theme.Warn
+	case "low", "minor", "lowest", "trivial":
+		return "▼", theme.Faint
 	}
 	return "·", theme.Faint
 }

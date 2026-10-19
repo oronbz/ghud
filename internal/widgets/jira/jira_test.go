@@ -75,10 +75,10 @@ func TestJiraListsAssignedIssuesFollowingTheSearchCursor(t *testing.T) {
 		t.Errorf("top border %q, want the title with a count of 5", top)
 	}
 	want := []string{
-		"⇈ OPS-12 Rotate the TLS certificates In Progress",
-		"= OPS-9 Upgrade Postgres to 17 To Do",
-		"↑ WEB-140 Dark mode for settings In Review",
-		"↓ WEB-133 Fix the flaky checkout test To Do",
+		"▲ OPS-12 Rotate the TLS certificates In Progress",
+		"■ OPS-9 Upgrade Postgres to 17 To Do",
+		"▲ WEB-140 Dark mode for settings In Review",
+		"▼ WEB-133 Fix the flaky checkout test To Do",
 		"· API-7 Document the rate limits Backlog",
 	}
 	if got := rows(h); strings.Join(got, "\n") != strings.Join(want, "\n") {
@@ -88,7 +88,7 @@ func TestJiraListsAssignedIssuesFollowingTheSearchCursor(t *testing.T) {
 	for _, c := range []struct {
 		text string
 		want theme.Token
-	}{{"In Progress", theme.Accent}, {"To Do", theme.Dim}, {"⇈", theme.Bad}, {"=", theme.Warn}, {"↓", theme.Info}} {
+	}{{"In Progress", theme.Accent}, {"To Do", theme.Dim}, {"▲", theme.Bad}, {"■", theme.Warn}, {"▼", theme.Faint}} {
 		x, y, ok := h.Find(c.text)
 		if !ok {
 			t.Errorf("%q not on screen", c.text)
