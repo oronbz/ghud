@@ -42,6 +42,11 @@ if [ -x "$("$brew" --prefix)/bin/ghud" ]; then
   exit 0
 fi
 
-echo "Installing ghud: $brew install $formula"
-HOMEBREW_NO_INSTALL_UPGRADE=1 "$brew" install "$formula"
+# brew's own output (auto-update news, hints, other taps' warnings) is shown
+# only when the install fails.
+echo "Installing ghud with Homebrew..."
+if ! out="$(HOMEBREW_NO_INSTALL_UPGRADE=1 HOMEBREW_NO_ENV_HINTS=1 "$brew" install "$formula" 2>&1)"; then
+  printf 'brew install %s failed:\n%s\n' "$formula" "$out" >&2
+  exit 1
+fi
 echo "ghud is installed. Run ghud, or bind it to a key in herdr (see https://github.com/oronbz/ghud#herdr)."

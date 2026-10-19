@@ -98,7 +98,7 @@ func TestGhudOnPathIsLeftAlone(t *testing.T) {
 	}
 }
 
-func TestMissingGhudIsInstalledWithBrewWithoutUpgrading(t *testing.T) {
+func TestMissingGhudIsInstalledQuietlyWithBrewWithoutUpgrading(t *testing.T) {
 	m := newMachine(t)
 	m.brew(m.path, t.TempDir(), 0)
 
@@ -111,8 +111,11 @@ func TestMissingGhudIsInstalledWithBrewWithoutUpgrading(t *testing.T) {
 	if strings.Join(r.calls, "|") != strings.Join(want, "|") {
 		t.Errorf("brew calls = %q, want %q", r.calls, want)
 	}
-	if !strings.Contains(r.stdout, "==> Installing ghud") {
-		t.Errorf("brew's output was not shown: %q", r.stdout)
+	if strings.Contains(r.stdout+r.stderr, "==> Installing ghud") {
+		t.Errorf("brew's own output was shown after it succeeded: %q", r.stdout+r.stderr)
+	}
+	if !strings.Contains(r.stdout, "ghud is installed") {
+		t.Errorf("stdout lacks the success line: %q", r.stdout)
 	}
 }
 
@@ -166,7 +169,7 @@ func TestWithoutBrewTheInstallOptionsArePrinted(t *testing.T) {
 	}
 }
 
-func TestAFailedBrewInstallFailsTheBuild(t *testing.T) {
+func TestAFailedBrewInstallFailsTheBuildAndShowsBrewsOutput(t *testing.T) {
 	m := newMachine(t)
 	m.brew(m.path, t.TempDir(), 3)
 
@@ -174,5 +177,8 @@ func TestAFailedBrewInstallFailsTheBuild(t *testing.T) {
 
 	if r.code == 0 {
 		t.Fatal("exit 0 after brew failed")
+	}
+	if !strings.Contains(r.stderr, "==> Installing ghud") {
+		t.Errorf("brew's output wasn't shown after it failed: %q", r.stderr)
 	}
 }
