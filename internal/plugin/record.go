@@ -49,19 +49,19 @@ const buried = ".uninstalled"
 type Tombstone struct {
 	Name    string `json:"name"`
 	Record  Record `json:"record"`
-	Widgets []struct {
-		Type  string `json:"type"`
-		Title string `json:"title"`
-	} `json:"widgets"`
+	Widgets []BuriedWidget `json:"widgets"`
+}
+
+// BuriedWidget is a Widget type of an uninstalled Plugin.
+type BuriedWidget struct {
+	Type  string `json:"type"`
+	Title string `json:"title"`
 }
 
 func Bury(pluginsDir string, m Manifest, rec Record) error {
 	t := Tombstone{Name: m.Name, Record: rec}
 	for _, wt := range m.Widgets {
-		t.Widgets = append(t.Widgets, struct {
-			Type  string `json:"type"`
-			Title string `json:"title"`
-		}{wt.Type, wt.Title})
+		t.Widgets = append(t.Widgets, BuriedWidget{Type: wt.Type, Title: wt.Title})
 	}
 	b, err := json.MarshalIndent(t, "", "  ")
 	if err != nil {
@@ -102,7 +102,6 @@ func Buried(pluginsDir string, taken []string) []widget.Type {
 	return types
 }
 
-// missing is the needs-setup hint of a gone Plugin's Widgets.
 func missing(name string, rec Record) string {
 	hint := fmt.Sprintf("Plugin `%s` isn't installed", name)
 	if rec.Source != "" {
