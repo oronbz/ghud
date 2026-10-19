@@ -265,3 +265,7 @@ The quickest way is to ask your agent to use the `visor-make-plugin` skill. By h
 5. To publish, push it to GitHub and add the `visor-plugin` topic to the repo. People install it with `visor plugin install you/hello`.
 
 Plugins draw only with visor's 13 colour tokens, never raw colours, so they follow the user's theme.
+
+## Inspiration
+
+visor was inspired by [mirador](https://github.com/jchultarsky/mirador), a personal dashboard for your terminal by Julian Chultarsky (@jchultarsky).
