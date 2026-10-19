@@ -5,6 +5,7 @@ package paths
 import (
 	"errors"
 	"path/filepath"
+	"strings"
 )
 
 type Paths struct {
@@ -20,6 +21,33 @@ func Under(root string) Paths {
 		Data:   filepath.Join(root, "data", "ghud"),
 		Cache:  filepath.Join(root, "cache", "ghud"),
 	}
+}
+
+// Home is the home directory getenv gives: HOME, else USERPROFILE (Windows
+// sets only that), else "".
+func Home(getenv func(string) string) string {
+	if getenv == nil {
+		return ""
+	}
+	if h := getenv("HOME"); h != "" {
+		return h
+	}
+	return getenv("USERPROFILE")
+}
+
+// Expand resolves a leading `~` or `~/` in p against home. Any other p, or
+// an empty home, leaves p as it is.
+func Expand(p, home string) string {
+	if home == "" {
+		return p
+	}
+	if p == "~" {
+		return home
+	}
+	if rest, ok := strings.CutPrefix(p, "~/"); ok {
+		return filepath.Join(home, rest)
+	}
+	return p
 }
 
 // Resolve applies XDG base directories, then the OS default: ~/.config,
@@ -39,7 +67,7 @@ func Resolve(getenv func(string) string, goos string) (Paths, error) {
 			}
 			return filepath.Join(base, "ghud", winSub), nil
 		}
-		home := getenv("HOME")
+		home := Home(getenv)
 		if home == "" {
 			return "", errors.New("paths: $HOME is not set")
 		}

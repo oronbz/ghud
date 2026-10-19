@@ -7,35 +7,27 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/gofrs/flock"
+
+	"github.com/oronbz/ghud/internal/paths"
 )
 
 // DataFile resolves a Widget's `file` setting: empty means def in the data
 // dir, a relative path is under the data dir, and `~/` is the home dir
-// (the data dir when there's no HOME).
+// (the data dir when there's no home).
 func (c Config) DataFile(file, def string) string {
-	switch {
-	case file == "":
+	if file == "" {
 		return filepath.Join(c.DataDir, def)
-	case strings.HasPrefix(file, "~/"):
-		return filepath.Join(c.home(), file[2:])
-	case !filepath.IsAbs(file):
+	}
+	home := paths.Home(c.Ports.Getenv)
+	if home == "" {
+		home = c.DataDir
+	}
+	if file = paths.Expand(file, home); !filepath.IsAbs(file) {
 		return filepath.Join(c.DataDir, file)
 	}
 	return file
-}
-
-func (c Config) home() string {
-	if c.Ports.Getenv != nil {
-		for _, k := range []string{"HOME", "USERPROFILE"} {
-			if h := c.Ports.Getenv(k); h != "" {
-				return h
-			}
-		}
-	}
-	return c.DataDir
 }
 
 // WriteFile replaces path atomically (temp file plus rename), so a reader

@@ -3,7 +3,6 @@ package host
 import (
 	"path/filepath"
 	"slices"
-	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -91,12 +90,7 @@ func PluginPaths(configFile string, loc config.Locale, getenv func(string) strin
 // pluginPath resolves a [[plugin]] path: ~/ is the home directory and a
 // relative path is relative to config.toml.
 func (m Model) pluginPath(configFile, p string) string {
-	if rest, ok := strings.CutPrefix(p, "~/"); ok {
-		if home := m.opts.Ports.Getenv("HOME"); home != "" {
-			return filepath.Join(home, rest)
-		}
-	}
-	if filepath.IsAbs(p) {
+	if p = paths.Expand(p, paths.Home(m.opts.Ports.Getenv)); filepath.IsAbs(p) {
 		return p
 	}
 	return filepath.Join(filepath.Dir(configFile), p)
