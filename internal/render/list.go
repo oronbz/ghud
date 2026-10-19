@@ -138,6 +138,10 @@ func row(th theme.Theme, p widget.Payload, item int, widths []int, w int, select
 	return ansi.Truncate(b.String(), w, "")
 }
 
+// oneLine keeps a field on its row: a newline in its text, from a multiline
+// reminder or a Plugin, would otherwise split the list's rows apart.
+var oneLine = strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ", "\t", " ").Replace
+
 // fieldText styles a field; on the selected row, plain text turns bright and bold.
 func fieldText(th theme.Theme, f widget.Field, bg lipgloss.Style, selected bool) string {
 	var b strings.Builder
@@ -149,7 +153,7 @@ func fieldText(th theme.Theme, f widget.Field, bg lipgloss.Style, selected bool)
 		if s.Bg != theme.Bg {
 			st = st.Background(th.Color(s.Bg))
 		}
-		b.WriteString(st.Render(s.Text))
+		b.WriteString(st.Render(oneLine(s.Text)))
 	}
 	return b.String()
 }
@@ -223,7 +227,7 @@ func columnWidths(p widget.Payload, w int) []int {
 func fieldWidth(f widget.Field) int {
 	n := 0
 	for _, s := range f {
-		n += ansi.StringWidth(s.Text)
+		n += ansi.StringWidth(oneLine(s.Text))
 	}
 	return n
 }

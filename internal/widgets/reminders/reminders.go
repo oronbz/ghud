@@ -1,10 +1,9 @@
-// Package reminders is the Reminders Widget type: the open reminders from
-// every list in Reminders.app. Like Meetings it reads EventKit through
+// Package reminders is the Reminders Widget type: the open reminders due
+// today or overdue, from every list in Reminders.app, like its Today list. Like Meetings it reads EventKit through
 // ports.EventKit, so the host registers it on darwin only.
 package reminders
 
 import (
-	"cmp"
 	"context"
 	"fmt"
 	"slices"
@@ -19,7 +18,7 @@ import (
 var Type = widget.Type{
 	Name:        "reminders",
 	Title:       "Reminders",
-	Description: "Open reminders from every list in Reminders.app (macOS).",
+	Description: "Reminders due today or overdue, from every list in Reminders.app (macOS).",
 	Refresh:     time.Minute,
 	Fetches:     true,
 	OptIn:       true,
@@ -41,12 +40,11 @@ func (r *reminders) Refresh(ctx context.Context, now time.Time) (widget.Payload,
 	if err != nil {
 		return widget.Payload{}, err
 	}
-	slices.SortStableFunc(rs, func(a, b ports.Reminder) int {
-		if a.Due.IsZero() || b.Due.IsZero() {
-			return cmp.Compare(btoi(a.Due.IsZero()), btoi(b.Due.IsZero()))
-		}
-		return a.Due.Compare(b.Due)
+	tomorrow := midnight(now).AddDate(0, 0, 1)
+	rs = slices.DeleteFunc(rs, func(rm ports.Reminder) bool {
+		return rm.Due.IsZero() || !rm.Due.In(now.Location()).Before(tomorrow)
 	})
+	slices.SortStableFunc(rs, func(a, b ports.Reminder) int { return a.Due.Compare(b.Due) })
 
 	lists := map[string]bool{}
 	for _, rm := range rs {
@@ -54,7 +52,7 @@ func (r *reminders) Refresh(ctx context.Context, now time.Time) (widget.Payload,
 	}
 	p := widget.Payload{
 		Columns: []widget.Column{{}, {Flex: true}, {Priority: 1, Right: true}},
-		Empty:   "No open reminders",
+		Empty:   "Nothing due today",
 		Count:   len(rs),
 	}
 	if len(lists) > 1 {
@@ -93,31 +91,20 @@ func (r *reminders) Invoke(ctx context.Context, inv widget.Invocation) (widget.R
 }
 
 // dueLabel reads like Tasks' due labels; a time of day shows as the time
-// while it's still today.
+// while it's still ahead.
 func (r *reminders) dueLabel(rm ports.Reminder, now time.Time) (string, theme.Token) {
-	if rm.Due.IsZero() {
-		return "", theme.Dim
-	}
-	loc := now.Location()
-	due := rm.Due.In(loc)
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
-	day := time.Date(due.Year(), due.Month(), due.Day(), 0, 0, 0, 0, loc)
-	days := int(day.Sub(today).Hours() / 24)
+	due := rm.Due.In(now.Location())
 	switch {
-	case days < 0, days == 0 && !rm.DateOnly && due.Before(now):
+	case due.Before(midnight(now)), !rm.DateOnly && due.Before(now):
 		return "overdue", theme.Bad
-	case days == 0 && rm.DateOnly:
+	case rm.DateOnly:
 		return "today", theme.Warn
-	case days == 0:
-		return r.clock(due), theme.Warn
-	case days == 1:
-		return "tomorrow", theme.Dim
-	case days < 7:
-		return due.Format("Mon"), theme.Dim
-	case due.Year() == now.Year():
-		return due.Format("2 Jan"), theme.Dim
 	}
-	return due.Format("2 Jan 2006"), theme.Dim
+	return r.clock(due), theme.Warn
+}
+
+func midnight(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
 }
 
 func (r *reminders) clock(t time.Time) string {
@@ -125,11 +112,4 @@ func (r *reminders) clock(t time.Time) string {
 		return t.Format("3:04 PM")
 	}
 	return t.Format("15:04")
-}
-
-func btoi(b bool) int {
-	if b {
-		return 1
-	}
-	return 0
 }

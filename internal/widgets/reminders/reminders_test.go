@@ -25,6 +25,8 @@ func list() []ports.Reminder {
 		{ID: "passport", Title: "Renew passport", List: "Personal", Due: on(2, 0, 0), DateOnly: true},
 		{ID: "dentist", Title: "Call the dentist", List: "Personal", Due: on(0, 16, 30)},
 		{ID: "taxes", Title: "File taxes", List: "Personal", Due: on(-3, 0, 0), DateOnly: true},
+		{ID: "plants", Title: "Water the plants", List: "Home", Due: on(0, 0, 0), DateOnly: true},
+		{ID: "bins", Title: "Take the bins out", List: "Home", Due: on(0, 9, 0)},
 	}
 }
 
@@ -56,13 +58,14 @@ func body(h *hosttest.Host) []string {
 	return out
 }
 
-func TestOpenRemindersAreListedByDueDateWithUndatedOnesLast(t *testing.T) {
+func TestRemindersDueTodayOrOverdueAreListedByDueDate(t *testing.T) {
 	h := withReminders(t, granted(list()), 60, 10)
 	want := []string{
-		"○ File taxes                           Personal  overdue",
-		"○ Call the dentist                     Personal    16:30",
-		"○ Renew passport                       Personal      Tue",
-		"○ Buy milk                             Groceries",
+		"○ File taxes                            Personal overdue",
+		"○ Water the plants                      Home       today",
+		"○ Take the bins out                     Home     overdue",
+		"○ Call the dentist                      Personal   16:30",
+		"",
 	}
 	got := body(h)
 	for i, line := range want {
@@ -70,8 +73,13 @@ func TestOpenRemindersAreListedByDueDateWithUndatedOnesLast(t *testing.T) {
 			t.Fatalf("body line %d = %q, want %q\nscreen:\n%s", i, at(got, i), line, h.Screen())
 		}
 	}
+	for _, later := range []string{"Renew passport", "Buy milk"} {
+		if _, _, ok := h.Find(later); ok {
+			t.Errorf("%q isn't due today but is listed:\n%s", later, h.Screen())
+		}
+	}
 	if _, _, ok := h.Find("Reminders 4"); !ok {
-		t.Errorf("title doesn't count the open reminders:\n%s", h.Screen())
+		t.Errorf("title doesn't count the reminders due today:\n%s", h.Screen())
 	}
 	x, y, _ := h.Find("overdue")
 	if tok, _ := h.Fg(x, y); tok != theme.Bad {
@@ -103,7 +111,7 @@ func TestSpaceCompletesTheSelectedReminderToastsAndRefreshes(t *testing.T) {
 
 func TestEnterOpensTheSelectedReminderInRemindersApp(t *testing.T) {
 	h := withReminders(t, granted(list()), 60, 10)
-	h.Press("1", "j", "enter")
+	h.Press("1", "j", "j", "j", "enter")
 	want := []string{"x-apple-reminderkit://REMCDReminder/dentist"}
 	if !slices.Equal(h.Opener.Opened, want) {
 		t.Errorf("opened %q, want %q", h.Opener.Opened, want)
@@ -117,12 +125,12 @@ func TestEnterOpensTheSelectedReminderInRemindersApp(t *testing.T) {
 
 func TestOneListLeavesTheListColumnOut(t *testing.T) {
 	h := withReminders(t, granted([]ports.Reminder{
-		{ID: "a", Title: "Water the plants", List: "Home"},
-		{ID: "b", Title: "Fix the tap", List: "Home", Due: on(1, 0, 0), DateOnly: true},
+		{ID: "a", Title: "Water the plants", List: "Home", Due: on(0, 0, 0), DateOnly: true},
+		{ID: "b", Title: "Fix the tap", List: "Home", Due: on(-1, 0, 0), DateOnly: true},
 	}), 50, 8)
 	want := []string{
-		"○ Fix the tap                         tomorrow",
-		"○ Water the plants",
+		"○ Fix the tap                          overdue",
+		"○ Water the plants                       today",
 	}
 	got := body(h)
 	for i, line := range want {
@@ -152,7 +160,7 @@ func TestUndeterminedAccessNeedsSetupAndEnterAsksForIt(t *testing.T) {
 	if !slices.Equal(ek.Requests, []ports.Entity{ports.Reminders}) {
 		t.Errorf("enter requested %v, want reminders access", ek.Requests)
 	}
-	if _, _, ok := h.Find("Buy milk"); !ok {
+	if _, _, ok := h.Find("File taxes"); !ok {
 		t.Errorf("granting access doesn't show the reminders:\n%s", h.Screen())
 	}
 }
@@ -181,4 +189,31 @@ func at(lines []string, i int) string {
 		return lines[i]
 	}
 	return "<missing>"
+}
+
+func TestAMultilineReminderStaysOnItsRow(t *testing.T) {
+	h := withReminders(t, granted([]ports.Reminder{
+		{ID: "a", Title: "ClaudeDevs (@ClaudeDevs)\n1.1K likes · 71 replies", List: "Home", Due: on(0, 0, 0), DateOnly: true},
+		{ID: "b", Title: "Fix the tap", List: "Home", Due: on(0, 0, 0), DateOnly: true},
+	}), 70, 8)
+	want := []string{
+		"○ ClaudeDevs (@ClaudeDevs) 1.1K likes · 71 replies           today",
+		"○ Fix the tap                                                today",
+	}
+	got := body(h)
+	for i, line := range want {
+		if i >= len(got) || got[i] != line {
+			t.Fatalf("body line %d = %q, want %q\nscreen:\n%s", i, at(got, i), line, h.Screen())
+		}
+	}
+}
+
+func TestNothingDueTodaySaysSo(t *testing.T) {
+	h := withReminders(t, granted([]ports.Reminder{
+		{ID: "a", Title: "Buy milk", List: "Home"},
+		{ID: "b", Title: "Renew passport", List: "Home", Due: on(3, 0, 0), DateOnly: true},
+	}), 50, 8)
+	if _, _, ok := h.Find("Nothing due today"); !ok {
+		t.Errorf("no empty message:\n%s", h.Screen())
+	}
 }
