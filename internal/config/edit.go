@@ -2,8 +2,6 @@ package config
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -12,8 +10,6 @@ import (
 	"reflect"
 	"slices"
 	"strings"
-
-	"github.com/gofrs/flock"
 
 	"github.com/oronbz/ghud/internal/widget"
 )
@@ -48,15 +44,11 @@ type Ref struct {
 // as explicit blocks, a missing file starting from the full reference, so
 // the edit can't change which Widgets exist by accident.
 func (e Editor) Edit(change func(src []byte, c Config) ([]byte, error), check func(before, after Config) error) error {
-	if err := os.MkdirAll(e.LockDir, 0o755); err != nil {
+	unlock, err := widget.Lock(widget.LockFile(e.LockDir, "config", e.Path))
+	if err != nil {
 		return err
 	}
-	sum := sha256.Sum256([]byte(e.Path))
-	l := flock.New(filepath.Join(e.LockDir, "config-"+hex.EncodeToString(sum[:8])+".lock"))
-	if err := l.Lock(); err != nil {
-		return err
-	}
-	defer l.Unlock()
+	defer unlock()
 
 	name := filepath.Base(e.Path)
 	src, err := os.ReadFile(e.Path)
