@@ -143,8 +143,9 @@ func (m Model) pushed(msg pushedMsg) (Model, tea.Cmd) {
 		fetched, p = now, *msg.push.Payload
 	}
 	s, _ = m.settle(msg.id, s, p, fetched, msg.push.Err)
+	s, write := m.cachePush(s, msg.push, now)
 	m.sched[msg.id] = s
-	m.sched[msg.id] = m.cachePush(msg.id, msg.push, now)
+	cmds = append(cmds, write)
 	m.clampList(msg.id)
 	if at := msg.push.Retry; !at.IsZero() {
 		id, from := msg.id, msg.from

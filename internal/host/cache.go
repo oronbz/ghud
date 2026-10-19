@@ -1,7 +1,9 @@
 package host
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"path/filepath"
 	"slices"
@@ -101,23 +103,44 @@ func record(e cache.Entry, p widget.Payload, err error, now time.Time) cache.Ent
 	return e
 }
 
-// cachePush writes what Source id pushed at now to its entry, as a fetch would.
-func (m Model) cachePush(id string, push widget.Push, now time.Time) sched {
-	s := m.sched[id]
-	if s.key == "" || push.Lost || local(push.Err) {
-		return s
+// cachePush shares what s's Source pushed at now through its entry, as a
+// fetch would. Updates about this instance alone, and ones that change
+// nothing, aren't written.
+func (m Model) cachePush(s sched, push widget.Push, now time.Time) (sched, tea.Cmd) {
+	if s.key == "" || push.Lost || local(push.Err) || push.Payload == nil && push.Err == nil {
+		return s, nil
 	}
-	e, _ := m.cache.Load(s.key)
-	if push.Payload != nil || push.Err != nil {
-		var p widget.Payload
-		if push.Payload != nil {
-			p = *push.Payload
+	var p widget.Payload
+	if push.Payload != nil {
+		p = *push.Payload
+	}
+	s.checked = now
+	store, key := m.cache, s.key
+	return s, func() tea.Msg {
+		// A held lock is a fetch in flight in another instance, which writes the entry.
+		unlock, ok := store.Lock(key, now, fetchTimeout)
+		if !ok {
+			return nil
 		}
-		e = record(e, p, push.Err, now)
+		defer unlock()
+		e, _ := store.Load(key)
+		if e.CheckedAt.After(now) {
+			return nil
+		}
+		if n := record(e, p, push.Err, now); !same(e, n) {
+			_ = store.Save(key, n)
+		}
+		return nil
 	}
-	_ = m.cache.Save(s.key, e)
-	s.checked = e.CheckedAt
-	return s
+}
+
+// same reports whether a and b hold the same data and Status, whenever
+// they were fetched or checked.
+func same(a, b cache.Entry) bool {
+	a.FetchedAt, a.CheckedAt, a.Fails = b.FetchedAt, b.CheckedAt, b.Fails
+	x, errX := json.Marshal(a)
+	y, errY := json.Marshal(b)
+	return errX == nil && errY == nil && bytes.Equal(x, y)
 }
 
 // adopt takes Source id's data and Status from its cache entry: written by
