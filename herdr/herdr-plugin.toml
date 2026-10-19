@@ -2,7 +2,7 @@ id = "visor"
 name = "visor"
 version = "0.2.0"
 min_herdr_version = "0.8.0"
-description = "Install visor, a god's-eye HUD for your day, if it's missing, and open it over the current tab with one key."
+description = "Install visor, a heads-up display for your terminal, if it's missing, and open it over the current tab with one key."
 platforms = ["macos", "linux"]
 
 [[build]]

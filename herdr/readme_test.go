@@ -130,7 +130,7 @@ func containsSeq(seqs []closekey.Seq, want closekey.Seq) bool {
 func TestReadmeCoversInstallAndSkills(t *testing.T) {
 	text := readme(t)
 	for _, want := range []string{
-		"god's-eye HUD for your day",
+		"A heads-up display for your terminal.",
 		"brew install oronbz/tap/visor",
 		"Intel",
 		"herdr plugin install oronbz/visor/herdr",

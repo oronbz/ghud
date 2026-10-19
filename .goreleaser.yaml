@@ -73,7 +73,7 @@ nfpms:
     vendor: oronbz
     homepage: https://github.com/oronbz/visor
     maintainer: Oron Ben Zvi <1288090+oronbz@users.noreply.github.com>
-    description: A god's-eye HUD for your day, in the terminal.
+    description: A heads-up display for your terminal.
     bindir: /usr/bin
 
 checksum:
@@ -107,7 +107,7 @@ homebrew_casks:
       name: homebrew-tap
       token: "{{ .Env.GITHUB_TOKEN }}"
     homepage: https://github.com/oronbz/visor
-    description: A god's-eye HUD for your day, in the terminal
+    description: A heads-up display for your terminal
     commit_msg_template: "Update visor to {{ .Version }}"
     binaries: [visor, visor-weather]
     custom_block: |

@@ -1,6 +1,6 @@
 # visor
 
-**A god's-eye HUD for your day, right in your terminal.**
+**A heads-up display for your terminal.**
 
 ![visor: clock, calendar, meetings, tasks, reminders, notes, CPU and memory, GitHub review requests, Jira issues and the weather in one terminal dashboard](docs/screenshot.png)
 
