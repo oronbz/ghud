@@ -62,6 +62,16 @@ go install github.com/oronbz/ghud/cmd/ghud-weather@latest
 
 Both binaries need to end up in the same directory, which `go install` does for you.
 
+### Update
+
+With Homebrew, on macOS or Linux:
+
+```sh
+brew upgrade ghud
+```
+
+With a package, the Windows zip or `go install`, install the newer release the same way you installed the first one.
+
 ## Getting started
 
 Run `ghud`. With no config you get the default Widgets: Clock, Calendar, Meetings (macOS), Tasks, Reminders (macOS), Notes, CPU + memory, PRs, Jira and Weather. Script is opt-in, add it with `ctrl+k` and Add Widget.
@@ -128,7 +138,7 @@ The plugin and ghud update separately. To get the plugin's latest actions, such 
 herdr plugin update ghud
 ```
 
-The plugin never upgrades ghud itself. Use `brew upgrade ghud` for that.
+The plugin never upgrades ghud itself. To upgrade ghud, see [Update](#update).
 
 ### Open ghud with one key
 
