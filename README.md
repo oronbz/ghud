@@ -118,7 +118,17 @@ If you use herdr, this installs ghud with Homebrew when it's missing:
 herdr plugin install oronbz/ghud/herdr
 ```
 
-When ghud is already on your `PATH` it does nothing. It never upgrades ghud and never asks anything. Without Homebrew it stops and prints the other ways to install. To upgrade later, use `brew upgrade ghud`.
+When ghud is already on your `PATH` it does nothing. It never upgrades ghud and never asks anything. Without Homebrew it stops and prints the other ways to install.
+
+### Update with herdr
+
+The plugin and ghud update separately. To get the plugin's latest actions, such as the one-key toggle below:
+
+```sh
+herdr plugin update ghud
+```
+
+The plugin never upgrades ghud itself. Use `brew upgrade ghud` for that.
 
 ### Open ghud with one key
 
@@ -141,8 +151,6 @@ description = "ghud"
 `cmd+shift+g` or `prefix+d` opens ghud over the whole tab you're in, and the same key closes it and brings your panes back. herdr's sidebar stays visible and clickable while ghud is open. If you switch to another tab and press the key, ghud moves to that tab. `q` quits ghud too.
 
 ghud runs in a real herdr pane here, so right-click opens ghud's Action menus, as it does in a tab.
-
-If you installed the plugin before it had this action, run `herdr plugin update ghud` first.
 
 ### Open ghud as a popup
 
