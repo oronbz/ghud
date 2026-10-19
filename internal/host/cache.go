@@ -77,8 +77,10 @@ func (m Model) fetchCached(id string, src widget.Source, now time.Time, force bo
 		ctx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
 		defer cancel()
 		p, err := src.Refresh(ctx, now)
-		// The cache only saves a fetch; failing to write it is no reason to drop the data.
-		_ = store.Save(key, record(e, p, err, now))
+		if !local(err) {
+			// The cache only saves a fetch; failing to write it is no reason to drop the data.
+			_ = store.Save(key, record(e, p, err, now))
+		}
 		return refreshedMsg{id: id, payload: p, err: err, at: now}
 	}
 }
@@ -102,13 +104,10 @@ func record(e cache.Entry, p widget.Payload, err error, now time.Time) cache.Ent
 // cachePush writes what Source id pushed at now to its entry, as a fetch would.
 func (m Model) cachePush(id string, push widget.Push, now time.Time) sched {
 	s := m.sched[id]
-	if s.key == "" {
+	if s.key == "" || push.Lost || local(push.Err) {
 		return s
 	}
 	e, _ := m.cache.Load(s.key)
-	if push.Lost {
-		e.Payload, e.FetchedAt = widget.Payload{}, time.Time{}
-	}
 	if push.Payload != nil || push.Err != nil {
 		var p widget.Payload
 		if push.Payload != nil {
@@ -181,6 +180,11 @@ func (f failure) Reason() string {
 }
 
 func (f failure) Hint() string { return f.hint }
+
+func local(err error) bool {
+	var l *widget.LocalError
+	return errors.As(err, &l)
+}
 
 func statusOf(err error) cache.Status {
 	if err == nil {

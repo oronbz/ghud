@@ -116,8 +116,8 @@ type Push struct {
 	Payload *Payload
 	// Err is a Status, read the way Refresh's error is.
 	Err error
-	// Lost drops the data shown, such as Items whose Actions can't run any
-	// more because the process behind them stopped.
+	// Lost drops the data this instance shows, such as Items whose Actions
+	// can't run any more because the process behind them stopped.
 	Lost bool
 	// Retry, when set, refreshes the Widget then, whatever its schedule.
 	Retry time.Time
