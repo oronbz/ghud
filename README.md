@@ -57,7 +57,7 @@ Both binaries need to end up in the same directory, which `go install` does for 
 
 ## Getting started
 
-Run `ghud`. With no config you get one Widget of every built-in type: Clock, Calendar, Meetings (macOS), Tasks, Notes, CPU + memory, PRs, Jira and Weather.
+Run `ghud`. With no config you get the default Widgets: Clock, Calendar, Meetings (macOS), Tasks, Notes, CPU + memory, PRs, Jira and Weather. Reminders and Script are opt-in, add them with `ctrl+k` and Add Widget.
 
 - `?` shows every key. `ctrl+k` opens the Action palette, and the footer shows the keys for whatever is focused.
 - `q` quits.
