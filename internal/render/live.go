@@ -14,13 +14,7 @@ import (
 // liveLines expands a live view's lines and host helpers into rows w cells
 // wide at most, giving charts without a height the rows left of h.
 func liveLines(th theme.Theme, lines []widget.Line, w, h int) []string {
-	used, fills := 0, 0
-	for _, l := range lines {
-		if l.Chart != nil && l.Chart.Rows == 0 {
-			fills++
-		}
-		used += lineRows(l)
-	}
+	used, fills := linesSpace(lines)
 	spare := max(0, h-used)
 	var out []string
 	for _, l := range lines {
@@ -40,6 +34,18 @@ func liveLines(th theme.Theme, lines []widget.Line, w, h int) []string {
 		}
 	}
 	return out
+}
+
+// linesSpace is the rows lines take, and how many charts without a height
+// share what's left.
+func linesSpace(lines []widget.Line) (used, fills int) {
+	for _, l := range lines {
+		if l.Chart != nil && l.Chart.Rows == 0 {
+			fills++
+		}
+		used += lineRows(l)
+	}
+	return used, fills
 }
 
 // lineRows is how many rows a line takes, a chart without a height none.

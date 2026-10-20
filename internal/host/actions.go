@@ -69,16 +69,16 @@ func (m Model) clampList(id string) {
 	}
 	p := m.payloadIn(id, r)
 	st := m.lists[id]
-	h := max(1, r.H-2)
 	if p.Wrap && !p.IsList() {
-		m.lists[id] = listState{top: min(max(st.top, 0), max(0, render.TextRows(p, r.W-2)-h))}
+		rows, h := m.textRows(id, p, r)
+		m.lists[id] = listState{top: min(max(st.top, 0), max(0, rows-max(1, h)))}
 		return
 	}
 	if len(p.Items) == 0 {
 		m.lists[id] = listState{}
 		return
 	}
-	h = itemRows(p, r)
+	h := itemRows(p, r)
 	st.idx = min(max(st.idx, 0), len(p.Items)-1)
 	st.sel = p.Items[st.idx].ID
 	rows := render.Rows(p)
@@ -104,6 +104,16 @@ func itemRows(p widget.Payload, r layout.Rect) int {
 	return max(1, body-render.SummaryRows(p, body))
 }
 
+// textRows is how many lines wrapped Widget id's Payload p takes in r, and
+// how many of them show beside or around its Image.
+func (m Model) textRows(id string, p widget.Payload, r layout.Rect) (rows, shown int) {
+	var pic *render.Picture
+	if shown, ok := m.images.shown[id]; ok {
+		pic = &shown
+	}
+	return render.TextRows(p, pic, r.W-2, r.H-2)
+}
+
 // moveSelection moves the focused list's selection to index i, clamped. A
 // wrapped text Widget scrolls instead, i being its top line out of n.
 func (m Model) moveSelection(i func(st listState, n int) int) {
@@ -114,7 +124,8 @@ func (m Model) moveSelection(i func(st listState, n int) int) {
 	}
 	p := m.payloadIn(id, r)
 	if p.Wrap && !p.IsList() {
-		m.lists[id] = listState{top: i(listState{idx: m.lists[id].top}, render.TextRows(p, r.W-2))}
+		rows, _ := m.textRows(id, p, r)
+		m.lists[id] = listState{top: i(listState{idx: m.lists[id].top}, rows)}
 		m.clampList(id)
 		return
 	}

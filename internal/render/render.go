@@ -165,13 +165,13 @@ func body(th theme.Theme, p widget.Payload, pic *Picture, l List, w, h int) []st
 	if p.IsList() {
 		return listBody(th, p, l, w, h)
 	}
-	if p.Wrap {
-		return textBody(th, p, l, w, h)
-	}
 	if p.Image != nil && pic != nil {
-		if out, ok := imageBody(th, p, *pic, w, h); ok {
+		if out, ok := imageBody(th, p, *pic, l, w, h); ok {
 			return out
 		}
+	}
+	if p.Wrap {
+		return textBody(th, p, l, w, h)
 	}
 	return liveBody(th, p, w, h)
 }

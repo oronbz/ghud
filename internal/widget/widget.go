@@ -215,8 +215,8 @@ type Payload struct {
 	// Wrap word-wraps Lines to the Widget's width instead of truncating
 	// them, and lets the user scroll them with j/k.
 	Wrap bool `json:"wrap,omitempty"`
-	// Image is drawn beside or above a live view's Lines; lists and wrapped
-	// Payloads leave it out.
+	// Image is drawn beside or above a live view's Lines, which wrap in the
+	// space it leaves; lists leave it out.
 	Image *Image `json:"image,omitempty"`
 
 	// Columns make the Payload a list: every Item has one Field per Column.
@@ -233,6 +233,8 @@ type Payload struct {
 }
 
 func (p Payload) IsList() bool { return len(p.Columns) > 0 }
+
+func (p Payload) HasImage() bool { return p.Image != nil && !p.IsList() }
 
 type Column struct {
 	// Priority decides which columns survive a narrow Widget: the
