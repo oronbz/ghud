@@ -23,8 +23,8 @@ type Tile struct {
 	// Handle draws the ⠿ grab handle before the title.
 	Handle  bool
 	Payload widget.Payload
-	// Picture is the Payload's Image as the host loaded it; nil leaves it out.
-	Picture *Picture
+	// Image is the Payload's Image as the host loaded it; nil leaves it out.
+	Image *Image
 	// List is how a list Payload is selected and scrolled.
 	List   List
 	Hints  []Hint
@@ -84,7 +84,7 @@ func Draw(th theme.Theme, t Tile) string {
 	out := make([]string, 0, t.H)
 	out = append(out, ansi.Truncate(top, t.W, ""))
 	t.List.Focused = t.Focused
-	for _, l := range body(th, t.Payload, t.Picture, t.List, inner, t.H-2) {
+	for _, l := range body(th, t.Payload, t.Image, t.List, inner, t.H-2) {
 		out = append(out, border.Render(b.Left)+l+border.Render(b.Right))
 	}
 	out = append(out, bottom(th, border, b, t.Hints, t.W))
@@ -161,7 +161,7 @@ func KeyLabel(key string) string {
 }
 
 // body renders a payload as exactly h lines, each exactly w cells wide.
-func body(th theme.Theme, p widget.Payload, pic *Picture, l List, w, h int) []string {
+func body(th theme.Theme, p widget.Payload, pic *Image, l List, w, h int) []string {
 	if p.IsList() {
 		return listBody(th, p, l, w, h)
 	}

@@ -49,8 +49,8 @@ func inner(t render.Tile) []string {
 func TestAnImageOnTheLeftTakesTheBodyHeightAndTheLinesTheWidthLeftAfterAGap(t *testing.T) {
 	// A square image in 1:2 cells is twice as many cells wide as it is rows tall.
 	for _, size := range []struct{ w, h, cols int }{{40, 8, 12}, {60, 10, 16}} {
-		pic := render.Picture{Size: image.Pt(40, 40), Cell: tall, Pixels: square(40, 40, red)}
-		body := inner(render.Tile{W: size.w, H: size.h, Payload: pictured(widget.Left, widget.Text(theme.Fg, "hello")), Picture: &pic})
+		pic := render.Image{Size: image.Pt(40, 40), Cell: tall, Pixels: square(40, 40, red)}
+		body := inner(render.Tile{W: size.w, H: size.h, Payload: pictured(widget.Left, widget.Text(theme.Fg, "hello")), Image: &pic})
 		for i, row := range body {
 			want := strings.Repeat("▀", size.cols)
 			if i == 0 {
@@ -64,8 +64,8 @@ func TestAnImageOnTheLeftTakesTheBodyHeightAndTheLinesTheWidthLeftAfterAGap(t *t
 }
 
 func TestHalfBlockCellsCarryTheImageColours(t *testing.T) {
-	pic := render.Picture{Size: image.Pt(2, 2), Cell: tall, Pixels: square(2, 2, red)}
-	out := render.Draw(theme.Dark(), render.Tile{W: 30, H: 3, Payload: pictured(widget.Left), Picture: &pic})
+	pic := render.Image{Size: image.Pt(2, 2), Cell: tall, Pixels: square(2, 2, red)}
+	out := render.Draw(theme.Dark(), render.Tile{W: 30, H: 3, Payload: pictured(widget.Left), Image: &pic})
 	buf := uv.NewScreenBuffer(30, 3)
 	uv.NewStyledString(out).Draw(buf, buf.Bounds())
 	c := buf.CellAt(1, 1)
@@ -75,11 +75,11 @@ func TestHalfBlockCellsCarryTheImageColours(t *testing.T) {
 }
 
 func TestAnImageOnTheRightLeavesTheLinesOnTheLeftAndCentreCentresThemInTheirArea(t *testing.T) {
-	pic := render.Picture{Size: image.Pt(40, 40), Cell: tall, Pixels: square(40, 40, red)}
+	pic := render.Image{Size: image.Pt(40, 40), Cell: tall, Pixels: square(40, 40, red)}
 	p := pictured(widget.Right, widget.Text(theme.Fg, "hi"))
 	p.Center = true
 	// 40×7: a 38×5 body, a 10-cell image, and 27 cells of lines before the gap.
-	body := inner(render.Tile{W: 40, H: 7, Payload: p, Picture: &pic})
+	body := inner(render.Tile{W: 40, H: 7, Payload: p, Image: &pic})
 	for i, row := range body {
 		lines, img := string([]rune(row)[:27]), string([]rune(row)[28:])
 		want := strings.Repeat(" ", 27)
@@ -93,13 +93,13 @@ func TestAnImageOnTheRightLeavesTheLinesOnTheLeftAndCentreCentresThemInTheirArea
 }
 
 func TestAnImageBesideLinesNarrowerThanTwentyCellsIsDropped(t *testing.T) {
-	pic := render.Picture{Size: image.Pt(40, 40), Cell: tall, Pixels: square(40, 40, red)}
+	pic := render.Image{Size: image.Pt(40, 40), Cell: tall, Pixels: square(40, 40, red)}
 	p := pictured(widget.Left, widget.Text(theme.Fg, "hello"))
 	// 34×7: a 32×5 body; the 10-cell image and its gap leave 21 cells, and 19 at 32×7.
-	if body := inner(render.Tile{W: 34, H: 7, Payload: p, Picture: &pic}); !strings.HasPrefix(body[0], "▀▀▀▀▀▀▀▀▀▀ hello") {
+	if body := inner(render.Tile{W: 34, H: 7, Payload: p, Image: &pic}); !strings.HasPrefix(body[0], "▀▀▀▀▀▀▀▀▀▀ hello") {
 		t.Errorf("at 21 cells of lines the image is gone: %q", body[0])
 	}
-	got := inner(render.Tile{W: 32, H: 7, Payload: p, Picture: &pic})
+	got := inner(render.Tile{W: 32, H: 7, Payload: p, Image: &pic})
 	want := inner(render.Tile{W: 32, H: 7, Payload: widget.Payload{Lines: p.Lines}})
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Errorf("at 19 cells of lines:\n%s\nwant only the lines:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
@@ -107,9 +107,9 @@ func TestAnImageBesideLinesNarrowerThanTwentyCellsIsDropped(t *testing.T) {
 }
 
 func TestAnImageOnTopTakesTheRowsTheLinesLeaveCentredAcross(t *testing.T) {
-	pic := render.Picture{Size: image.Pt(40, 40), Cell: tall, Pixels: square(40, 40, red)}
+	pic := render.Image{Size: image.Pt(40, 40), Cell: tall, Pixels: square(40, 40, red)}
 	// 30×12: a 28×10 body; one line leaves 9 rows, an 18-cell-wide square.
-	body := inner(render.Tile{W: 30, H: 12, Payload: pictured(widget.Top, widget.Text(theme.Fg, "hello")), Picture: &pic})
+	body := inner(render.Tile{W: 30, H: 12, Payload: pictured(widget.Top, widget.Text(theme.Fg, "hello")), Image: &pic})
 	img := strings.Repeat(" ", 5) + strings.Repeat("▀", 18) + strings.Repeat(" ", 5)
 	for i, row := range body[:9] {
 		if row != img {
@@ -122,10 +122,10 @@ func TestAnImageOnTopTakesTheRowsTheLinesLeaveCentredAcross(t *testing.T) {
 }
 
 func TestAnImageAtTheBottomSharesTheRowsLeftWithAFillChart(t *testing.T) {
-	pic := render.Picture{Size: image.Pt(40, 40), Cell: tall, Pixels: square(40, 40, red)}
+	pic := render.Image{Size: image.Pt(40, 40), Cell: tall, Pixels: square(40, 40, red)}
 	fill := widget.Line{Chart: &widget.Chart{Values: []float64{1, 1}, Token: theme.Ok}}
 	// 30×12: a 28×10 body; the line leaves 9 rows, 4 for the image and 5 for the chart.
-	body := inner(render.Tile{W: 30, H: 12, Payload: pictured(widget.Bottom, widget.Text(theme.Fg, "hello"), fill), Picture: &pic})
+	body := inner(render.Tile{W: 30, H: 12, Payload: pictured(widget.Bottom, widget.Text(theme.Fg, "hello"), fill), Image: &pic})
 	for i := 1; i <= 5; i++ {
 		if !strings.Contains(body[i], "⣿") {
 			t.Errorf("row %d %q isn't chart", i, body[i])
@@ -140,24 +140,24 @@ func TestAnImageAtTheBottomSharesTheRowsLeftWithAFillChart(t *testing.T) {
 }
 
 func TestAWideImageAboveLinesIsCappedAtTheBodyWidth(t *testing.T) {
-	pic := render.Picture{Size: image.Pt(200, 40), Cell: tall, Pixels: square(200, 40, red)}
-	body := inner(render.Tile{W: 30, H: 12, Payload: pictured(widget.Top, widget.Text(theme.Fg, "hello")), Picture: &pic})
+	pic := render.Image{Size: image.Pt(200, 40), Cell: tall, Pixels: square(200, 40, red)}
+	body := inner(render.Tile{W: 30, H: 12, Payload: pictured(widget.Top, widget.Text(theme.Fg, "hello")), Image: &pic})
 	if !slicesContain(body, strings.Repeat("▀", 28)) {
 		t.Errorf("no image row across the whole body:\n%s", strings.Join(body, "\n"))
 	}
 }
 
 func TestAnImageUnderThreeRowsAboveOrBelowLinesIsDropped(t *testing.T) {
-	pic := render.Picture{Size: image.Pt(40, 40), Cell: tall, Pixels: square(40, 40, red)}
+	pic := render.Image{Size: image.Pt(40, 40), Cell: tall, Pixels: square(40, 40, red)}
 	for _, side := range []widget.Side{widget.Top, widget.Bottom} {
 		p := pictured(side, widget.Text(theme.Fg, "one"), widget.Text(theme.Fg, "two"))
 		// 30×6: a 4-row body; two lines leave 2.
-		got := inner(render.Tile{W: 30, H: 6, Payload: p, Picture: &pic})
+		got := inner(render.Tile{W: 30, H: 6, Payload: p, Image: &pic})
 		want := inner(render.Tile{W: 30, H: 6, Payload: widget.Payload{Lines: p.Lines}})
 		if strings.Join(got, "\n") != strings.Join(want, "\n") {
 			t.Errorf("side %d:\n%s\nwant only the lines", side, strings.Join(got, "\n"))
 		}
-		if got := inner(render.Tile{W: 30, H: 7, Payload: p, Picture: &pic}); !slicesContain(got, strings.Repeat(" ", 11)+"▀▀▀▀▀▀"+strings.Repeat(" ", 11)) {
+		if got := inner(render.Tile{W: 30, H: 7, Payload: p, Image: &pic}); !slicesContain(got, strings.Repeat(" ", 11)+"▀▀▀▀▀▀"+strings.Repeat(" ", 11)) {
 			t.Errorf("side %d at 3 rows, no image:\n%s", side, strings.Join(got, "\n"))
 		}
 	}
@@ -165,9 +165,9 @@ func TestAnImageUnderThreeRowsAboveOrBelowLinesIsDropped(t *testing.T) {
 
 func TestAnUploadedImageIsDrawnAsPlaceholderCellsEncodingItsIDPlacementAndPosition(t *testing.T) {
 	for _, id := range []uint32{7, 3<<24 | 5} {
-		pic := render.Picture{Size: image.Pt(40, 40), Cell: tall, ID: id, Placement: 2}
+		pic := render.Image{Size: image.Pt(40, 40), Cell: tall, ID: id, Placement: 2}
 		// 40×5: a 3-row body and a 6-cell image.
-		out := render.Draw(theme.Dark(), render.Tile{W: 40, H: 5, Payload: pictured(widget.Left, widget.Text(theme.Fg, "hi")), Picture: &pic})
+		out := render.Draw(theme.Dark(), render.Tile{W: 40, H: 5, Payload: pictured(widget.Left, widget.Text(theme.Fg, "hi")), Image: &pic})
 		buf := uv.NewScreenBuffer(40, 5)
 		uv.NewStyledString(out).Draw(buf, buf.Bounds())
 		for r := range 3 {
@@ -195,12 +195,12 @@ func TestAnUploadedImageIsDrawnAsPlaceholderCellsEncodingItsIDPlacementAndPositi
 }
 
 func TestAWrappedPayloadDrawsItsImageAndWrapsItsLinesInTheSpaceLeft(t *testing.T) {
-	pic := render.Picture{Size: image.Pt(40, 40), Cell: tall, Pixels: square(40, 40, red)}
+	pic := render.Image{Size: image.Pt(40, 40), Cell: tall, Pixels: square(40, 40, red)}
 	p := pictured(widget.Left, widget.Text(theme.Fg, "alpha bravo charlie delta echo foxtrot"))
 	p.Wrap = true
 	// 40×8: a 38×6 body, a 12-cell image, and 25 cells after the gap that
 	// wrap inside their one-cell margins at 23.
-	body := inner(render.Tile{W: 40, H: 8, Payload: p, Picture: &pic})
+	body := inner(render.Tile{W: 40, H: 8, Payload: p, Image: &pic})
 	img := strings.Repeat("▀", 12)
 	for i, want := range []string{img + "  alpha bravo charlie", img + "  delta echo foxtrot", img} {
 		if got := strings.TrimRight(body[i], " "); got != want {
@@ -214,7 +214,7 @@ func TestAWrappedPayloadDrawsItsImageAndWrapsItsLinesInTheSpaceLeft(t *testing.T
 	p.Image.Side = widget.Top
 	// 40×10: a 38×8 body; the lines wrap to 2 rows at the body width and
 	// leave 6 for a 12-cell square.
-	body = inner(render.Tile{W: 40, H: 10, Payload: p, Picture: &pic})
+	body = inner(render.Tile{W: 40, H: 10, Payload: p, Image: &pic})
 	if want := strings.Repeat(" ", 13) + img; strings.TrimRight(body[5], " ") != want {
 		t.Errorf("last image row %q, want %q", body[5], want)
 	}

@@ -2,7 +2,7 @@ package layout
 
 import "slices"
 
-// shown reports whether c draws: a Widget that isn't hidden, or a stack
+// shown reports whether c draws: a Widget that isn't hidden, or a Stack
 // with something shown in it.
 func (l Layout) shown(c Cell) bool {
 	if c.IsStack() {
@@ -15,7 +15,7 @@ func (l Layout) rowShown(r Row) bool { return slices.ContainsFunc(r.Widgets, l.s
 
 func (l Layout) IsHidden(id string) bool { return slices.Contains(l.Hidden, id) }
 
-// rowsAt is the rows of the container at p: the dashboard's, or a stack's.
+// rowsAt is the rows of the container at p: the dashboard's, or a Stack's.
 func (l *Layout) rowsAt(p Path) *[]Row {
 	if len(p) == 0 {
 		return &l.Rows
@@ -27,7 +27,6 @@ func (l *Layout) rowAt(p Path) *Row { return &(*l.rowsAt(p[:len(p)-1]))[p[len(p)
 
 func (l *Layout) cellAt(p Path) *Cell { return &l.rowAt(p[:len(p)-1]).Widgets[p[len(p)-1]] }
 
-// has reports whether p addresses a place in l.
 func (l Layout) has(p Path) bool {
 	rows := l.Rows
 	for k, i := range p {

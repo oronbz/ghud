@@ -178,7 +178,7 @@ func gap(v, lo, hi float64) float64 {
 }
 
 // column makes id a full-height column on side of the dashboard, share of
-// its width; everything else keeps its rows in a stack beside it.
+// its width; everything else keeps its rows in a Stack beside it.
 func (l Layout) column(id string, side Dir, share float64) Layout {
 	out := l.clone()
 	p := out.Find(id)
@@ -236,7 +236,7 @@ func (l *Layout) insertRow(cp Path, at int, c Cell) {
 	*rows = slices.Insert(*rows, min(max(at, 0), len(*rows)), Row{Weight: mean(ws), Widgets: []Cell{c}})
 }
 
-// stackWith turns the Widget at p into a stack of it and c, c on top when
+// stackWith turns the Widget at p into a Stack of it and c, c on top when
 // first.
 func (l *Layout) stackWith(p Path, c Cell, first bool) {
 	t := l.cellAt(p)
@@ -277,7 +277,7 @@ const minShare = 0.05
 
 // Resize is the keyboard resize: Right and Left widen and narrow id, Down
 // and Up make it taller and shorter, in the nearest container (going out
-// from id) where it, or the stack it's in, has a sibling that way. Only
+// from id) where it, or the Stack it's in, has a sibling that way. Only
 // visible cells and rows share the space; the others keep their proportions.
 func (l Layout) Resize(id string, d Dir) Layout {
 	out := l.clone()

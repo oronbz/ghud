@@ -15,8 +15,8 @@ import (
 	"github.com/oronbz/visor/internal/widget"
 )
 
-// Picture is a live view's Image as the host loaded it.
-type Picture struct {
+// Image is a Payload's widget.Image as the host loaded it.
+type Image struct {
 	// Size is the image's size in pixels, which sets its aspect ratio.
 	Size image.Point
 	// Cell is a terminal cell's size in pixels.
@@ -40,7 +40,7 @@ const minImageRows = 3
 
 // imageSplit is where a live view's Image and its Lines go in a body w×h,
 // relative to the body; ok is false when the Image is dropped.
-func imageSplit(p widget.Payload, pic Picture, w, h int) (img, lines layout.Rect, ok bool) {
+func imageSplit(p widget.Payload, pic Image, w, h int) (img, lines layout.Rect, ok bool) {
 	if side := p.Image.Side; side == widget.Top || side == widget.Bottom {
 		used, fills := linesSpace(p.Lines)
 		if p.Wrap {
@@ -74,7 +74,7 @@ func imageSplit(p widget.Payload, pic Picture, w, h int) (img, lines layout.Rect
 
 // ImageBox is the size in cells of the box a live view's Image is drawn in,
 // in a body w×h; zero when it's left out.
-func ImageBox(p widget.Payload, pic Picture, w, h int) image.Point {
+func ImageBox(p widget.Payload, pic Image, w, h int) image.Point {
 	if !p.HasImage() {
 		return image.Point{}
 	}
@@ -86,7 +86,7 @@ func ImageBox(p widget.Payload, pic Picture, w, h int) image.Point {
 }
 
 // colsFor is how many cells wide pic is when it's rows cells tall.
-func colsFor(pic Picture, rows int) int {
+func colsFor(pic Image, rows int) int {
 	if pic.Size.X <= 0 || pic.Size.Y <= 0 || pic.Cell.X <= 0 || pic.Cell.Y <= 0 {
 		return 0
 	}
@@ -94,7 +94,7 @@ func colsFor(pic Picture, rows int) int {
 }
 
 // imageBody is a live view with an Image as exactly h lines of w cells.
-func imageBody(th theme.Theme, p widget.Payload, pic Picture, l List, w, h int) ([]string, bool) {
+func imageBody(th theme.Theme, p widget.Payload, pic Image, l List, w, h int) ([]string, bool) {
 	at, rest, ok := imageSplit(p, pic, w, h)
 	if !ok {
 		return nil, false
@@ -135,7 +135,7 @@ func imageBody(th theme.Theme, p widget.Payload, pic Picture, l List, w, h int) 
 // underline colour the Placement, and the first two diacritics the cell's
 // row and column in the image. Indexed colours, unlike RGB ones, come
 // through a terminal profile with 256 colours unchanged.
-func placeholders(pic Picture, cols, rows int) []string {
+func placeholders(pic Image, cols, rows int) []string {
 	st := lipgloss.NewStyle().Foreground(ansi.IndexedColor(pic.ID & 0xff)).UnderlineColor(ansi.IndexedColor(pic.Placement))
 	high := ""
 	if pic.ID>>24 != 0 {
@@ -157,7 +157,7 @@ func placeholders(pic Picture, cols, rows int) []string {
 
 // HalfBlocks is the size, in pixels of half a cell, that pic is drawn at in
 // a box cols×rows cells: fitted inside it, aspect ratio kept.
-func HalfBlocks(pic Picture, cols, rows int) image.Point {
+func HalfBlocks(pic Image, cols, rows int) image.Point {
 	if pic.Size.X <= 0 || pic.Size.Y <= 0 || pic.Cell.X <= 0 || pic.Cell.Y <= 0 {
 		return image.Point{}
 	}
@@ -199,7 +199,7 @@ func Shrink(img image.Image, size image.Point) image.Image {
 
 // halfBlocks draws pic centred in cols×rows cells, two pixels a cell: the
 // upper one in the foreground of ▀, the lower in its background.
-func halfBlocks(pic Picture, cols, rows int) []string {
+func halfBlocks(pic Image, cols, rows int) []string {
 	size := HalfBlocks(pic, cols, rows)
 	var px image.Image = image.NewRGBA(image.Rectangle{Max: size})
 	if pic.Pixels != nil {

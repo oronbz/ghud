@@ -57,7 +57,7 @@ func (k ZoneKind) String() string {
 
 // Zone is a hit-test rectangle. ID names the Widget for Body and Title. A
 // WidgetSeam's Path is its row and Index the cell to its left; a RowSeam's
-// Path is its container (the dashboard or a stack) and Index the row above
+// Path is its container (the dashboard or a Stack) and Index the row above
 // it. Indexes count every cell or row, hidden ones included.
 type Zone struct {
 	Kind ZoneKind
@@ -185,7 +185,7 @@ func (y laying) tile(id string, r Rect, at Path) {
 	)
 }
 
-// needCell is the smallest c draws in: a tile, or what a stack's rows need.
+// needCell is the smallest c draws in: a tile, or what a Stack's rows need.
 func (l Layout) needCell(c Cell) Size {
 	if c.IsStack() {
 		return l.needRows(c.Rows)

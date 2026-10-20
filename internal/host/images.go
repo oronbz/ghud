@@ -53,7 +53,7 @@ type images struct {
 	asked  image.Point
 	loaded map[string]*loaded
 	// shown are the images drawn this frame, by Widget id.
-	shown  map[string]render.Picture
+	shown  map[string]render.Image
 	shrunk map[shrinkKey]image.Image
 	// uploads are the images the terminal holds, by content hash.
 	uploads map[[32]byte]*upload
@@ -115,7 +115,7 @@ type shrinkKey struct {
 }
 
 func newImages() *images {
-	return &images{loaded: map[string]*loaded{}, shown: map[string]render.Picture{}, shrunk: map[shrinkKey]image.Image{}, uploads: map[[32]byte]*upload{}}
+	return &images{loaded: map[string]*loaded{}, shown: map[string]render.Image{}, shrunk: map[shrinkKey]image.Image{}, uploads: map[[32]byte]*upload{}}
 }
 
 // chunk is the most base64 a kitty graphics escape carries.
@@ -299,7 +299,7 @@ func (m Model) syncImages() tea.Cmd {
 		out.WriteString(cellSizeQueries)
 	}
 	used := map[*upload]map[image.Point]bool{}
-	shown := map[string]render.Picture{}
+	shown := map[string]render.Image{}
 	loaded := map[string]*loaded{}
 	shrunk := map[shrinkKey]image.Image{}
 	for i, ref := range in.refs {
@@ -314,7 +314,7 @@ func (m Model) syncImages() tea.Cmd {
 		if ref.tile == (layout.Rect{}) {
 			continue
 		}
-		pic := render.Picture{Size: l.img.Bounds().Size(), Cell: in.cell}
+		pic := render.Image{Size: l.img.Bounds().Size(), Cell: in.cell}
 		box := render.ImageBox(payloads[i], pic, ref.tile.W-2, ref.tile.H-2)
 		switch {
 		case box == (image.Point{}):

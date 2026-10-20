@@ -11,7 +11,7 @@ import (
 )
 
 // Layout is the saved arrangement: weighted rows of weighted cells, where a
-// cell is a Widget or a stack holding rows of its own.
+// cell is a Widget or a Stack holding rows of its own.
 type Layout struct {
 	Rows   []Row    `json:"rows"`
 	Hidden []string `json:"hidden,omitempty"`
@@ -22,19 +22,18 @@ type Row struct {
 	Widgets []Cell  `json:"widgets"`
 }
 
-// Cell is a Widget (ID set) or a stack (Rows set), weighted within its row.
+// Cell is a Widget (ID set) or a Stack (Rows set), weighted within its row.
 type Cell struct {
 	ID     string  `json:"id,omitempty"`
 	Weight float64 `json:"weight"`
 	Rows   []Row   `json:"rows,omitempty"`
 }
 
-// IsStack reports whether c holds rows rather than a Widget.
 func (c Cell) IsStack() bool { return len(c.Rows) > 0 }
 
 // Path addresses a place in a Layout: row and cell indexes alternate from
 // the dashboard down. An odd-length Path is a row; an even-length one is a
-// cell, or for a stack also the container of its rows. The empty Path is the
+// cell, or for a Stack also the container of its rows. The empty Path is the
 // dashboard itself.
 type Path []int
 
@@ -112,7 +111,7 @@ func (l Layout) Join(ids []string) Layout {
 }
 
 // IDs lists every Widget in l, hidden or not, in reading order: row by row,
-// and through a stack's rows where it stands.
+// and through a Stack's rows where it stands.
 func (l Layout) IDs() []string {
 	var out []string
 	var walk func(rows []Row)
@@ -164,8 +163,8 @@ func atLeast(ws []*float64) {
 	}
 }
 
-// tidy removes empty cells, rows and stacks, turns a one-row stack into
-// cells of its parent row and a row holding only a stack into rows of its
+// tidy removes empty cells, rows and Stacks, turns a one-row Stack into
+// cells of its parent row and a row holding only a Stack into rows of its
 // container, rescaling weights so nothing changes size on screen.
 func tidy(rows []Row) []Row {
 	for {

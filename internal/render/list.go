@@ -49,7 +49,7 @@ type List struct {
 // minFlex is the narrowest a flex column gets before other columns drop.
 const minFlex = 10
 
-// SummaryRows is how many of a list body's h rows its summary takes: all of
+// SummaryRows is how many of a list body's h rows its Summary takes: all of
 // its Lines, or none when they and one Item row don't fit. The Items are
 // drawn in the rows below it.
 func SummaryRows(p widget.Payload, h int) int {
@@ -77,7 +77,7 @@ func summary(p widget.Payload) []widget.Line {
 	return lines
 }
 
-// listBody draws exactly h lines of w cells: the summary pinned on top, then
+// listBody draws exactly h lines of w cells: the Summary pinned on top, then
 // the Items, inside a one-cell margin each side.
 func listBody(th theme.Theme, p widget.Payload, l List, w, h int) []string {
 	s := SummaryRows(p, h)
