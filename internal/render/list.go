@@ -1,6 +1,7 @@
 package render
 
 import (
+	"cmp"
 	"slices"
 	"strings"
 
@@ -169,7 +170,7 @@ func row(th theme.Theme, p widget.Payload, item int, widths []int, w int, select
 		if fs := p.Items[item].Fields; c < len(fs) {
 			f = fs[c]
 		}
-		text := ansi.Truncate(fieldText(th, f, bg, selected), cw, "…")
+		text := ansi.Truncate(fieldText(th, f, bg, selected, fieldBars(f, cw, p.Columns[c].Flex)), cw, "…")
 		gap := bg.Render(strings.Repeat(" ", cw-ansi.StringWidth(text)))
 		if p.Columns[c].Right {
 			b.WriteString(gap + text)
@@ -186,10 +187,15 @@ func row(th theme.Theme, p widget.Payload, item int, widths []int, w int, select
 // reminder or a Plugin, would otherwise split the list's rows apart.
 var oneLine = strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ", "\t", " ").Replace
 
-// fieldText styles a field; on the selected row, plain text turns bright and bold.
-func fieldText(th theme.Theme, f widget.Field, bg lipgloss.Style, selected bool) string {
+// fieldText styles a field, its bar spans bars cells wide; on the selected
+// row, plain text turns bright and bold.
+func fieldText(th theme.Theme, f widget.Field, bg lipgloss.Style, selected bool, bars []int) string {
 	var b strings.Builder
-	for _, s := range f {
+	for i, s := range f {
+		if s.Bar != nil {
+			b.WriteString(bar(th, s, bars[i], bg))
+			continue
+		}
 		st := bg.Foreground(th.Color(s.Token)).Bold(s.Bold)
 		if selected && s.Token == theme.Fg {
 			st = st.Foreground(th.Color(theme.Bright)).Bold(true)
@@ -268,9 +274,32 @@ func columnWidths(p widget.Payload, w int) []int {
 	return widths
 }
 
+// fieldBar is how wide a bar without a Width is outside a flex column.
+const fieldBar = 10
+
+// fieldBars gives each bar span in a field its width in a column w wide:
+// its own Width, else in a flex column a share of what the field's other
+// spans leave, else fieldBar.
+func fieldBars(f widget.Field, w int, flex bool) []int {
+	if flex {
+		return barWidths(f, w)
+	}
+	widths := make([]int, len(f))
+	for i, s := range f {
+		if s.Bar != nil {
+			widths[i] = cmp.Or(s.Bar.Width, fieldBar)
+		}
+	}
+	return widths
+}
+
 func fieldWidth(f widget.Field) int {
 	n := 0
 	for _, s := range f {
+		if s.Bar != nil {
+			n += cmp.Or(s.Bar.Width, fieldBar)
+			continue
+		}
 		n += ansi.StringWidth(oneLine(s.Text))
 	}
 	return n
