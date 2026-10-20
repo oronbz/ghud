@@ -15,7 +15,7 @@ import (
 )
 
 // colorWait is how long visor waits for the terminal to answer its colour
-// queries before settling on what it has.
+// and graphics queries before settling on what it has.
 const colorWait = 500 * time.Millisecond
 
 // colors tracks the theme against the terminal's colour answers.
@@ -36,9 +36,30 @@ type colorWaitMsg struct{}
 // Theme is the palette in use.
 func (m Model) Theme() theme.Theme { return m.opts.Theme }
 
-// queryColors asks for the terminal's colours, then for device attributes,
-// whose answer comes after every colour answer the terminal will give.
+// queryTerminal asks whether the terminal draws kitty graphics and how big
+// its cells are, then what queryColors asks.
+func (m Model) queryTerminal() tea.Cmd {
+	return m.query(append([]tea.Cmd{tea.Raw(graphicsQuery + cellSizeQueries)}, m.colorQueries()...))
+}
+
+// queryColors asks for the terminal's colours, unless the theme is pinned.
 func (m Model) queryColors() tea.Cmd {
+	if m.colors.pinned {
+		return nil
+	}
+	return m.query(m.colorQueries())
+}
+
+// query sends queries, then asks for device attributes, whose answer comes
+// after every other answer the terminal will give.
+func (m Model) query(queries []tea.Cmd) tea.Cmd {
+	return tea.Batch(
+		tea.Sequence(append(queries, tea.Raw(ansi.RequestPrimaryDeviceAttributes))...),
+		m.opts.Ports.Clock.After(colorWait, func(time.Time) tea.Msg { return colorWaitMsg{} }),
+	)
+}
+
+func (m Model) colorQueries() []tea.Cmd {
 	if m.colors.pinned {
 		return nil
 	}
@@ -50,11 +71,7 @@ func (m Model) queryColors() tea.Cmd {
 		}
 		queries = append(queries, tea.RequestForegroundColor, tea.Raw(osc4.String()))
 	}
-	queries = append(queries, tea.Raw(ansi.RequestPrimaryDeviceAttributes))
-	return tea.Batch(
-		tea.Sequence(queries...),
-		m.opts.Ports.Clock.After(colorWait, func(time.Time) tea.Msg { return colorWaitMsg{} }),
-	)
+	return queries
 }
 
 // background is the colour visor sets as the terminal background, nil while

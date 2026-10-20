@@ -91,9 +91,9 @@ func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case closekey.Close:
 		if m.editing != nil {
 			m, save := m.saveEdit()
-			return m, tea.Sequence(save, tea.Quit)
+			return m, tea.Sequence(save, m.quit())
 		}
-		return m, tea.Quit
+		return m, m.quit()
 	case closekey.Swallow:
 		return m, nil
 	}
@@ -132,7 +132,7 @@ func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 			m = m.openMenu(m.focus, x, y)
 		}
 	case key.Matches(msg, keys.Quit):
-		return m, tea.Quit
+		return m, m.quit()
 	case key.Matches(msg, keys.Refresh):
 		return m.startAll(true)
 	case key.Matches(msg, keys.Unfocus):
