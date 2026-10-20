@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"path/filepath"
 	"slices"
 	"time"
 
@@ -118,8 +119,9 @@ type status struct {
 
 // read is an update in Widget-contract terms: its payload, if any, and its
 // Status as Refresh would return it. A payload the schema rejects, such as
-// one with a raw colour, is an error naming why.
-func (u update) read() (*widget.Payload, error) {
+// one with a raw colour, is an error naming why. An image path is relative
+// to dir, where the Plugin runs.
+func (u update) read(dir string) (*widget.Payload, error) {
 	var p *widget.Payload
 	if len(u.Payload) > 0 && string(u.Payload) != "null" {
 		p = new(widget.Payload)
@@ -129,6 +131,9 @@ func (u update) read() (*widget.Payload, error) {
 		}
 		if err != nil {
 			return nil, fmt.Errorf("sent a payload visor can't show: %w", err)
+		}
+		if img := p.Image; img != nil && img.Path != "" && !filepath.IsAbs(img.Path) {
+			img.Path = filepath.Join(dir, img.Path)
 		}
 	}
 	if u.Status == nil {

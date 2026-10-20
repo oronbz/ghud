@@ -190,6 +190,8 @@ func (f *fixture) refresh(id json.RawMessage, w *widget) {
 			map[string]any{"digits": "half-block", "spans": []any{map[string]any{"text": "12:34", "token": "fg"}}},
 			line("dim", fmt.Sprintf("refresh %d", n)),
 		}, "image": map[string]any{"data": pixel, "side": "right"}}})
+	case "image-file":
+		f.reply(id, map[string]any{"payload": map[string]any{"lines": []any{line("fg", "hi")}, "image": map[string]any{"path": "pixel.png"}}})
 	case "two-images":
 		f.reply(id, map[string]any{"payload": map[string]any{"lines": []any{line("fg", "hi")}, "image": map[string]any{"data": pixel, "path": "/tmp/pixel.png"}}})
 	case "bad-side":

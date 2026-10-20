@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/ansi/kitty"
@@ -310,12 +311,68 @@ func TestAMenuOverATileCoversItsImage(t *testing.T) {
 	}
 }
 
-func TestAWindowTooSmallForTheTilesDeletesTheirImages(t *testing.T) {
-	h, _ := withPicture(t, 40, 9, &widget.Image{Data: dataOf(pngOf(t, 8, 8, redPx))}, widget.Text(theme.Fg, "hello"))
+func TestAnImageItsTileLeavesOutStaysUploadedWhileItsPayloadHasIt(t *testing.T) {
+	for _, small := range []struct {
+		name string
+		w, h int
+	}{{"a window too small for the tiles", 4, 2}, {"lines narrower than 20 cells", 30, 9}} {
+		t.Run(small.name, func(t *testing.T) {
+			h, _ := withPicture(t, 40, 9, &widget.Image{Data: dataOf(pngOf(t, 8, 8, redPx))}, widget.Text(theme.Fg, "hello"))
+			kittyTerminal(h)
+			h.Resize(small.w, small.h)
+			if !strings.HasSuffix(h.Written(), apc("a=d,d=i,i=1,p=1,q=2", "")) {
+				t.Errorf("the placement outlives its tile: %q", h.Written())
+			}
+			if strings.Contains(h.Written(), "a=d,d=I") {
+				t.Errorf("the image was deleted while its Payload still has it: %q", h.Written())
+			}
+			h.Resize(40, 9)
+			if !strings.HasSuffix(h.Written(), apc("a=p,U=1,i=1,p=1,c=12,r=6,q=2", "")) {
+				t.Errorf("the image isn't placed again: %q", h.Written())
+			}
+			if n := strings.Count(h.Written(), "a=t,"); n != 1 {
+				t.Errorf("uploaded %d times, want once", n)
+			}
+		})
+	}
+}
+
+func TestAnImageFileIsReadAgainOnlyWithANewPayload(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "a.png")
+	blue := pngOf(t, 8, 16, color.RGBA{B: 255, A: 255})
+	if err := os.WriteFile(file, pngOf(t, 8, 8, redPx), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h, p := withPicture(t, 40, 9, &widget.Image{Path: file}, widget.Text(theme.Fg, "hello"))
 	kittyTerminal(h)
-	h.Resize(4, 2)
-	if !strings.HasSuffix(h.Written(), apc("a=d,d=I,i=1,q=2", "")) {
-		t.Errorf("the image outlives its tile: %q", h.Written())
+	if err := os.WriteFile(file, blue, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.Send(tea.MouseMotionMsg{X: 5, Y: 3})
+	h.Resize(41, 9)
+	if n := strings.Count(h.Written(), "a=t,"); n != 1 {
+		t.Errorf("uploaded %d times before a new Payload, want once: %q", n, h.Written())
+	}
+	p.Image = &widget.Image{Path: file}
+	h.Press("tab")
+	if !strings.Contains(h.Written(), apc("a=t,f=100,i=2,q=2", dataOf(blue))) {
+		t.Errorf("a new Payload doesn't read the changed file: %q", h.Written())
+	}
+}
+
+func TestTheCellSizeIsAskedAgainOnlyWhenAResizedWindowHasImages(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		img  *widget.Image
+		want int
+	}{{"no image", nil, 1}, {"an image", &widget.Image{Data: dataOf(pngOf(t, 8, 8, redPx))}, 2}} {
+		h, _ := withPicture(t, 40, 9, c.img, widget.Text(theme.Fg, "hello"))
+		kittyTerminal(h)
+		h.Resize(50, 11)
+		h.Resize(50, 11)
+		if n := strings.Count(h.Written(), "\x1b[16t"); n != c.want {
+			t.Errorf("with %s the cell size was asked %d times, want %d", c.name, n, c.want)
+		}
 	}
 }
 

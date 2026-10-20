@@ -222,11 +222,11 @@ func (m Model) baseTypes() []widget.Type {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	ask := m.graphicsAnswer(msg)
+	m.images.answer(msg)
 	next, cmd := m.update(msg)
 	n := next.(Model)
 	n.observe()
-	return n, tea.Batch(cmd, ask, n.syncImages())
+	return n, tea.Batch(cmd, n.syncImages())
 }
 
 func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
