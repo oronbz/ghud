@@ -151,7 +151,7 @@
       "additionalProperties": false,
       "properties": {
         "spans": { "type": "array", "items": { "$ref": "#/$defs/span" } },
-        "digits": { "description": "Draw the line's text as big digits (0-9, ':', space, A, P, M).", "enum": ["", "half-block", "block"] },
+        "digits": { "description": "Draw the line's text as big digits (0-9, ':', '.', ',', '%', '-', space, A, B, G, K, M, P, T; lowercase letters draw as uppercase).", "enum": ["", "half-block", "block"] },
         "chart": { "$ref": "#/$defs/chart" }
       }
     },
