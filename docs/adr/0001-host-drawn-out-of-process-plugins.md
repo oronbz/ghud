@@ -19,3 +19,7 @@ Plugins never draw cells. List Widgets send Items as typed fields with column pr
 ## Note (2026-10-19)
 
 mirador now has plugins: its external panel protocol v1 shipped in 1.6.0 and is a compatibility commitment (1.22.1 at the time of writing). The decision stands. v1 is still one tile per process drawing whole frames of styled lines with key bindings; it has no request/response matching, Items, typed Actions or choice menus.
+
+## Note (2026-10-20)
+
+Images are now a host-drawn helper too. ADR 0002 records that v1 dropped them; Plugins that wanted one had to write kitty graphics to the terminal themselves and fake placeholder cells with theme tokens, which broke when the colours changed and let two Plugins clash. A live view's payload may now carry one `image` (a path or base64 PNG or JPEG, and a side). The host lays it out beside or above the lines, detects kitty graphics at startup, allocates the image ids, uploads each distinct image once and deletes it when unused, and falls back to truecolor half-blocks elsewhere. Plugins still never draw cells or write escapes.
