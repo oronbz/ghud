@@ -409,7 +409,7 @@ func (p *Plugin) notified(method string, params json.RawMessage) {
 	if w == nil {
 		return
 	}
-	payload, err := u.read()
+	payload, err := u.read(p.m.Dir)
 	w.deliver(widget.Push{Payload: payload, Err: p.withName(err)})
 }
 
@@ -534,7 +534,7 @@ func (w *pluginWidget) Refresh(ctx context.Context, _ time.Time) (widget.Payload
 	if err := proc.conn.Call(ctx, "widget/refresh", widgetParams{Widget: w.id}, &u); err != nil {
 		return widget.Payload{}, w.p.callErr(err)
 	}
-	p, err := u.read()
+	p, err := u.read(w.p.m.Dir)
 	switch {
 	case err != nil:
 		return widget.Payload{}, w.p.withName(err)

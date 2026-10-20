@@ -93,6 +93,23 @@ func TestAPluginWidgetTypeComesFromItsManifest(t *testing.T) {
 	}
 }
 
+func TestARelativeImagePathIsReadFromThePluginsFolder(t *testing.T) {
+	dir := plugintest.Write(t, filepath.Join(t.TempDir(), "fixture"), plugintest.Options{Mode: "image-file"})
+	r := plugin.NewRegistry()
+	t.Cleanup(r.Close)
+	types, problems := r.Discover([]string{dir}, nil)
+	if len(problems) > 0 || len(types) != 1 {
+		t.Fatalf("types %v, problems %v", types, problems)
+	}
+	p, err := refresh(t, open(t, types[0], "fx", &clock{now: t0}, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(dir, "pixel.png"); p.Image == nil || p.Image.Path != want {
+		t.Errorf("image %+v, want the path %q", p.Image, want)
+	}
+}
+
 func TestAPluginWidgetRefreshesItsItemsFromTheProcess(t *testing.T) {
 	_, typ := fixture(t, plugintest.Options{})
 	w := open(t, typ, "fx", &clock{now: t0}, widget.Settings{"greeting": "hi"})

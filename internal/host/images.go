@@ -19,6 +19,7 @@ import (
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/oronbz/visor/internal/layout"
 	"github.com/oronbz/visor/internal/render"
 	"github.com/oronbz/visor/internal/widget"
 )
@@ -48,12 +49,40 @@ type images struct {
 	answered bool
 	// cell and window are the sizes the terminal reported, in pixels.
 	cell, window image.Point
-	loaded       map[string]*loaded
+	// asked is the window size, in cells, the cell size was last asked at.
+	asked  image.Point
+	loaded map[string]*loaded
 	// shown are the images drawn this frame, by Widget id.
 	shown  map[string]render.Picture
 	shrunk map[shrinkKey]image.Image
 	// uploads are the images the terminal holds, by content hash.
 	uploads map[[32]byte]*upload
+	// synced is what the last sync drew from, so a frame with nothing new
+	// for images skips it.
+	synced imageInputs
+}
+
+// imageInputs are what decides how images draw: the graphics mode, the
+// cell size and every Payload with an image.
+type imageInputs struct {
+	mode graphicsMode
+	cell image.Point
+	refs []imageRef
+}
+
+func (a imageInputs) equal(b imageInputs) bool {
+	return a.mode == b.mode && a.cell == b.cell && slices.Equal(a.refs, b.refs)
+}
+
+// imageRef is a Widget whose Payload has an image, and the tile it's drawn
+// in, zero when it isn't. A Payload's Lines and Wrap decide the image's box
+// too; a Plugin sends a new Payload, so a new Image, when they change.
+type imageRef struct {
+	id    string
+	img   *widget.Image
+	tile  layout.Rect
+	wrap  bool
+	lines int
 }
 
 // upload is an image the terminal holds, and its virtual placements by
@@ -73,9 +102,11 @@ type loaded struct {
 	// png is what's uploaded: the file itself when it's a PNG.
 	png []byte
 	err error
-	// mod and size tell a changed file from the one loaded.
+	// mod and size tell a changed file from the one loaded, and from the
+	// Image they were last checked for.
 	mod  time.Time
 	size int64
+	from *widget.Image
 }
 
 type shrinkKey struct {
@@ -141,8 +172,9 @@ func (g *images) place(u *upload, box image.Point, out *strings.Builder) uint32 
 	return p
 }
 
-// prune deletes the placements this frame didn't use, and the images it
-// didn't use at all, from the terminal.
+// prune deletes the placements this frame didn't use, and the images no
+// Payload has any more, from the terminal. used holds every image a Payload
+// has, with the placements drawn.
 func (g *images) prune(used map[*upload]map[image.Point]bool, out *strings.Builder) {
 	for _, hash := range g.byID() {
 		u := g.uploads[hash]
@@ -178,11 +210,8 @@ func (m Model) quit() tea.Cmd {
 	return tea.Sequence(tea.Raw(out.String()), tea.Quit)
 }
 
-// graphicsAnswer reads the terminal's answers to the graphics and cell size
-// queries, and asks for the cell size again when the window changes, as a
-// font size change does.
-func (m Model) graphicsAnswer(msg tea.Msg) tea.Cmd {
-	g := m.images
+// answer reads the terminal's answers to the graphics and cell size queries.
+func (g *images) answer(msg tea.Msg) {
 	switch msg := msg.(type) {
 	case uv.KittyGraphicsEvent:
 		g.answered = g.answered || msg.Options.ID == 31
@@ -197,52 +226,96 @@ func (m Model) graphicsAnswer(msg tea.Msg) tea.Cmd {
 		g.cell = image.Pt(msg.Width, msg.Height)
 	case uv.PixelSizeEvent:
 		g.window = image.Pt(msg.Width, msg.Height)
-	case tea.WindowSizeMsg:
-		return tea.Raw(cellSizeQueries)
 	}
-	return nil
 }
 
-// cellSize is a cell's size in pixels, or a guess of 1:2 when the terminal
-// hasn't said.
-func (m Model) cellSize() image.Point {
-	g := m.images
+// cellSize is a cell's size in pixels in a window w×h cells, or a guess of
+// 1:2 when the terminal hasn't said.
+func (g *images) cellSize(w, h int) image.Point {
 	switch {
 	case g.cell.X > 0 && g.cell.Y > 0:
 		return g.cell
-	case g.window.X > 0 && g.window.Y > 0 && m.w > 0 && m.h > 0:
-		return image.Pt(g.window.X/m.w, g.window.Y/m.h)
+	case g.window.X > 0 && g.window.Y > 0 && w > 0 && h > 0:
+		return image.Pt(g.window.X/w, g.window.Y/h)
 	}
 	return image.Pt(1, 2)
 }
 
+// imageInputs gathers what images draw from: every Widget whose Payload has
+// an image, visible or not, and the tile it's drawn in. A hidden Widget's
+// Payload counts only when it doesn't depend on a size, as a Source's.
+// payloads are the refs' Payloads.
+func (m Model) imageInputs() (in imageInputs, payloads []widget.Payload) {
+	in = imageInputs{mode: m.images.mode, cell: m.images.cellSize(m.w, m.h)}
+	f := layout.Compute(m.layout, nil, m.w, m.h-footerHeight, layout.Pointer{})
+	laid := f
+	if f.TooSmall {
+		laid = m.placed()
+	}
+	add := func(id string, p widget.Payload, tile layout.Rect) {
+		if p.HasImage() {
+			in.refs = append(in.refs, imageRef{id: id, img: p.Image, tile: tile, wrap: p.Wrap, lines: len(p.Lines)})
+			payloads = append(payloads, p)
+		}
+	}
+	for _, t := range laid.Tiles {
+		var tile layout.Rect
+		if !f.TooSmall && (m.editing == nil || m.editing.widget != t.ID) {
+			tile = t.Rect
+		}
+		add(t.ID, m.payloadIn(t.ID, t.Rect), tile)
+	}
+	for _, id := range m.ids() {
+		if _, ok := laid.Tile(id); ok {
+			continue
+		}
+		if _, ok := m.widgets[id].widget.(widget.Source); ok {
+			add(id, m.payloadIn(id, layout.Rect{}), layout.Rect{})
+		}
+	}
+	return in, payloads
+}
+
 // syncImages loads the images the frame shows, sizing each to its tile. With
 // kitty graphics it uploads and places the ones the terminal doesn't hold
-// yet and deletes those no tile shows any more, in escapes written outside
-// the frame, ahead of it.
+// yet, and deletes placements no tile draws and images no Payload has any
+// more, in escapes written outside the frame, ahead of it. It does nothing
+// while what images draw from is unchanged.
 func (m Model) syncImages() tea.Cmd {
 	g := m.images
 	if g.mode == graphicsAsking || m.w == 0 || m.h == 0 {
 		return nil
 	}
+	in, payloads := m.imageInputs()
+	if in.equal(g.synced) {
+		return nil
+	}
+	g.synced = in
 	var out strings.Builder
+	if size := image.Pt(m.w, m.h); g.asked == (image.Point{}) {
+		g.asked = size
+	} else if size != g.asked && len(in.refs) > 0 {
+		g.asked = size
+		out.WriteString(cellSizeQueries)
+	}
 	used := map[*upload]map[image.Point]bool{}
 	shown := map[string]render.Picture{}
 	loaded := map[string]*loaded{}
 	shrunk := map[shrinkKey]image.Image{}
-	s := m.scene()
-	for i, tile := range s.tiles {
-		t, p := s.Tiles[i], tile.Payload
-		if !p.HasImage() {
-			continue
-		}
-		key, l := g.load(*p.Image)
+	for i, ref := range in.refs {
+		key, l := g.load(ref.img)
 		loaded[key] = l
 		if l.err != nil {
 			continue
 		}
-		pic := render.Picture{Size: l.img.Bounds().Size(), Cell: m.cellSize()}
-		box := render.ImageBox(p, pic, t.W-2, t.H-2)
+		if u := g.uploads[l.hash]; u != nil && used[u] == nil {
+			used[u] = map[image.Point]bool{}
+		}
+		if ref.tile == (layout.Rect{}) {
+			continue
+		}
+		pic := render.Picture{Size: l.img.Bounds().Size(), Cell: in.cell}
+		box := render.ImageBox(payloads[i], pic, ref.tile.W-2, ref.tile.H-2)
 		switch {
 		case box == (image.Point{}):
 			continue
@@ -260,7 +333,7 @@ func (m Model) syncImages() tea.Cmd {
 			}
 			pic.Pixels = shrunk[k]
 		}
-		shown[t.ID] = pic
+		shown[ref.id] = pic
 	}
 	g.shown, g.loaded, g.shrunk = shown, loaded, shrunk
 	g.prune(used, &out)
@@ -270,9 +343,9 @@ func (m Model) syncImages() tea.Cmd {
 	return tea.Raw(out.String())
 }
 
-// load reads and decodes img, or returns what it read before while the file
-// or data is unchanged; key names it among the loaded images.
-func (g *images) load(img widget.Image) (string, *loaded) {
+// load reads and decodes img, or returns what it read before. A file is
+// checked for changes only when img is new, as it is in a new Payload.
+func (g *images) load(img *widget.Image) (string, *loaded) {
 	if img.Path == "" {
 		key := "data:" + img.Data
 		if l := g.loaded[key]; l != nil {
@@ -285,19 +358,24 @@ func (g *images) load(img widget.Image) (string, *loaded) {
 		return key, decode(b)
 	}
 	key := "path:" + img.Path
+	l := g.loaded[key]
+	if l != nil && l.from == img {
+		return key, l
+	}
 	st, err := os.Stat(img.Path)
 	if err != nil {
-		return key, &loaded{err: err}
+		return key, &loaded{err: err, from: img}
 	}
-	if l := g.loaded[key]; l != nil && l.mod.Equal(st.ModTime()) && l.size == st.Size() {
+	if l != nil && l.err == nil && l.mod.Equal(st.ModTime()) && l.size == st.Size() {
+		l.from = img
 		return key, l
 	}
 	b, err := os.ReadFile(img.Path)
 	if err != nil {
-		return key, &loaded{err: err}
+		return key, &loaded{err: err, from: img}
 	}
-	l := decode(b)
-	l.mod, l.size = st.ModTime(), st.Size()
+	l = decode(b)
+	l.mod, l.size, l.from = st.ModTime(), st.Size(), img
 	return key, l
 }
 
