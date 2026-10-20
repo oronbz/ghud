@@ -159,11 +159,11 @@ func (l Layout) Drop(id string, d Drop) Layout {
 		t := out.cellAt(tp)
 		t.Weight = round3(t.Weight / 2)
 		cell.Weight = t.Weight
-		at := tp[len(tp)-1]
+		at := tp.last()
 		if d.Side == Right {
 			at++
 		}
-		out.insertCell(tp[:len(tp)-1], at, cell)
+		out.insertCell(tp.parent(), at, cell)
 	default:
 		out.stackWith(tp, cell, d.Side == Up)
 	}
@@ -183,12 +183,12 @@ func (l Layout) Split(f Frame, s Zone, at int) Layout {
 	var first, span, la, lb int
 	siblings := 0.0
 	switch {
-	case s.Kind == WidgetSeam && len(s.Path)%2 == 1:
-		cells := out.rowAt(s.Path).Widgets
+	case s.Kind == WidgetSeam && s.Path.isRow():
+		cells := out.rowAt(s.Path).Cells
 		if s.Index < 0 || s.Index >= len(cells) {
 			return out
 		}
-		j := l.nextShown(cells, s.Index, 1)
+		j := nextShown(cells, s.Index, 1, l.shown)
 		if j < 0 {
 			return out
 		}
@@ -199,12 +199,12 @@ func (l Layout) Split(f Frame, s Zone, at int) Layout {
 		for _, c := range cells {
 			siblings += c.Weight
 		}
-	case s.Kind == RowSeam && len(s.Path)%2 == 0:
+	case s.Kind == RowSeam && !s.Path.isRow():
 		rows := *out.rowsAt(s.Path)
 		if s.Index < 0 || s.Index >= len(rows) {
 			return out
 		}
-		j := l.nextRowShown(rows, s.Index, 1)
+		j := nextShown(rows, s.Index, 1, l.rowShown)
 		if j < 0 {
 			return out
 		}

@@ -51,7 +51,7 @@ type images struct {
 	cell, window image.Point
 	// asked is the window size, in cells, the cell size was last asked at.
 	asked  image.Point
-	loaded map[string]*loaded
+	loaded map[string]*decoded
 	// shown are the images drawn this frame, by Widget id.
 	shown  map[string]render.Image
 	shrunk map[shrinkKey]image.Image
@@ -96,7 +96,7 @@ type upload struct {
 // a 256-colour foreground carries it, and what's over in its high byte.
 func (u *upload) id() uint32 { return uint32((u.n-1)/255)<<24 | uint32((u.n-1)%255+1) }
 
-type loaded struct {
+type decoded struct {
 	hash [32]byte
 	img  image.Image
 	// png is what's uploaded: the file itself when it's a PNG.
@@ -115,14 +115,14 @@ type shrinkKey struct {
 }
 
 func newImages() *images {
-	return &images{loaded: map[string]*loaded{}, shown: map[string]render.Image{}, shrunk: map[shrinkKey]image.Image{}, uploads: map[[32]byte]*upload{}}
+	return &images{loaded: map[string]*decoded{}, shown: map[string]render.Image{}, shrunk: map[shrinkKey]image.Image{}, uploads: map[[32]byte]*upload{}}
 }
 
-// chunk is the most base64 a kitty graphics escape carries.
-const chunk = 4096
+// maxChunk is the most base64 a kitty graphics escape carries.
+const maxChunk = 4096
 
 // upload sends l to the terminal, unless it holds it already.
-func (g *images) upload(l *loaded, out *strings.Builder) *upload {
+func (g *images) upload(l *decoded, out *strings.Builder) *upload {
 	if u := g.uploads[l.hash]; u != nil {
 		return u
 	}
@@ -133,12 +133,12 @@ func (g *images) upload(l *loaded, out *strings.Builder) *upload {
 	g.uploads[l.hash] = u
 	data := base64.StdEncoding.EncodeToString(l.png)
 	keys := fmt.Sprintf("a=t,f=100,i=%d,q=2", u.id())
-	if len(data) <= chunk {
+	if len(data) <= maxChunk {
 		out.WriteString(ansi.KittyGraphics([]byte(data), keys))
 		return u
 	}
 	for len(data) > 0 {
-		n := min(chunk, len(data))
+		n := min(maxChunk, len(data))
 		more := 0
 		if n < len(data) {
 			more = 1
@@ -215,7 +215,7 @@ func (g *images) answer(msg tea.Msg) {
 	switch msg := msg.(type) {
 	case uv.KittyGraphicsEvent:
 		g.answered = g.answered || msg.Options.ID == 31
-	case uv.PrimaryDeviceAttributesEvent, colorWaitMsg:
+	case uv.PrimaryDeviceAttributesEvent, queryWaitMsg:
 		if g.mode == graphicsAsking {
 			g.mode = graphicsHalfBlocks
 			if g.answered {
@@ -250,7 +250,7 @@ func (m Model) imageInputs() (in imageInputs, payloads []widget.Payload) {
 	f := layout.Compute(m.layout, nil, m.w, m.h-footerHeight, layout.Pointer{})
 	laid := f
 	if f.TooSmall {
-		laid = m.placed()
+		laid = m.laidOut()
 	}
 	add := func(id string, p widget.Payload, tile layout.Rect) {
 		if p.HasImage() {
@@ -300,7 +300,7 @@ func (m Model) syncImages() tea.Cmd {
 	}
 	used := map[*upload]map[image.Point]bool{}
 	shown := map[string]render.Image{}
-	loaded := map[string]*loaded{}
+	loaded := map[string]*decoded{}
 	shrunk := map[shrinkKey]image.Image{}
 	for i, ref := range in.refs {
 		key, l := g.load(ref.img)
@@ -345,7 +345,7 @@ func (m Model) syncImages() tea.Cmd {
 
 // load reads and decodes img, or returns what it read before. A file is
 // checked for changes only when img is new, as it is in a new Payload.
-func (g *images) load(img *widget.Image) (string, *loaded) {
+func (g *images) load(img *widget.Image) (string, *decoded) {
 	if img.Path == "" {
 		key := "data:" + img.Data
 		if l := g.loaded[key]; l != nil {
@@ -353,7 +353,7 @@ func (g *images) load(img *widget.Image) (string, *loaded) {
 		}
 		b, err := base64.StdEncoding.DecodeString(img.Data)
 		if err != nil {
-			return key, &loaded{err: err}
+			return key, &decoded{err: err}
 		}
 		return key, decode(b)
 	}
@@ -364,7 +364,7 @@ func (g *images) load(img *widget.Image) (string, *loaded) {
 	}
 	st, err := os.Stat(img.Path)
 	if err != nil {
-		return key, &loaded{err: err, from: img}
+		return key, &decoded{err: err, from: img}
 	}
 	if l != nil && l.err == nil && l.mod.Equal(st.ModTime()) && l.size == st.Size() {
 		l.from = img
@@ -372,29 +372,29 @@ func (g *images) load(img *widget.Image) (string, *loaded) {
 	}
 	b, err := os.ReadFile(img.Path)
 	if err != nil {
-		return key, &loaded{err: err, from: img}
+		return key, &decoded{err: err, from: img}
 	}
 	l = decode(b)
 	l.mod, l.size, l.from = st.ModTime(), st.Size(), img
 	return key, l
 }
 
-func decode(b []byte) *loaded {
+func decode(b []byte) *decoded {
 	img, format, err := image.Decode(bytes.NewReader(b))
 	if err != nil {
-		return &loaded{err: err}
+		return &decoded{err: err}
 	}
-	l := &loaded{hash: sha256.Sum256(b), img: img, png: b}
+	l := &decoded{hash: sha256.Sum256(b), img: img, png: b}
 	switch format {
 	case "png":
 	case "jpeg":
 		var out bytes.Buffer
 		if err := png.Encode(&out, img); err != nil {
-			return &loaded{err: err}
+			return &decoded{err: err}
 		}
 		l.png = out.Bytes()
 	default:
-		return &loaded{err: errors.New("not a PNG or JPEG")}
+		return &decoded{err: errors.New("not a PNG or JPEG")}
 	}
 	return l
 }

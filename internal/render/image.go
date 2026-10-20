@@ -85,9 +85,13 @@ func ImageBox(p widget.Payload, pic Image, w, h int) image.Point {
 	return image.Pt(at.W, at.H)
 }
 
+func (pic Image) sized() bool {
+	return pic.Size.X > 0 && pic.Size.Y > 0 && pic.Cell.X > 0 && pic.Cell.Y > 0
+}
+
 // colsFor is how many cells wide pic is when it's rows cells tall.
 func colsFor(pic Image, rows int) int {
-	if pic.Size.X <= 0 || pic.Size.Y <= 0 || pic.Cell.X <= 0 || pic.Cell.Y <= 0 {
+	if !pic.sized() {
 		return 0
 	}
 	return max(1, int(math.Round(float64(rows*pic.Cell.Y*pic.Size.X)/float64(pic.Size.Y*pic.Cell.X))))
@@ -158,7 +162,7 @@ func placeholders(pic Image, cols, rows int) []string {
 // HalfBlocks is the size, in pixels of half a cell, that pic is drawn at in
 // a box cols×rows cells: fitted inside it, aspect ratio kept.
 func HalfBlocks(pic Image, cols, rows int) image.Point {
-	if pic.Size.X <= 0 || pic.Size.Y <= 0 || pic.Cell.X <= 0 || pic.Cell.Y <= 0 {
+	if !pic.sized() {
 		return image.Point{}
 	}
 	s := min(float64(cols*pic.Cell.X)/float64(pic.Size.X), float64(rows*pic.Cell.Y)/float64(pic.Size.Y))

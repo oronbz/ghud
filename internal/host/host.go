@@ -455,8 +455,9 @@ func (m Model) scene() scene {
 		}
 		if tile.Payload.IsList() {
 			rows := render.Rows(tile.Payload)
-			top := t.Y + 1 + render.SummaryRows(tile.Payload, t.H-2)
-			for i := range t.Y + t.H - 1 - top {
+			n := itemRows(tile.Payload, t.Rect)
+			top := t.Y + t.H - 1 - n
+			for i := range n {
 				if j := tile.List.Top + i; j < len(rows) && rows[j] >= 0 {
 					s.Zones = append(s.Zones, layout.Zone{Kind: layout.Item, ID: t.ID, Index: rows[j], Rect: layout.Rect{X: t.X + 1, Y: top + i, W: t.W - 2, H: 1}})
 				}

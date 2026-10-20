@@ -143,7 +143,7 @@ func TestDraggingASeamResizesLiveAndWritesTheLayoutOnRelease(t *testing.T) {
 	if tok, _ := h.Fg(30, 7); tok != theme.Accent {
 		t.Errorf("dragged seam drawn in %v, want accent", tok)
 	}
-	if saved, _ := layout.Load(h.Paths.Config); saved.Rows[0].Widgets[0].Weight != 1 {
+	if saved, _ := layout.Load(h.Paths.Config); saved.Rows[0].Cells[0].Weight != 1 {
 		t.Errorf("layout.json changed mid-drag: %+v", saved.Rows[0])
 	}
 	h.DragTo(5, 7)
@@ -156,7 +156,7 @@ func TestDraggingASeamResizesLiveAndWritesTheLayoutOnRelease(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, b := saved.Rows[0].Widgets[0].Weight, saved.Rows[0].Widgets[1].Weight
+	a, b := saved.Rows[0].Cells[0].Weight, saved.Rows[0].Cells[1].Weight
 	if share := a / (a + b); share < 40.5/96 || share > 41.5/96 {
 		t.Errorf("saved Alpha:Bravo %v:%v, want Alpha 41 of 96 columns", a, b)
 	}

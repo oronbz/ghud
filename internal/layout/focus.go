@@ -1,6 +1,9 @@
 package layout
 
-import "math"
+import (
+	"math"
+	"slices"
+)
 
 // Toward is the tile focus moves to from id going d: the nearest tile that
 // way, preferring tiles that overlap id's across the direction of travel.
@@ -41,20 +44,11 @@ func (f Frame) Toward(id string, d Dir) string {
 		if overlap > 0 {
 			apart = 0
 		}
-		if score := [3]float64{apart, float64(gap), off}; less(score, bestScore) {
+		if score := [3]float64{apart, float64(gap), off}; slices.Compare(score[:], bestScore[:]) < 0 {
 			best, bestScore = o.ID, score
 		}
 	}
 	return best
-}
-
-func less(a, b [3]float64) bool {
-	for i := range a {
-		if a[i] != b[i] {
-			return a[i] < b[i]
-		}
-	}
-	return false
 }
 
 // NextRow is Tab: the tile in the top-level row step rows on from id's,
@@ -78,7 +72,7 @@ func (f Frame) NextRow(id string, step int) string {
 	}
 	next := rows[((k+step)%len(rows)+len(rows))%len(rows)]
 	cx := t.X + t.W/2
-	best, bestScore := id, [3]float64{math.Inf(1)}
+	best, bestScore := id, [2]float64{math.Inf(1)}
 	for _, o := range f.Tiles {
 		if o.Path[0] != next {
 			continue
@@ -89,7 +83,7 @@ func (f Frame) NextRow(id string, step int) string {
 		} else if cx >= o.X+o.W {
 			d = cx - (o.X + o.W - 1)
 		}
-		if score := [3]float64{float64(d), float64(o.Y)}; less(score, bestScore) {
+		if score := [2]float64{float64(d), float64(o.Y)}; slices.Compare(score[:], bestScore[:]) < 0 {
 			best, bestScore = o.ID, score
 		}
 	}
