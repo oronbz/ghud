@@ -221,8 +221,12 @@ const Stacks = (() => {
       }
       return out;
     };
+    // floor keeps every weight at 5% or more of its siblings' total, so no tile gets squeezed to nothing.
+    const floor = items => { const sum = items.reduce((a, x) => a + x.weight, 0); items.forEach(x => { x.weight = Math.max(x.weight, r3(sum * 0.05)); }); };
+    const floorAll = rows => { floor(rows); rows.forEach(r => { floor(r.widgets); r.widgets.forEach(c => { if (isStack(c)) floorAll(c.rows); }); }); };
     let prev;
     do { prev = JSON.stringify(L); L.rows = normRows(L.rows); } while (JSON.stringify(L) !== prev);
+    floorAll(L.rows);
     return L;
   }
 
@@ -313,7 +317,8 @@ const Stacks = (() => {
   // the next cell is looked for further out. A Widget alone in a stack's row
   // steps out beside that stack. Past the dashboard's edge, a full-height column.
   // Up and down: a Widget sharing its row takes a row of its own above or
-  // below; alone, it joins the next row at the same horizontal position
+  // below. Alone, it swaps with the next row when that row is a lone Widget,
+  // and otherwise joins the next row at the same horizontal position
   // (descending into stacks), stepping out of a stack as a row of its own
   // beside the stack's row.
   function move(L, W, H, id, dir) {
@@ -361,6 +366,11 @@ const Stacks = (() => {
       const j = level.rowIndex + step;
       if (j < 0 || j >= level.container.rows.length) continue;
       let row = level.container.rows[j];
+      if (k === chain.length - 1 && row.widgets.length === 1 && !isStack(row.widgets[0])) {
+        const rows = level.container.rows;
+        [rows[level.rowIndex], rows[j]] = [rows[j], rows[level.rowIndex]];
+        return normalize(c);
+      }
       for (;;) {
         const near = nearestBy(row.widgets, x => f.cellRect.get(x), "x", me.x);
         if (isStack(near)) { row = step < 0 ? near.rows.at(-1) : near.rows[0]; continue; }
@@ -772,15 +782,15 @@ const SCENARIOS = [
     ] },
   { name: "Keyboard in and out of a stack", start: STACKED, focus: "agents",
     desc: "Agents is alone in its row inside a stack. Each press is one step: out beside the stack, into the next cell, out the other side, and so on.",
-    watch: "↑ inside the stack first joins Spotify's row (side by side). The next ↑ gives it a row of its own above Spotify, which is a swap in two presses.",
+    watch: "↑ inside the stack swaps Agents with Spotify, because Spotify is alone in its row. ↑ again steps out of the top of the stack as a full-width row.",
     steps: [
       ["Focus Agents (in the stack) and press m", () => { focusOn("agents")(); keyOp("m"); }],
       ["← : out of the stack, a column between Priorities and the stack", key("ArrowLeft")],
       ["← : into Priorities' cell, above it", key("ArrowLeft")],
       ["→ : out the other side, a column again", key("ArrowRight")],
       ["→ : back into the stack, as a row of its own at its height", key("ArrowRight")],
-      ["↑ : into Spotify's row", key("ArrowUp")],
-      ["↑ : a row of its own above Spotify", key("ArrowUp")],
+      ["↑ : swap with Spotify", key("ArrowUp")],
+      ["↑ : out of the top of the stack, a full-width row", key("ArrowUp")],
       ["esc : revert all of it", key("Escape")],
     ] },
   { name: "Stacks unwind themselves", start: Stacks.drop(VISOR, "agents", { kind: "side", target: "spotify", side: "down" }), focus: "agents",
