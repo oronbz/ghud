@@ -131,7 +131,7 @@ name = "mode"
 kind = "string"
 default = %q
 description = "What refreshes return"
-choices = ["items", "lines", "raw-colour", "malformed", "unknown-field", "setup", "error"]
+choices = ["items", "lines", "raw-colour", "malformed", "unknown-field", "setup", "error", "two-images", "bad-side"]
 %s`, o.Name, o.Protocol, quoted(o.Command), o.Name, o.Refresh, o.Default, o.Mode, build.String())
 }
 

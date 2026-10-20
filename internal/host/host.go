@@ -110,6 +110,7 @@ type Model struct {
 	plugins  *plugin.Registry
 	pushes   chan tea.Msg
 	observed map[string]observation
+	images   *images
 }
 
 type placed struct {
@@ -136,7 +137,7 @@ func New(o Options) Model {
 	m := Model{opts: o, now: o.Ports.Clock.Now(), widgets: map[string]placed{},
 		fetched: map[string]widget.Payload{}, lists: map[string]listState{},
 		sched: map[string]sched{}, paused: map[string]time.Time{}, cache: cacheStore(o), rng: newRand(o.Ports.Clock.Now()), timers: new(int),
-		closing: closekey.NewMatcher(o.CloseKeys), plugins: plugin.NewRegistry(), pushes: make(chan tea.Msg, 64), observed: map[string]observation{}}
+		closing: closekey.NewMatcher(o.CloseKeys), plugins: plugin.NewRegistry(), pushes: make(chan tea.Msg, 64), observed: map[string]observation{}, images: newImages()}
 	file := o.ConfigFile
 	if file == "" {
 		file = filepath.Join(o.Paths.Config, config.FileName)
@@ -210,7 +211,7 @@ func (m Model) place(wc config.Widget, ref config.Ref) placed {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.nextTick(), m.queryColors(), m.nextChange(), m.nextPush(), m.listen(m.ids()), func() tea.Msg { return startMsg{} }, m.cleanCache(), m.refreshSkills())
+	return tea.Batch(m.nextTick(), m.queryTerminal(), m.nextChange(), m.nextPush(), m.listen(m.ids()), func() tea.Msg { return startMsg{} }, m.cleanCache(), m.refreshSkills())
 }
 
 func (m Model) baseTypes() []widget.Type {
@@ -221,9 +222,11 @@ func (m Model) baseTypes() []widget.Type {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	ask := m.graphicsAnswer(msg)
 	next, cmd := m.update(msg)
-	next.(Model).observe()
-	return next, cmd
+	n := next.(Model)
+	n.observe()
+	return n, tea.Batch(cmd, ask, n.syncImages())
 }
 
 func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -438,6 +441,9 @@ func (m Model) scene() scene {
 			Payload: m.payloadIn(t.ID, t.Rect),
 			List:    m.lists[t.ID].render(),
 			Status:  m.chrome(t.ID),
+		}
+		if pic, ok := m.images.shown[t.ID]; ok {
+			tile.Picture = &pic
 		}
 		switch {
 		case m.editing != nil && t.ID == m.editing.widget:

@@ -23,6 +23,8 @@ type Tile struct {
 	// Handle draws the ⠿ grab handle before the title.
 	Handle  bool
 	Payload widget.Payload
+	// Picture is the Payload's Image as the host loaded it; nil leaves it out.
+	Picture *Picture
 	// List is how a list Payload is selected and scrolled.
 	List   List
 	Hints  []Hint
@@ -82,7 +84,7 @@ func Draw(th theme.Theme, t Tile) string {
 	out := make([]string, 0, t.H)
 	out = append(out, ansi.Truncate(top, t.W, ""))
 	t.List.Focused = t.Focused
-	for _, l := range body(th, t.Payload, t.List, inner, t.H-2) {
+	for _, l := range body(th, t.Payload, t.Picture, t.List, inner, t.H-2) {
 		out = append(out, border.Render(b.Left)+l+border.Render(b.Right))
 	}
 	out = append(out, bottom(th, border, b, t.Hints, t.W))
@@ -159,13 +161,23 @@ func KeyLabel(key string) string {
 }
 
 // body renders a payload as exactly h lines, each exactly w cells wide.
-func body(th theme.Theme, p widget.Payload, l List, w, h int) []string {
+func body(th theme.Theme, p widget.Payload, pic *Picture, l List, w, h int) []string {
 	if p.IsList() {
 		return listBody(th, p, l, w, h)
 	}
 	if p.Wrap {
 		return textBody(th, p, l, w, h)
 	}
+	if p.Image != nil && pic != nil {
+		if out, ok := imageBody(th, p, *pic, w, h); ok {
+			return out
+		}
+	}
+	return liveBody(th, p, w, h)
+}
+
+// liveBody is a live view's Lines as exactly h lines of w cells.
+func liveBody(th theme.Theme, p widget.Payload, w, h int) []string {
 	lines := liveLines(th, p.Lines, w, h)
 
 	top := 0
