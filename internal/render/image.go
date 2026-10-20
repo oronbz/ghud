@@ -42,12 +42,9 @@ const minImageRows = 3
 // relative to the body; ok is false when the Image is dropped.
 func imageSplit(p widget.Payload, pic Picture, w, h int) (img, lines layout.Rect, ok bool) {
 	if side := p.Image.Side; side == widget.Top || side == widget.Bottom {
-		used, fills := 0, 0
-		for _, l := range p.Lines {
-			if l.Chart != nil && l.Chart.Rows == 0 {
-				fills++
-			}
-			used += lineRows(l)
+		used, fills := linesSpace(p.Lines)
+		if p.Wrap {
+			used, fills = len(wrapped(theme.Dark(), p, w)), 0
 		}
 		rows := max(0, h-used) / (fills + 1)
 		if rows < minImageRows {
@@ -78,7 +75,7 @@ func imageSplit(p widget.Payload, pic Picture, w, h int) (img, lines layout.Rect
 // ImageBox is the size in cells of the box a live view's Image is drawn in,
 // in a body w×h; zero when it's left out.
 func ImageBox(p widget.Payload, pic Picture, w, h int) image.Point {
-	if p.Image == nil || p.IsList() || p.Wrap {
+	if !p.HasImage() {
 		return image.Point{}
 	}
 	at, _, ok := imageSplit(p, pic, w, h)
@@ -97,12 +94,17 @@ func colsFor(pic Picture, rows int) int {
 }
 
 // imageBody is a live view with an Image as exactly h lines of w cells.
-func imageBody(th theme.Theme, p widget.Payload, pic Picture, w, h int) ([]string, bool) {
+func imageBody(th theme.Theme, p widget.Payload, pic Picture, l List, w, h int) ([]string, bool) {
 	at, rest, ok := imageSplit(p, pic, w, h)
 	if !ok {
 		return nil, false
 	}
-	text := liveBody(th, p, rest.W, rest.H)
+	var text []string
+	if p.Wrap {
+		text = textBody(th, p, l, rest.W, rest.H)
+	} else {
+		text = liveBody(th, p, rest.W, rest.H)
+	}
 	cells := placeholders(pic, at.W, at.H)
 	if pic.ID == 0 {
 		cells = halfBlocks(pic, at.W, at.H)

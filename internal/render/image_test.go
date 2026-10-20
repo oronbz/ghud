@@ -194,6 +194,41 @@ func TestAnUploadedImageIsDrawnAsPlaceholderCellsEncodingItsIDPlacementAndPositi
 	}
 }
 
+func TestAWrappedPayloadDrawsItsImageAndWrapsItsLinesInTheSpaceLeft(t *testing.T) {
+	pic := render.Picture{Size: image.Pt(40, 40), Cell: tall, Pixels: square(40, 40, red)}
+	p := pictured(widget.Left, widget.Text(theme.Fg, "alpha bravo charlie delta echo foxtrot"))
+	p.Wrap = true
+	// 40×8: a 38×6 body, a 12-cell image, and 25 cells after the gap that
+	// wrap inside their one-cell margins at 23.
+	body := inner(render.Tile{W: 40, H: 8, Payload: p, Picture: &pic})
+	img := strings.Repeat("▀", 12)
+	for i, want := range []string{img + "  alpha bravo charlie", img + "  delta echo foxtrot", img} {
+		if got := strings.TrimRight(body[i], " "); got != want {
+			t.Errorf("row %d: %q, want %q", i, got, want)
+		}
+	}
+	if rows, shown := render.TextRows(p, &pic, 38, 6); rows != 2 || shown != 6 {
+		t.Errorf("TextRows beside the image = %d in %d shown, want 2 in 6", rows, shown)
+	}
+
+	p.Image.Side = widget.Top
+	// 40×10: a 38×8 body; the lines wrap to 2 rows at the body width and
+	// leave 6 for a 12-cell square.
+	body = inner(render.Tile{W: 40, H: 10, Payload: p, Picture: &pic})
+	if want := strings.Repeat(" ", 13) + img; strings.TrimRight(body[5], " ") != want {
+		t.Errorf("last image row %q, want %q", body[5], want)
+	}
+	if got := strings.TrimRight(body[6], " "); got != " alpha bravo charlie delta echo" {
+		t.Errorf("first row under the image %q, want the line wrapped at the body width", got)
+	}
+	if rows, shown := render.TextRows(p, &pic, 38, 8); rows != 2 || shown != 2 {
+		t.Errorf("TextRows under the image = %d in %d shown, want 2 in 2", rows, shown)
+	}
+	if rows, shown := render.TextRows(p, nil, 38, 8); rows != 2 || shown != 8 {
+		t.Errorf("TextRows without the image = %d in %d shown, want 2 in 8", rows, shown)
+	}
+}
+
 func slicesContain(rows []string, s string) bool {
 	for _, r := range rows {
 		if strings.Contains(r, s) {

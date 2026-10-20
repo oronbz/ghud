@@ -148,7 +148,7 @@
       }
     },
     "image": {
-      "description": "A PNG or JPEG the host draws in a live view, keeping its aspect ratio: as kitty graphics where the terminal has them, else as truecolor half-blocks. The host uploads each distinct image once and allocates its id. Lists and wrapped payloads leave it out, and an unreadable path or undecodable data leaves it out while the lines still draw.",
+      "description": "A PNG or JPEG the host draws in a live view, keeping its aspect ratio: as kitty graphics where the terminal has them, else as truecolor half-blocks. The host uploads each distinct image once and allocates its id. Lists leave it out, and wrapped lines wrap in the space it leaves. An unreadable path or undecodable data leaves it out while the lines still draw.",
       "type": "object",
       "additionalProperties": false,
       "oneOf": [{ "required": ["path"] }, { "required": ["data"] }],

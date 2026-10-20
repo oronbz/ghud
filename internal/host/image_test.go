@@ -3,6 +3,7 @@ package host_test
 import (
 	"bytes"
 	"encoding/base64"
+	"fmt"
 	"image"
 	"image/color"
 	"image/jpeg"
@@ -324,6 +325,22 @@ func TestWithoutImagesNothingButTheQueriesIsWritten(t *testing.T) {
 	h.Press("tab", "q")
 	if strings.Count(h.Written(), "\x1b_G") != 1 {
 		t.Errorf("kitty graphics escapes besides the query: %q", h.Written())
+	}
+}
+
+func TestAWrappedPayloadDrawsItsImageAndScrollsItsLinesBesideIt(t *testing.T) {
+	var lines []widget.Line
+	for i := range 10 {
+		lines = append(lines, widget.Text(theme.Fg, fmt.Sprintf("line %d", i)))
+	}
+	h, p := withPicture(t, 40, 9, &widget.Image{Data: dataOf(pngOf(t, 8, 8, redPx))}, lines...)
+	p.Wrap = true
+	h.Advance(time.Second)
+	h.Press("tab", "j", "j", "j", "j", "j", "j")
+
+	// A 38×6 body: a 12-cell image, and 10 lines that scroll by 4 at most.
+	if got, want := h.Line(1), "│"+strings.Repeat("▀", 12)+"  line 4"; !strings.HasPrefix(got, want) {
+		t.Errorf("first body row %q, want %q:\n%s", got, want, h.Screen())
 	}
 }
 

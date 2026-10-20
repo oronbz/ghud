@@ -233,7 +233,7 @@ func (m Model) syncImages() tea.Cmd {
 	s := m.scene()
 	for i, tile := range s.tiles {
 		t, p := s.Tiles[i], tile.Payload
-		if p.Image == nil || p.IsList() || p.Wrap {
+		if !p.HasImage() {
 			continue
 		}
 		key, l := g.load(*p.Image)
