@@ -1,7 +1,6 @@
 package host
 
 import (
-	"math"
 	"slices"
 
 	"charm.land/bubbles/v2/key"
@@ -25,8 +24,8 @@ var keys = keyMap{
 	Unfocus:   key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "unfocus")),
 	NextRow:   key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next row")),
 	PrevRow:   key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("S-tab", "previous row")),
-	Left:      key.NewBinding(key.WithKeys("h", "left"), key.WithHelp("← h", "previous Widget in the row")),
-	Right:     key.NewBinding(key.WithKeys("l", "right"), key.WithHelp("→ l", "next Widget in the row")),
+	Left:      key.NewBinding(key.WithKeys("h", "left"), key.WithHelp("← h", "focus the Widget to the left")),
+	Right:     key.NewBinding(key.WithKeys("l", "right"), key.WithHelp("→ l", "focus the Widget to the right")),
 	MoveLeft:  key.NewBinding(key.WithKeys("H", "shift+left"), key.WithHelp("S-← H", "focus left")),
 	MoveDown:  key.NewBinding(key.WithKeys("J", "shift+down"), key.WithHelp("S-↓ J", "focus down")),
 	MoveUp:    key.NewBinding(key.WithKeys("K", "shift+up"), key.WithHelp("S-↑ K", "focus up")),
@@ -44,7 +43,7 @@ var keys = keyMap{
 	Last:      key.NewBinding(key.WithKeys("G"), key.WithHelp("G", "last Item")),
 	Primary:   key.NewBinding(key.WithKeys("enter"), key.WithHelp("⏎", "run the Item's primary Action")),
 
-	Shift:  key.NewBinding(key.WithKeys("h", "j", "k", "l", "left", "down", "up", "right"), key.WithHelp("←↓↑→ hjkl", "arrange: move (past an edge opens a row)")),
+	Shift:  key.NewBinding(key.WithKeys("h", "j", "k", "l", "left", "down", "up", "right"), key.WithHelp("←↓↑→ hjkl", "arrange: move one place (past an edge opens a row or column)")),
 	Grow:   key.NewBinding(key.WithKeys("H", "J", "K", "L", "shift+left", "shift+down", "shift+up", "shift+right"), key.WithHelp("S-←↓↑→ HJKL", "arrange: resize")),
 	Keep:   key.NewBinding(key.WithKeys("enter"), key.WithHelp("⏎", "arrange: keep")),
 	Revert: key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "arrange: revert")),
@@ -141,7 +140,7 @@ func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		if m.focus == "" {
 			m.focus = m.lastFocus()
 		} else {
-			m.arranging, m.before = true, m.layout
+			m.arranging, m.before, m.via = true, m.layout, layout.Via{}
 		}
 	case key.Matches(msg, keys.Widgets):
 		m.picking, m.cursor = true, 0
@@ -166,21 +165,20 @@ func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 			m.focus = m.lastFocus()
 			break
 		}
-		ri, ci := m.find(m.focus)
-		rows := m.rows()
+		f := m.placed()
 		switch {
 		case key.Matches(msg, keys.Left, keys.MoveLeft):
-			m.focus = rows[ri].Widgets[max(ci-1, 0)].ID
+			m.focus = f.Toward(m.focus, layout.Left)
 		case key.Matches(msg, keys.Right, keys.MoveRight):
-			m.focus = rows[ri].Widgets[min(ci+1, len(rows[ri].Widgets)-1)].ID
+			m.focus = f.Toward(m.focus, layout.Right)
 		case key.Matches(msg, keys.MoveDown):
-			m.focus = m.nearest(min(ri+1, len(rows)-1))
+			m.focus = f.Toward(m.focus, layout.Down)
 		case key.Matches(msg, keys.MoveUp):
-			m.focus = m.nearest(max(ri-1, 0))
+			m.focus = f.Toward(m.focus, layout.Up)
 		case key.Matches(msg, keys.NextRow):
-			m.focus = m.nearest((ri + 1) % len(rows))
+			m.focus = f.NextRow(m.focus, 1)
 		case key.Matches(msg, keys.PrevRow):
-			m.focus = m.nearest((ri - 1 + len(rows)) % len(rows))
+			m.focus = f.NextRow(m.focus, -1)
 		}
 	default:
 		if a, ok := m.actionFor(msg.String()); ok && m.focus != "" {
@@ -193,35 +191,19 @@ func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// nearest is the Widget in row ri horizontally closest to the focused
-// Widget's centre.
-func (m Model) nearest(ri int) string {
-	rects := m.rects()
-	cur := rects[m.focus]
-	cx := cur.X + cur.W/2
-	best, bestD := "", math.MaxInt
-	for _, c := range m.rows()[ri].Widgets {
-		r := rects[c.ID]
-		d := 0
-		if cx < r.X {
-			d = r.X - cx
-		} else if cx >= r.X+r.W {
-			d = cx - (r.X + r.W - 1)
-		}
-		if d < bestD {
-			best, bestD = c.ID, d
-		}
-	}
-	return best
-}
-
-// rects places every Widget. While the terminal is too small to draw the
-// grid, it lays out at the minimum size so focus still moves sensibly.
-func (m Model) rects() map[string]layout.Rect {
+// placed lays every visible Widget out. While the terminal is too small to
+// draw the grid, it lays out at the minimum size so focus still moves
+// sensibly.
+func (m Model) placed() layout.Frame {
 	f := m.frame()
 	if f.TooSmall {
 		f = layout.Compute(m.layout, m.titles(), f.Need.W, f.Need.H, layout.Pointer{})
 	}
+	return f
+}
+
+func (m Model) rects() map[string]layout.Rect {
+	f := m.placed()
 	out := make(map[string]layout.Rect, len(f.Tiles))
 	for _, t := range f.Tiles {
 		out[t.ID] = t.Rect
@@ -229,13 +211,10 @@ func (m Model) rects() map[string]layout.Rect {
 	return out
 }
 
-// nth is the id of the Nth Widget counting row by row from 0, or "".
+// nth is the id of the Nth Widget in reading order from 0, or "".
 func (m Model) nth(n int) string {
-	for _, r := range m.rows() {
-		if n < len(r.Widgets) {
-			return r.Widgets[n].ID
-		}
-		n -= len(r.Widgets)
+	if ts := m.placed().Tiles; n < len(ts) {
+		return ts[n].ID
 	}
 	return ""
 }
@@ -243,23 +222,8 @@ func (m Model) nth(n int) string {
 // lastFocus is the Widget focus returns to: the last one focused, or the
 // first on a fresh start or once that one has left the Layout.
 func (m Model) lastFocus() string {
-	if ri, _ := m.find(m.last); ri >= 0 {
+	if _, ok := m.rects()[m.last]; ok {
 		return m.last
 	}
 	return m.nth(0)
-}
-
-// rows are the visible rows, the ones focus moves over.
-func (m Model) rows() []layout.Row { return m.layout.Visible().Rows }
-
-// find is id's place among the visible rows, or -1, -1.
-func (m Model) find(id string) (row, index int) {
-	for ri, r := range m.rows() {
-		for ci, c := range r.Widgets {
-			if c.ID == id {
-				return ri, ci
-			}
-		}
-	}
-	return -1, -1
 }

@@ -1,6 +1,9 @@
 package layout
 
-import "math"
+import (
+	"math"
+	"slices"
+)
 
 // HandleGlyph is the grab handle drawn before a hovered or dragged title.
 const HandleGlyph = "⠿ "
@@ -26,11 +29,28 @@ type Drag struct {
 	Drop         *Drop
 }
 
-// Drop is where a dragged Widget lands: on Side of Target. Left and Right
-// join Target's row; Up and Down open a new row above or below it.
+type DropKind int
+
+const (
+	// OnTile is a side of the Target tile: Left and Right join its row,
+	// Up and Down stack with it in its cell.
+	OnTile DropKind = iota
+	// OnEdge is a side of the dashboard: Left and Right make a full-height
+	// column Share of the width, Up and Down a full-width row.
+	OnEdge
+	// OnSeam is a row seam: a new row in the container at Path, before row At.
+	OnSeam
+)
+
+// Drop is where a dragged Widget lands, and Bar the line that marks it.
 type Drop struct {
+	Kind   DropKind
 	Target string
 	Side   Dir
+	Path   Path
+	At     int
+	Share  float64
+	Bar    Rect
 }
 
 // hitOrder ranks overlapping zones: a title sits in a row seam's cells, and
@@ -58,87 +78,143 @@ func (f Frame) Tile(id string) (Tile, bool) {
 	return Tile{}, false
 }
 
-// DropAt is where Widget id lands when released over x, y: the side of the
-// Widget under the pointer that the pointer is nearest, relative to its size.
+// DropAt is where Widget id lands when released over x, y: the dashboard's
+// edge (its outermost two columns, or its top or bottom line), a row seam,
+// or else the side of the tile under the pointer that it's nearest,
+// relative to the tile's size.
 func (f Frame) DropAt(id string, x, y int) (Drop, bool) {
+	if f.rects == nil {
+		return Drop{}, false
+	}
+	switch {
+	case x <= 1:
+		return Drop{Kind: OnEdge, Side: Left, Share: f.share(id), Bar: Rect{0, 0, 1, f.h}}, true
+	case x >= f.w-2:
+		return Drop{Kind: OnEdge, Side: Right, Share: f.share(id), Bar: Rect{f.w - 1, 0, 1, f.h}}, true
+	case y <= 0:
+		return Drop{Kind: OnEdge, Side: Up, Bar: Rect{0, 0, f.w, 1}}, true
+	case y >= f.h-1:
+		return Drop{Kind: OnEdge, Side: Down, Bar: Rect{0, f.h - 1, f.w, 1}}, true
+	}
+	for _, z := range f.Zones {
+		if z.Kind == RowSeam && z.Contains(x, y) {
+			return Drop{Kind: OnSeam, Path: z.Path, At: z.Index + 1, Bar: Rect{z.X, y, z.W, 1}}, true
+		}
+	}
 	for _, t := range f.Tiles {
 		if t.ID == id || !t.Contains(x, y) {
 			continue
 		}
 		dx := (float64(x-t.X)+0.5)/float64(t.W) - 0.5
 		dy := (float64(y-t.Y)+0.5)/float64(t.H) - 0.5
-		side := Down
+		d := Drop{Kind: OnTile, Target: t.ID, Side: Down, Bar: Rect{t.X, t.Y + t.H - 1, t.W, 1}}
 		switch {
 		case math.Abs(dx) > math.Abs(dy) && dx < 0:
-			side = Left
+			d.Side, d.Bar = Left, Rect{t.X, t.Y, 1, t.H}
 		case math.Abs(dx) > math.Abs(dy):
-			side = Right
+			d.Side, d.Bar = Right, Rect{t.X + t.W - 1, t.Y, 1, t.H}
 		case dy < 0:
-			side = Up
+			d.Side, d.Bar = Up, Rect{t.X, t.Y, t.W, 1}
 		}
-		return Drop{Target: t.ID, Side: side}, true
+		return d, true
 	}
 	return Drop{}, false
 }
 
-func (l Layout) Drop(id string, d Drop) Layout {
-	tr, tc := l.Find(d.Target)
-	if tr < 0 || id == d.Target {
-		return l.clone()
+// share is the part of the width id's tile has, as a full-height column
+// keeps it: between 15% and 60%.
+func (f Frame) share(id string) float64 {
+	share := 0.3
+	if t, ok := f.Tile(id); ok && f.w > 0 {
+		share = float64(t.W) / float64(f.w)
 	}
-	switch d.Side {
-	case Left:
-		return l.JoinRow(id, tr, tc)
-	case Right:
-		return l.JoinRow(id, tr, tc+1)
-	case Up:
-		return l.OpenRow(id, tr)
-	}
-	return l.OpenRow(id, tr+1)
+	return min(max(share, 0.15), 0.6)
 }
 
-// Split moves seam s so its first cell (the left Widget's right border, or
+func (l Layout) Drop(id string, d Drop) Layout {
+	p := l.Find(id)
+	if p == nil || l.IsHidden(id) {
+		return l.clone()
+	}
+	switch d.Kind {
+	case OnEdge:
+		switch d.Side {
+		case Left, Right:
+			return l.column(id, d.Side, d.Share)
+		case Up:
+			return l.openRow(id, Path{}, 0)
+		}
+		return l.openRow(id, Path{}, len(l.Rows))
+	case OnSeam:
+		return l.openRow(id, d.Path, d.At)
+	}
+	tp := l.Find(d.Target)
+	if tp == nil || id == d.Target {
+		return l.clone()
+	}
+	out := l.clone()
+	cell := out.take(p)
+	switch d.Side {
+	case Left, Right:
+		t := out.cellAt(tp)
+		t.Weight = round3(t.Weight / 2)
+		cell.Weight = t.Weight
+		at := tp[len(tp)-1]
+		if d.Side == Right {
+			at++
+		}
+		out.insertCell(tp[:len(tp)-1], at, cell)
+	default:
+		out.stackWith(tp, cell, d.Side == Up)
+	}
+	return out.normalise()
+}
+
+// Split moves seam s so its first cell (the left cell's right border, or
 // the upper row's bottom border) lands on at, a column or a row. Only the
-// two Widgets or rows either side change, keeping their combined weight,
-// and neither gets smaller than MinTile. f is l's frame.
+// two cells or rows either side change, keeping their combined weight, and
+// neither gets smaller than it needs. f is l's frame.
 func (l Layout) Split(f Frame, s Zone, at int) Layout {
 	out := l.clone()
-	vis := l.Visible()
-	if s.Row < 0 || s.Row >= len(vis.Rows) {
+	if f.rects == nil || !l.has(s.Path) {
 		return out
 	}
 	var a, b *float64
-	var first, span, least int
-	switch s.Kind {
-	case WidgetSeam:
-		ws := vis.Rows[s.Row].Widgets
-		if s.Index < 0 || s.Index+1 >= len(ws) {
+	var first, span, la, lb int
+	switch {
+	case s.Kind == WidgetSeam && len(s.Path)%2 == 1:
+		cells := out.rowAt(s.Path).Widgets
+		if s.Index < 0 || s.Index >= len(cells) {
 			return out
 		}
-		ra, _ := f.Tile(ws[s.Index].ID)
-		rb, _ := f.Tile(ws[s.Index+1].ID)
-		first, span, least = ra.X, ra.W+rb.W, MinTile.W
-		ri, ci := out.Find(ws[s.Index].ID)
-		rj, cj := out.Find(ws[s.Index+1].ID)
-		a, b = &out.Rows[ri].Widgets[ci].Weight, &out.Rows[rj].Widgets[cj].Weight
-	case RowSeam:
-		if s.Row+1 >= len(vis.Rows) {
+		j := l.nextShown(cells, s.Index, 1)
+		if j < 0 {
 			return out
 		}
-		upper, lower := vis.Rows[s.Row].Widgets[0].ID, vis.Rows[s.Row+1].Widgets[0].ID
-		ra, _ := f.Tile(upper)
-		rb, _ := f.Tile(lower)
-		first, span, least = ra.Y, ra.H+rb.H, MinTile.H
-		ri, _ := out.Find(upper)
-		rj, _ := out.Find(lower)
-		a, b = &out.Rows[ri].Weight, &out.Rows[rj].Weight
+		ra, rb := f.rects[s.Path.with(s.Index).key()], f.rects[s.Path.with(j).key()]
+		first, span = ra.X, ra.W+rb.W
+		la, lb = l.needCell(cells[s.Index]).W, l.needCell(cells[j]).W
+		a, b = &cells[s.Index].Weight, &cells[j].Weight
+	case s.Kind == RowSeam && len(s.Path)%2 == 0:
+		rows := *out.rowsAt(s.Path)
+		if s.Index < 0 || s.Index >= len(rows) {
+			return out
+		}
+		j := l.nextRowShown(rows, s.Index, 1)
+		if j < 0 {
+			return out
+		}
+		ra, rb := f.rects[s.Path.with(s.Index).key()], f.rects[s.Path.with(j).key()]
+		first, span = ra.Y, ra.H+rb.H
+		la, lb = l.needRow(rows[s.Index]).H, l.needRow(rows[j]).H
+		a, b = &rows[s.Index].Weight, &rows[j].Weight
 	default:
 		return out
 	}
-	if span < 2*least {
+	if span < la+lb {
 		return out
 	}
-	size := min(max(at-first+1, least), span-least)
+	size := min(max(at-first+1, la), span-lb)
 	total := *a + *b
 	*a = math.Round(total*float64(size)/float64(span)*1000) / 1000
 	*b = math.Round((total-*a)*1000) / 1000
@@ -152,7 +228,7 @@ func (f Frame) tint(s *Zone) []Rect {
 		return nil
 	}
 	for _, z := range f.Zones {
-		if z.Kind != s.Kind || z.Row != s.Row || z.Index != s.Index {
+		if z.Kind != s.Kind || z.Index != s.Index || !slices.Equal(z.Path, s.Path) {
 			continue
 		}
 		if z.Kind == WidgetSeam {
@@ -162,13 +238,15 @@ func (f Frame) tint(s *Zone) []Rect {
 			return nil
 		}
 		var out []Rect
-		for _, b := range f.Zones {
+		for _, t := range f.Tiles {
+			if t.X < z.X || t.X+t.W > z.X+z.W {
+				continue
+			}
 			switch {
-			case b.Kind != Body:
-			case b.Row == z.Row:
-				out = append(out, Rect{b.X, b.Y + b.H, b.W, 1})
-			case b.Row == z.Row+1:
-				out = append(out, Rect{b.X, b.Y - 1, b.W, 1})
+			case t.Y+t.H-1 == z.Y:
+				out = append(out, Rect{t.X + 1, z.Y, t.W - 2, 1})
+			case t.Y == z.Y+1:
+				out = append(out, Rect{t.X + 1, z.Y + 1, t.W - 2, 1})
 			}
 		}
 		return out
@@ -177,7 +255,7 @@ func (f Frame) tint(s *Zone) []Rect {
 }
 
 // ghost places the dragged Widget's outline under the pointer, held where it
-// was grabbed and kept on screen, and the bar on the side it would drop.
+// was grabbed and kept on screen, and the bar where it would drop.
 func (f Frame) ghost(d Drag, w, h int) (ghost, bar Rect) {
 	t, ok := f.Tile(d.ID)
 	if !ok {
@@ -190,19 +268,5 @@ func (f Frame) ghost(d Drag, w, h int) (ghost, bar Rect) {
 	if d.Drop == nil {
 		return ghost, Rect{}
 	}
-	r, ok := f.Tile(d.Drop.Target)
-	if !ok {
-		return ghost, Rect{}
-	}
-	switch d.Drop.Side {
-	case Left:
-		bar = Rect{r.X, r.Y, 1, r.H}
-	case Right:
-		bar = Rect{r.X + r.W - 1, r.Y, 1, r.H}
-	case Up:
-		bar = Rect{r.X, r.Y, r.W, 1}
-	default:
-		bar = Rect{r.X, r.Y + r.H - 1, r.W, 1}
-	}
-	return ghost, bar
+	return ghost, d.Drop.Bar
 }
