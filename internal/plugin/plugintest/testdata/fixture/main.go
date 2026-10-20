@@ -189,7 +189,11 @@ func (f *fixture) refresh(id json.RawMessage, w *widget) {
 			line("accent", greeting+" from lines"),
 			map[string]any{"digits": "half-block", "spans": []any{map[string]any{"text": "12:34", "token": "fg"}}},
 			line("dim", fmt.Sprintf("refresh %d", n)),
-		}}})
+		}, "image": map[string]any{"data": pixel, "side": "right"}}})
+	case "two-images":
+		f.reply(id, map[string]any{"payload": map[string]any{"lines": []any{line("fg", "hi")}, "image": map[string]any{"data": pixel, "path": "/tmp/pixel.png"}}})
+	case "bad-side":
+		f.reply(id, map[string]any{"payload": map[string]any{"lines": []any{line("fg", "hi")}, "image": map[string]any{"data": pixel, "side": "under"}}})
 	case "raw-colour":
 		f.reply(id, map[string]any{"payload": map[string]any{"lines": []any{line("#ff0000", "red")}}})
 	case "unknown-field":
@@ -255,6 +259,9 @@ func (f *fixture) invoke(id json.RawMessage, w *widget, action, item, text, choi
 		f.fail(id, 1, "no action "+action)
 	}
 }
+
+// pixel is a 1×1 PNG, base64.
+const pixel = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
 
 var widgetActions = []any{
 	map[string]any{"id": "note", "key": "t", "label": "note", "input": "text", "prompt": "Note"},

@@ -155,7 +155,7 @@ func TestTheProtocolSchemaDescribesARealSession(t *testing.T) {
 func TestTheHostAndTheSchemaRejectTheSameRefreshes(t *testing.T) {
 	for mode, rejected := range map[string]bool{
 		"items": false, "lines": false, "setup": false, "error": false,
-		"raw-colour": true, "malformed": true, "unknown-field": true,
+		"raw-colour": true, "malformed": true, "unknown-field": true, "two-images": true, "bad-side": true,
 	} {
 		t.Run(mode, func(t *testing.T) {
 			o := plugintest.Options{Mode: mode}
