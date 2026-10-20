@@ -138,12 +138,27 @@
         "lines": { "description": "A live view's lines. In a list they are its summary, pinned above the items while the items scroll: a chart without rows takes 1 row there, center and wrap don't apply, and the whole summary is left out on a tile too short for it and one item row.", "type": "array", "items": { "$ref": "#/$defs/line" } },
         "center": { "description": "Centre the lines in the tile.", "type": "boolean" },
         "wrap": { "description": "Word-wrap the lines and let the user scroll them.", "type": "boolean" },
+        "image": { "$ref": "#/$defs/image" },
         "columns": { "description": "Makes the payload a list: every item has one field per column.", "type": "array", "items": { "$ref": "#/$defs/column" } },
         "items": { "type": "array", "items": { "$ref": "#/$defs/item" } },
         "count": { "description": "Drawn after the title.", "type": "integer" },
         "empty": { "description": "Shown when the list has no items.", "type": "string" },
         "rule": { "$ref": "#/$defs/rule" },
         "actions": { "description": "Widget Actions.", "type": "array", "items": { "$ref": "#/$defs/action" } }
+      }
+    },
+    "image": {
+      "description": "A PNG or JPEG the host draws in a live view, keeping its aspect ratio: as kitty graphics where the terminal has them, else as truecolor half-blocks. The host uploads each distinct image once and allocates its id. Lists and wrapped payloads leave it out, and an unreadable path or undecodable data leaves it out while the lines still draw.",
+      "type": "object",
+      "additionalProperties": false,
+      "oneOf": [{ "required": ["path"] }, { "required": ["data"] }],
+      "properties": {
+        "path": { "description": "An absolute path to the file. The host reads it again when it changes.", "type": "string", "minLength": 1 },
+        "data": { "description": "The file's bytes, base64.", "type": "string", "contentEncoding": "base64", "minLength": 1 },
+        "side": {
+          "description": "Where the image goes. left (the default) and right: the full body height, the lines in the width left after a one-cell gap, centred there with center; the image is left out when the lines would get narrower than 20 cells. top and bottom: the rows the lines leave, shared equally with charts without rows, at most the body width and centred across it; the image is left out under 3 rows.",
+          "enum": ["left", "right", "top", "bottom"]
+        }
       }
     },
     "line": {
