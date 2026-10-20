@@ -306,8 +306,11 @@ const Stacks = (() => {
   };
 
   // move is the keyboard move. Left and right swap with the neighbour in the
-  // row, enter a neighbouring stack as a row of its own at the height of the
-  // Widget's centre, or step out of the stack at its edge. Up
+  // row, or enter a neighbouring stack as a row of its own at the height of
+  // the Widget's centre. At a stack's edge they move into the next cell of the
+  // parent row: stacking with a Widget there (above or below, by centre),
+  // joining a stack as its own row, or stepping out beside the stack when
+  // there's no next cell. Past the dashboard's edge, a full-height column. Up
   // and down join the next row in the nearest container that has one, at the
   // same horizontal position (descending into stacks), and past the
   // dashboard's edge open a new full-width row.
@@ -329,10 +332,22 @@ const Stacks = (() => {
         return normalize(c);
       }
       if (chain.length < 2) return column(L, W, H, id, dir);
-      const parent = chain.at(-2);
+      const parent = chain.at(-2), pr = parent.row.widgets, nj = pr.indexOf(parent.cell) + step;
       detach(lv);
-      cell.weight = r3(mean(parent.row.widgets.map(x => x.weight)));
-      parent.row.widgets.splice(parent.row.widgets.indexOf(parent.cell) + (step > 0 ? 1 : 0), 0, cell);
+      if (nj < 0 || nj >= pr.length) {
+        cell.weight = r3(mean(pr.map(x => x.weight)));
+        pr.splice(pr.indexOf(parent.cell) + (step > 0 ? 1 : 0), 0, cell);
+        return normalize(c);
+      }
+      const nb = pr[nj];
+      if (isStack(nb)) {
+        const at = nb.rows.filter(r => center(f.rowRect.get(r)).y < me.y).length;
+        nb.rows.splice(at, 0, { weight: r3(mean(nb.rows.map(r => r.weight))), widgets: [{ ...cell, weight: 1 }] });
+      } else {
+        const mine = { ...cell, weight: 1 }, target = { ...nb, weight: 1 };
+        const rows = me.y < center(f.cellRect.get(nb)).y ? [mine, target] : [target, mine];
+        pr[nj] = { weight: nb.weight, rows: rows.map(x => ({ weight: 1, widgets: [x] })) };
+      }
       return normalize(c);
     }
     for (let k = chain.length - 1; k >= 0; k--) {
@@ -721,13 +736,24 @@ const SCENARIOS = [
       ["Drag Clock onto the dashboard's right edge", dragTo("clock", { kind: "col", side: "right" })],
       ["Drag Clock onto the left edge of Weather (back where it was, nearly)", dragTo("clock", { kind: "side", target: "weather", side: "left" })],
     ] },
+  { name: "Into a column by keyboard", start: Stacks.drop(REPORTER, "meetings", { kind: "side", target: "spotify", side: "left" }), focus: "meetings",
+    desc: "Priorities is a full-height column, and Meetings sits beside it in the top row of the rows on the right. The goal is to get Meetings into Priorities' column, above it, using only the keyboard.",
+    watch: "← moves Meetings into the cell to its left. That cell is a Widget, so Meetings stacks with it, above it because its centre is higher up.",
+    steps: [
+      ["Focus Meetings and press m", () => { focusOn("meetings")(); keyOp("m"); }],
+      ["← : into Priorities' column, above it", key("ArrowLeft")],
+      ["← again: out as a column of its own, left of Priorities", key("ArrowLeft")],
+      ["→ : swap places with Priorities", key("ArrowRight")],
+      ["→ : into the rows on the right, as a row of its own at its height", key("ArrowRight")],
+      ["esc : revert all of it", key("Escape")],
+    ] },
   { name: "Keyboard in and out of a stack", start: STACKED, focus: "agents",
-    desc: "In arrange mode, the arrow keys move the Widget within its nearest container. ←/→ into a stack gives the Widget its own row there, and ←/→ at a stack's edge steps it out to the parent row. ↑/↓ join the next row at the same horizontal position, as they do today.",
+    desc: "In arrange mode, the arrow keys move the Widget within its nearest container. ←/→ into a stack gives the Widget its own row there. At a stack's edge, ←/→ move it into the next cell over: stacking with a Widget there, or joining a stack as its own row. ↑/↓ join the next row at the same horizontal position, as they do today.",
     watch: "Is it predictable? Pay attention to ↑ from inside the stack: it joins Spotify's row inside the stack (side by side) rather than swapping places with it.",
     steps: [
       ["Focus Agents (in the stack) and press m", () => { focusOn("agents")(); keyOp("m"); }],
-      ["← : step out of the stack, between Priorities and the stack", key("ArrowLeft")],
-      ["→ : enter the stack again, as a row of its own at the height of its centre", key("ArrowRight")],
+      ["← : into Priorities' cell, below it (its centre is lower)", key("ArrowLeft")],
+      ["→ : back into the stack on the right, as a row of its own at its height", key("ArrowRight")],
       ["↑ : join the row above inside the stack", key("ArrowUp")],
       ["↑ : past the top of the dashboard, open a new full-width row", key("ArrowUp")],
       ["esc : revert all of it", key("Escape")],
