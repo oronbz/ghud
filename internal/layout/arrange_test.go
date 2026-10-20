@@ -362,6 +362,26 @@ func TestMovesStepOverHiddenWidgetsAndRows(t *testing.T) {
 	}
 }
 
+func TestJoinDropsWidgetsThatAreGoneFromStacksAndUnwindsWhatThatLeaves(t *testing.T) {
+	l := layout.Layout{Rows: []layout.Row{
+		row(1, w("p", 3), stack(7, row(1, w("s", 1)), row(1, w("gone", 1)))),
+		row(1, w("x", 1)),
+	}, Hidden: []string{"gone", "s"}}
+	got := l.Join([]string{"p", "s", "x", "new"})
+	if want := "p s / x / new"; shape(got) != want {
+		t.Errorf("Join gives %q, want %q", shape(got), want)
+	}
+	if ws := got.Rows[0].Widgets; ws[0].Weight != 3 || ws[1].Weight != 7 {
+		t.Errorf("weights %v %v, want s to take its stack's 7 beside p's 3", ws[0].Weight, ws[1].Weight)
+	}
+	if !slices.Equal(got.Hidden, []string{"s"}) {
+		t.Errorf("Hidden %v, want [s]", got.Hidden)
+	}
+	if none := l.Join(nil); none.Rows != nil {
+		t.Errorf("Join with no Widgets gives rows %+v, want none", none.Rows)
+	}
+}
+
 func TestNewRowsAreAsTallAsTheirContainersRowsOnAverage(t *testing.T) {
 	l := parse("a b / c")
 	l.Rows[0].Weight, l.Rows[1].Weight = 7, 3

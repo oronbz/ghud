@@ -131,27 +131,6 @@ func (l Layout) IDs() []string {
 	return out
 }
 
-// Visible is l without its hidden Widgets and what they leave empty.
-func (l Layout) Visible() Layout {
-	var keep func(rows []Row) []Row
-	keep = func(rows []Row) []Row {
-		var out []Row
-		for _, r := range rows {
-			nr := Row{Weight: r.Weight}
-			for _, c := range r.Widgets {
-				if c.IsStack() {
-					nr.Widgets = append(nr.Widgets, Cell{Weight: c.Weight, Rows: keep(c.Rows)})
-				} else if !l.IsHidden(c.ID) {
-					nr.Widgets = append(nr.Widgets, c)
-				}
-			}
-			out = append(out, nr)
-		}
-		return out
-	}
-	return Layout{Rows: tidy(keep(l.Rows))}
-}
-
 // normalise is what every change ends with: tidy, then no weight under
 // minShare of its siblings' total, so nothing gets squeezed to nothing.
 func (l Layout) normalise() Layout {
@@ -199,7 +178,7 @@ func tidy(rows []Row) []Row {
 }
 
 func tidyOnce(rows []Row) []Row {
-	out := make([]Row, 0, len(rows))
+	var out []Row
 	for _, r := range rows {
 		var cells []Cell
 		for _, c := range r.Widgets {
