@@ -69,7 +69,9 @@ type Model struct {
 	keyMap      bool
 	arranging   bool
 	// before is the Layout arrange mode reverts to.
-	before  layout.Layout
+	before layout.Layout
+	// via is what the last arrange move went into.
+	via     layout.Via
 	picking bool
 	cursor  int
 	toast   toast
