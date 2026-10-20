@@ -70,6 +70,9 @@ func (l Layout) Move(id string, d Dir) Layout {
 	return l.JoinRow(id, t, tv[len(tv)-1]+1)
 }
 
+// minShare is the smallest share of its siblings' total a weight is given.
+const minShare = 0.05
+
 // ResizeStep is how much of its row (or of the height) one keyboard resize
 // gives or takes.
 const ResizeStep = 0.1
@@ -114,7 +117,6 @@ func (l Layout) Resize(id string, d Dir) Layout {
 // minShare and 1-minShare, and leaves the others' weights (and so their
 // proportions to each other) alone.
 func reshare(ws []*float64, i int, delta float64) {
-	const minShare = 0.05
 	if len(ws) < 2 {
 		return
 	}
@@ -171,22 +173,6 @@ func (l Layout) SetHidden(id string, hidden bool) Layout {
 	out.Hidden = slices.DeleteFunc(out.Hidden, func(h string) bool { return h == id })
 	if hidden {
 		out.Hidden = append(out.Hidden, id)
-	}
-	return out
-}
-
-// Visible is l without its hidden Widgets and the rows they leave empty:
-// what Compute lays out.
-func (l Layout) Visible() Layout {
-	var out Layout
-	for ri, r := range l.Rows {
-		nr := Row{Weight: r.Weight}
-		for _, ci := range l.visibleIn(ri) {
-			nr.Widgets = append(nr.Widgets, r.Widgets[ci])
-		}
-		if len(nr.Widgets) > 0 {
-			out.Rows = append(out.Rows, nr)
-		}
 	}
 	return out
 }
