@@ -30,7 +30,7 @@ Run `visor config default`. It prints every global option, every Widget type (bu
 - **Two Widgets of one type** (two Jira queries, weather for two cities) each need their own `id`. `title` names them in the dashboard.
 - **Colours:** `theme` is a string (`"terminal"`, the default, or `"visor"`). Per-colour overrides go in `[colors.dark]` and `[colors.light]` tables, keyed by the token names the reference lists.
 - **Credentials** stay out of `config.toml`. GitHub uses `gh auth login` or `GH_TOKEN`; Jira uses `visor auth jira`, which prompts for a masked token, so ask the user to run it in their own terminal.
-- **Arrangement** (order, sizes, hidden Widgets) lives in `layout.json`, which visor rewrites. Leave it to visor and tell the user the keys: `m` arranges the focused Widget (`←↓↑→` move, `⇧←↓↑→` resize, `⏎` keep), dragging a title or border with the mouse does the same, `w` shows or hides Widgets.
+- **Arrangement** (order, sizes, hidden Widgets) lives in `layout.json`, which visor rewrites. Leave it to visor and tell the user the keys: `m` arranges the focused Widget (`←↓↑→` move, `Shift + ←↓↑→` resize, `⏎` keep), dragging a title or border with the mouse does the same, `w` shows or hides Widgets.
 
 Done when: the file parses as TOML, every key you wrote appears for its Widget type in `visor config default`, and nothing outside your edit changed (diff it).
 
