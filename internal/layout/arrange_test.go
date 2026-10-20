@@ -134,6 +134,61 @@ func TestEachArrowPressMovesOnePositionIntoTheNextWidgetThenPastIt(t *testing.T)
 	}
 }
 
+func TestTheOppositeArrowUndoesAPressExactly(t *testing.T) {
+	for _, c := range []struct {
+		start, id string
+		dirs      []layout.Dir
+	}{
+		{"a b c", "a", []layout.Dir{down, up}},
+		{"a b c", "b", []layout.Dir{up, down}},
+		{"a b c / d e", "a", []layout.Dir{right, down, up, left}},
+		{"a b c / d e", "d", []layout.Dir{up, up, up, down, down, down}},
+		{"p [s / a]", "s", []layout.Dir{left, down, up, right}},
+	} {
+		l := parse(c.start)
+		l.Rows[0].Widgets[0].Weight = 3
+		got := l
+		var via layout.Via
+		for _, d := range c.dirs {
+			got, via = got.Move(c.id, d, area, via)
+		}
+		if !reflect.DeepEqual(got, l) {
+			t.Errorf("%s %v from %q gives %q %+v, want it back as it was %+v", c.id, c.dirs, c.start, shape(got), got, l)
+		}
+	}
+}
+
+func TestUndoingAPressStillLetsTheNextOneGoPast(t *testing.T) {
+	if got := presses(t, parse("a / b c"), "a", down, down, up, down); got[3] != "b [c / a]" {
+		t.Errorf("↓ ↓ ↑ ↓ gives %q, want ↓ again past c after undoing the step past it", got[3])
+	}
+}
+
+func TestADropAResizeOrASeamDragForgetsWhatTheLastPressWentInto(t *testing.T) {
+	start := parse("a / b c / d")
+	moved, via := start.Move("a", down, area, layout.Via{})
+	if shape(moved) != "b a c / d" || via.ID != "c" {
+		t.Fatalf("↓ gives %q into %q, want a into c's row", shape(moved), via.ID)
+	}
+	f := layout.Compute(moved, nil, area.W, area.H, layout.Pointer{})
+	for _, c := range []struct {
+		name string
+		l    layout.Layout
+		want string
+	}{
+		{"a drop", moved.Drop("d", layout.Drop{Kind: layout.OnEdge, Side: up}), "d / b c / a"},
+		{"a resize", moved.Resize("d", down), "b c / a / d"},
+		{"a seam drag", moved.Split(f, layout.Zone{Kind: layout.RowSeam, Path: layout.Path{}, Index: 0}, 25), "b c / a / d"},
+	} {
+		if got, _ := c.l.Move("a", down, area, via); shape(got) != c.want {
+			t.Errorf("after %s ↓ gives %q, want %q as if nothing was remembered", c.name, shape(got), c.want)
+		}
+		if got, _ := c.l.Move("a", up, area, via); reflect.DeepEqual(got, start) {
+			t.Errorf("after %s ↑ undid the ↓ from before it", c.name)
+		}
+	}
+}
+
 func TestASwapWithAnyNeighbourTakesTwoPresses(t *testing.T) {
 	for _, c := range []struct {
 		start, id string
@@ -204,8 +259,9 @@ func TestEveryOperationLeavesTheLayoutNormalised(t *testing.T) {
 		f := layout.Compute(l, nil, area.W, area.H, layout.Pointer{})
 		for _, id := range l.IDs() {
 			for _, d := range []layout.Dir{left, right, up, down} {
-				for _, via := range []layout.Via{{}, {ID: "a", Dir: d}, {ID: "s", Dir: d}} {
-					got, _ := l.Move(id, d, area, via)
+				once, via := l.Move(id, d, area, layout.Via{})
+				twice, _ := once.Move(id, d, area, via)
+				for _, got := range []layout.Layout{once, twice} {
 					if err := normal(got); err != "" {
 						t.Errorf("%q: %s %v gives %q with %s", start, id, d, shape(got), err)
 					}

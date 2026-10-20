@@ -57,6 +57,32 @@ func TestSplitMovesASeamBetweenVisibleNeighboursOnly(t *testing.T) {
 	}
 }
 
+func TestASeamDragLeavesNoWeightUnder5PercentOfItsSiblings(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		l    layout.Layout
+		seam layout.Zone
+		w, h int
+	}{
+		{"row seam", parse("a / b"), layout.Zone{Kind: layout.RowSeam, Path: layout.Path{}, Index: 0}, 40, 400},
+		{"widget seam", parse("a b"), layout.Zone{Kind: layout.WidgetSeam, Path: layout.Path{0}, Index: 0}, 800, 10},
+	} {
+		f := layout.Compute(c.l, nil, c.w, c.h, layout.Pointer{})
+		for _, at := range []int{0, c.w + c.h} {
+			got := c.l.Split(f, c.seam, at)
+			var ws []float64
+			if c.seam.Kind == layout.RowSeam {
+				ws = []float64{got.Rows[0].Weight, got.Rows[1].Weight}
+			} else {
+				ws = []float64{got.Rows[0].Widgets[0].Weight, got.Rows[0].Widgets[1].Weight}
+			}
+			if sum := ws[0] + ws[1]; sum != 2 || min(ws[0], ws[1]) < 0.1 {
+				t.Errorf("%s dragged to %d gives weights %v, want each at least 5%% of their 2", c.name, at, ws)
+			}
+		}
+	}
+}
+
 func TestDropsOnATilesSidesJoinItsRowOrStackWithIt(t *testing.T) {
 	for _, c := range []struct {
 		start, id, target string

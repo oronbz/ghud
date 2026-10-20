@@ -234,6 +234,10 @@ func cellWeights(c *Cell) *float64 { return &c.Weight }
 
 func rowWeights(r *Row) *float64 { return &r.Weight }
 
+func (l Layout) same(o Layout) bool {
+	return slices.EqualFunc(l.Rows, o.Rows, sameRow) && slices.Equal(l.Hidden, o.Hidden)
+}
+
 func sameRow(a, b Row) bool {
 	return a.Weight == b.Weight && slices.EqualFunc(a.Widgets, b.Widgets, func(x, y Cell) bool {
 		return x.ID == y.ID && x.Weight == y.Weight && slices.EqualFunc(x.Rows, y.Rows, sameRow)

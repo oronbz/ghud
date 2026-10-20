@@ -28,30 +28,47 @@ func (d Dir) step() int {
 
 func (d Dir) across() bool { return d == Left || d == Right }
 
-// Via is the Widget a keyboard move went into, and which way, so that the
-// next press that way goes past it. The zero Via is none.
+func (d Dir) opposite() Dir { return [...]Dir{Right, Left, Down, Up}[d] }
+
+// Via is what arrange mode remembers between presses: the Widget the last
+// press went into and which way, so the next press that way goes past it,
+// and the press the opposite arrow undoes. The zero Via is none.
 type Via struct {
-	ID  string
-	Dir Dir
+	ID   string
+	Dir  Dir
+	back *press
+}
+
+// press is one keyboard move, kept so the opposite arrow can put back the
+// Layout and the Via from before it.
+type press struct {
+	id            string
+	d             Dir
+	before, after Layout
+	via           Via
 }
 
 // Move is the keyboard move: one position per press, into the next Widget
-// that way and then past it. area is the dashboard's size, and via what the
-// last press went into; the Via returned is for the next press.
-//
-// Left and right: into a Widget sharing the row is stacking with it in its
-// cell (above it when level or higher); into a stack is a row of its own
-// there, at the height of id's centre. With nothing that way in its row, id
-// steps out beside the stack it's in, or at the dashboard's edge becomes a
-// full-height column.
-//
-// Up and down: a Widget sharing its row takes a row of its own above or
-// below, unless that way is past the Widget it went into: then it stacks
-// below or above it in its cell. A Widget alone in its row goes into the
-// next row, beside the Widget nearest it, or into a stack there as its first
-// or last row; at a stack's edge it takes a row of its own beside the
-// stack's row, and at the dashboard's it stays.
+// that way and then past it, the opposite arrow undoing each press. area is
+// the dashboard's size, and via what the last press left; the Via returned
+// is for the next press.
 func (l Layout) Move(id string, d Dir, area Size, via Via) (Layout, Via) {
+	b := via.back
+	if b == nil || b.id != id || !l.same(b.after) {
+		via, b = Via{}, nil
+	}
+	if b != nil && b.d == d.opposite() {
+		return b.before.clone(), b.via
+	}
+	out, next := l.move(id, d, area, via)
+	next.back = via.back
+	if !out.same(l) {
+		next.back = &press{id: id, d: d, before: l.clone(), after: out.clone(), via: via}
+	}
+	return out, next
+}
+
+func (l Layout) move(id string, d Dir, area Size, via Via) (Layout, Via) {
 	p := l.Find(id)
 	if p == nil || l.IsHidden(id) {
 		return l.clone(), Via{}
