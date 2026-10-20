@@ -16,7 +16,7 @@ func TestSaveWritesWhatLoadReadsAndLeavesOnlyLayoutJSON(t *testing.T) {
 		t.Fatalf("Load before any Save: %v, want not-exist", err)
 	}
 	first := grid([]string{"a", "b"}, []string{"c"}).SetHidden("b", true)
-	second := first.Move("a", layout.Right)
+	second, _ := first.Move("a", layout.Right, area, layout.Via{})
 	for _, l := range []layout.Layout{first, second} {
 		if err := layout.Save(dir, l); err != nil {
 			t.Fatal(err)

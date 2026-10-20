@@ -21,9 +21,9 @@ func TestArrangeMoveRightIsKeptWrittenAndRestoredOnRestart(t *testing.T) {
 	root := savedLayout(t, threeAcross)
 	h := phoneticAt(t, root)
 
-	h.Press("1", "m", "l", "enter")
+	h.Press("1", "m", "l", "l", "enter")
 	if got := order(t, h, "Alpha", "Bravo", "Charlie"); got != "Bravo Alpha Charlie" {
-		t.Fatalf("after m l ⏎ the first row reads %q, want Bravo Alpha Charlie:\n%s", got, h.Screen())
+		t.Fatalf("after m l l ⏎ the first row reads %q, want Bravo Alpha Charlie:\n%s", got, h.Screen())
 	}
 	saved, err := layout.Load(h.Paths.Config)
 	if err != nil {
