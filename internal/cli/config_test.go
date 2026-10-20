@@ -168,7 +168,7 @@ func TestConfigDefaultPrintsTheFullyCommentedReference(t *testing.T) {
 		t.Errorf("not everything is commented out, got keys %v", doc)
 	}
 	for _, want := range []string{
-		`#theme = "visor"`,
+		`#theme = "terminal"`,
 		`#time_format = "12h"`,
 		`#week_start = "sunday"`,
 		`#mouse = true`,
@@ -223,7 +223,7 @@ func TestConfigDefaultDocumentsTheThemeAndEveryColourToken(t *testing.T) {
 		t.Fatalf("exit code %d, stderr: %s", code, stderr)
 	}
 	ref := stdout.String()
-	for _, want := range []string{`#theme = "visor"`, "#[colors.dark]", "#[colors.light]"} {
+	for _, want := range []string{`#theme = "terminal"`, "#[colors.dark]", "#[colors.light]"} {
 		if !strings.Contains(ref, want+"\n") {
 			t.Errorf("reference lacks %q:\n%s", want, ref)
 		}

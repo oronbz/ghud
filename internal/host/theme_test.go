@@ -37,7 +37,7 @@ func fgHex(t *testing.T, h *hosttest.Host, text string) string {
 var answered = uv.PrimaryDeviceAttributesEvent{62, 22}
 
 func TestALightTerminalBackgroundSelectsTheLightPalette(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 40, Height: 9})
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 40, Height: 9, Config: `theme = "visor"`})
 
 	h.Send(tea.BackgroundColorMsg{Color: lipgloss.Color("#fdf6e3")})
 	h.Send(answered)
@@ -54,7 +54,7 @@ func TestALightTerminalBackgroundSelectsTheLightPalette(t *testing.T) {
 }
 
 func TestADarkTerminalBackgroundKeepsTheDarkPalette(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 40, Height: 9})
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 40, Height: 9, Config: `theme = "visor"`})
 
 	h.Send(tea.BackgroundColorMsg{Color: lipgloss.Color("#1e1e2e")})
 	h.Send(answered)
@@ -68,7 +68,7 @@ func TestADarkTerminalBackgroundKeepsTheDarkPalette(t *testing.T) {
 }
 
 func TestSettingTheBackgroundRedrawsTheWholeScreen(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 40, Height: 9})
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 40, Height: 9, Config: `theme = "visor"`})
 
 	h.Send(tea.BackgroundColorMsg{Color: lipgloss.Color("#1e1e2e")})
 	if h.Clears() != 0 {
@@ -112,7 +112,7 @@ func TestTerminalThemeDerivesTokensFromTheTerminalsColours(t *testing.T) {
 	h.Send(tea.BackgroundColorMsg{Color: lipgloss.Color("#000000")})
 	h.Send(tea.ForegroundColorMsg{Color: lipgloss.Color("#ffffff")})
 	h.Send(osc4(1, "rgb:cccc/0000/0000"))
-	h.Send(osc4(4, "rgb:1111/2222/eeee"))
+	h.Send(osc4(4, "rgb:5555/8888/ffff"))
 	h.Send(answered)
 
 	if got := fgHex(t, h, "Clock"); got != "#ffffff" {
@@ -129,8 +129,22 @@ func TestTerminalThemeDerivesTokensFromTheTerminalsColours(t *testing.T) {
 	}
 
 	h.Press("tab")
-	if got := fgHex(t, h, "╭"); got != "#1122ee" {
-		t.Errorf("focused border %s, want accent from palette colour 4 (blue), #1122ee", got)
+	if got := fgHex(t, h, "╭"); got != "#5588ff" {
+		t.Errorf("focused border %s, want accent from palette colour 4 (blue), #5588ff", got)
+	}
+}
+
+func TestTerminalThemeKeepsVisorsColourForAPaletteColourTooFaintToRead(t *testing.T) {
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 40, Height: 9})
+
+	h.Send(tea.BackgroundColorMsg{Color: lipgloss.Color("#000000")})
+	h.Send(tea.ForegroundColorMsg{Color: lipgloss.Color("#ffffff")})
+	h.Send(osc4(4, "rgb:0000/0000/eeee"))
+	h.Send(answered)
+	h.Press("tab")
+
+	if got := fgHex(t, h, "╭"); got != "#8aa9ff" {
+		t.Errorf("focused border %s, want visor's own accent #8aa9ff over the unreadable #0000ee", got)
 	}
 }
 
@@ -149,6 +163,7 @@ func TestTerminalThemeFallsBackToVisorWithoutAnswers(t *testing.T) {
 
 func TestAnAccentOverrideColoursTheFocusedBorder(t *testing.T) {
 	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 40, Height: 9, Config: `
+theme = "visor"
 [colors.dark]
 accent = "#ff8800"
 
@@ -176,12 +191,13 @@ accent = "#0055aa"
 
 func TestAnInvalidColourToastsAndIsIgnored(t *testing.T) {
 	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 120, Height: 9, Config: `
+theme = "visor"
 [colors.dark]
 line = "#00ff00"
 accent = "orange"
 `})
 
-	if _, _, ok := h.Find("config.toml:4: `accent` in [colors.dark] must be a colour like \"#ff8800\""); !ok {
+	if _, _, ok := h.Find("config.toml:5: `accent` in [colors.dark] must be a colour like \"#ff8800\""); !ok {
 		t.Errorf("no toast naming the bad value's line:\n%s", h.Screen())
 	}
 	if got := fgHex(t, h, "╭"); got != "#00ff00" {
@@ -220,7 +236,7 @@ line = "#00ff00"
 }
 
 func TestWithNoAnswerTheDarkPaletteIsUsed(t *testing.T) {
-	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 40, Height: 9})
+	h := hosttest.New(t, hosttest.Options{Types: liveViews, Width: 40, Height: 9, Config: `theme = "visor"`})
 
 	if got := hexOf(h.View().BackgroundColor); got != "none" {
 		t.Errorf("terminal background set to %s before the terminal could answer the query", got)

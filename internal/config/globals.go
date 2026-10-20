@@ -26,9 +26,9 @@ func Globals(loc Locale) []widget.Setting {
 	}
 	return []widget.Setting{
 		{
-			Name: "theme", Kind: widget.String, Default: "visor", Choices: []string{"visor", "terminal"},
-			Description: `Colour theme: "visor" is the built-in palette, light or dark to match your terminal's background; "terminal" derives colours from your terminal's own, falling back to "visor" when the terminal doesn't answer.`,
-			Why:         `Pick "terminal" to match a terminal colour scheme you already like.`,
+			Name: "theme", Kind: widget.String, Default: "terminal", Choices: []string{"terminal", "visor"},
+			Description: `Colour theme: "terminal" derives colours from your terminal's own, keeping visor's for any too faint to read on your background, and falls back to "visor" when the terminal doesn't answer; "visor" is the built-in palette, light or dark to match your terminal's background.`,
+			Why:         `Pick "visor" for visor's own palette whatever your terminal's colour scheme.`,
 		},
 		{
 			Name: "time_format", Kind: widget.String, Default: loc.TimeFormat, Choices: []string{"12h", "24h"},

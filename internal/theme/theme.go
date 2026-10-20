@@ -216,11 +216,35 @@ func base(name string, term Terminal, dark bool) Theme {
 	}
 	t.colors[Bright] = mix(extreme, fg, 0.5)
 	for n, tok := range ansiTokens {
-		if c := term.ANSI[n]; c != nil {
+		if c := term.ANSI[n]; c != nil && contrast(c, bg) >= minContrast {
 			t.colors[tok] = c
 		}
 	}
 	return t
+}
+
+// minContrast is the WCAG ratio a palette colour needs against the
+// background to stand in for a token; below it the token keeps visor's own,
+// since many schemes ship a blue or yellow too faint to read on their background.
+const minContrast = 3.0
+
+// contrast is the WCAG contrast ratio of a and b, from 1 to 21.
+func contrast(a, b color.Color) float64 {
+	la, lb := luminance(a), luminance(b)
+	return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
+}
+
+// luminance is the WCAG relative luminance of c.
+func luminance(c color.Color) float64 {
+	r, g, b, _ := c.RGBA()
+	lin := func(v uint32) float64 {
+		s := float64(v) / 0xffff
+		if s <= 0.04045 {
+			return s / 12.92
+		}
+		return math.Pow((s+0.055)/1.055, 2.4)
+	}
+	return 0.2126*lin(r) + 0.7152*lin(g) + 0.0722*lin(b)
 }
 
 // mix is p of a over 1-p of b, per sRGB channel.

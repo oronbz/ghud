@@ -92,7 +92,7 @@ visor config init      # write that reference to your config path, once
 The reference lists every option and every Widget type, built-in and installed, with its settings, defaults and why you'd change them. A small config looks like this:
 
 ```toml
-theme = "visor"   # or "terminal" to take colours from your terminal
+theme = "terminal"   # or "visor" for visor's own palette
 
 [[widget]]
 type = "jira"
