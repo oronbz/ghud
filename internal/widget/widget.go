@@ -207,6 +207,8 @@ type Frame struct {
 // Payload is what a Widget shows: a live view's styled Lines, or a list
 // Widget's Items under Columns. Either kind may carry Widget Actions.
 type Payload struct {
+	// Lines in a list are its summary, pinned above the Items; there a chart
+	// without Rows takes one row, and Center and Wrap don't apply.
 	Lines []Line `json:"lines,omitempty"`
 	// Center centres the block vertically and each line horizontally.
 	Center bool `json:"center,omitempty"`
@@ -401,7 +403,9 @@ type Span struct {
 type Bar struct {
 	// Value is 0 to 1.
 	Value float64 `json:"value"`
-	// Width is the bar's width in cells; zero takes the width the line's other spans leave.
+	// Width is the bar's width in cells; zero takes the width the line's
+	// other spans leave. In an Item Field, zero takes what the Field's other
+	// spans leave of a flex Column, or 10 cells in any other.
 	Width int `json:"width,omitempty"`
 }
 
