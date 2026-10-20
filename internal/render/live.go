@@ -4,6 +4,7 @@ import (
 	"math"
 	"strings"
 
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/oronbz/visor/internal/theme"
@@ -128,13 +129,14 @@ func barWidths(spans []widget.Span, w int) []int {
 
 var eighths = []string{"", "▏", "▎", "▍", "▌", "▋", "▊", "▉"}
 
-// bar fills Value of w cells in eighth blocks, over a track in the line token.
-func bar(th theme.Theme, s widget.Span, w int) string {
+// bar fills Value of w cells in eighth blocks, over a track in the line
+// token, both on base's background.
+func bar(th theme.Theme, s widget.Span, w int, base lipgloss.Style) string {
 	if w <= 0 {
 		return ""
 	}
 	n := int(math.Round(min(max(s.Bar.Value, 0), 1) * float64(w*8)))
 	filled := strings.Repeat("█", n/8) + eighths[n%8]
 	cells := n/8 + min(1, n%8)
-	return th.Fg(s.Token).Render(filled) + th.Fg(theme.Line).Render(strings.Repeat("─", w-cells))
+	return base.Foreground(th.Color(s.Token)).Render(filled) + base.Foreground(th.Color(theme.Line)).Render(strings.Repeat("─", w-cells))
 }

@@ -116,6 +116,37 @@ func TestASummaryChartWithoutAHeightTakesOneRow(t *testing.T) {
 	}
 }
 
+func TestBarsInItemFieldsAreDrawnAndSizeTheirColumns(t *testing.T) {
+	half := func(width int) widget.Span {
+		return widget.Span{Token: theme.Info, Bar: &widget.Bar{Value: 0.5, Width: width}}
+	}
+	p := widget.Payload{
+		Columns: []widget.Column{{Flex: true}, {}, {}},
+		Items: []widget.Item{
+			{ID: "cpu", Fields: []widget.Field{{{Text: "cpu ", Token: theme.Fg}, half(0)}, {half(6)}, {half(0)}}},
+			{ID: "mem", Fields: []widget.Field{widget.F(theme.Fg, "mem"), nil, widget.F(theme.Dim, "35%")}},
+		},
+	}
+	h, _ := withInbox(t, 8, p, nil)
+
+	// 36 cells: a 6-cell bar, a 10-cell bar, two gaps, and 18 for the flex column.
+	want := "│ cpu " + strings.Repeat("█", 7) + strings.Repeat("─", 7) + " ███─── █████───── │"
+	if got := h.Line(1); got != want {
+		t.Errorf("bars row\n%q, want\n%q", got, want)
+	}
+	if got, want := h.Line(2), "│ mem"+strings.Repeat(" ", 23)+"35%        │"; got != want {
+		t.Errorf("text row\n%q, want\n%q", got, want)
+	}
+
+	h.Press("tab")
+	if fg, _ := h.Fg(2+4, 1); fg != theme.Info {
+		t.Errorf("selected bar drawn in %v, want its own info", fg)
+	}
+	if bg, _ := h.Bg(2+4+10, 1); bg != theme.Sel {
+		t.Errorf("selected bar's track background %v, want sel", bg)
+	}
+}
+
 func TestAnEmptyListWithASummaryShowsTheSummaryThenTheEmptyText(t *testing.T) {
 	p := summarised()
 	p.Items, p.Empty = nil, "nothing to review"
