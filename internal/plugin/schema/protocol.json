@@ -131,11 +131,11 @@
       "enum": ["bg", "sel", "line", "faint", "dim", "fg", "bright", "accent", "warn", "ok", "bad", "info", "alt"]
     },
     "payload": {
-      "description": "What a Widget shows: a live view's styled lines, or a list's items under columns. Either may carry Widget Actions.",
+      "description": "What a Widget shows: a live view's styled lines, or a list's items under columns, optionally with summary lines above them. Either may carry Widget Actions.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "lines": { "type": "array", "items": { "$ref": "#/$defs/line" } },
+        "lines": { "description": "A live view's lines. In a list they are its summary, pinned above the items while the items scroll: a chart without rows takes 1 row there, center and wrap don't apply, and the whole summary is left out on a tile too short for it and one item row.", "type": "array", "items": { "$ref": "#/$defs/line" } },
         "center": { "description": "Centre the lines in the tile.", "type": "boolean" },
         "wrap": { "description": "Word-wrap the lines and let the user scroll them.", "type": "boolean" },
         "columns": { "description": "Makes the payload a list: every item has one field per column.", "type": "array", "items": { "$ref": "#/$defs/column" } },
@@ -151,7 +151,7 @@
       "additionalProperties": false,
       "properties": {
         "spans": { "type": "array", "items": { "$ref": "#/$defs/span" } },
-        "digits": { "description": "Draw the line's text as big digits (0-9, ':', space, A, P, M).", "enum": ["", "half-block", "block"] },
+        "digits": { "description": "Draw the line's text as big digits (0-9, ':', '.', ',', '%', '-', space, A, B, G, K, M, P, T; lowercase letters draw as uppercase).", "enum": ["", "half-block", "block"] },
         "chart": { "$ref": "#/$defs/chart" }
       }
     },
@@ -171,7 +171,7 @@
           "additionalProperties": false,
           "properties": {
             "value": { "type": "number", "minimum": 0, "maximum": 1 },
-            "width": { "description": "Cells; 0 takes what the line's other spans leave.", "type": "integer", "minimum": 0 }
+            "width": { "description": "Cells; 0 takes what the line's other spans leave. In an item field, 0 takes what the field's other spans leave of a flex column, or 10 cells in any other column.", "type": "integer", "minimum": 0 }
           }
         }
       }
@@ -196,7 +196,7 @@
         "right": { "type": "boolean" }
       }
     },
-    "field": { "type": "array", "items": { "$ref": "#/$defs/span" } },
+    "field": { "description": "One item's spans in one column; a span's bar is drawn in the field too.", "type": "array", "items": { "$ref": "#/$defs/span" } },
     "item": {
       "type": "object",
       "required": ["id", "fields"],

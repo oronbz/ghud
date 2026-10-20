@@ -100,7 +100,7 @@ func (m Model) scroll(id string, lines int) {
 		return
 	}
 	rows := render.Rows(p)
-	h := max(1, r.H-2)
+	h := itemRows(p, r)
 	st := m.lists[id]
 	st.top = min(max(st.top+lines, 0), max(0, len(rows)-h))
 	if line := slices.Index(rows, st.idx); line < st.top || line >= st.top+h {

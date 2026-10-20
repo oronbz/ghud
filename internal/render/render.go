@@ -188,7 +188,7 @@ func styled(th theme.Theme, spans []widget.Span, w int) string {
 	bars := barWidths(spans, w)
 	for i, s := range spans {
 		if s.Bar != nil {
-			b.WriteString(bar(th, s, bars[i]))
+			b.WriteString(bar(th, s, bars[i], lipgloss.NewStyle()))
 			continue
 		}
 		st := th.Fg(s.Token)
