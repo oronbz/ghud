@@ -1,0 +1,797 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nested Stacks Spike</title>
+<!-- PROTOTYPE for #58: throwaway. The Stacks module below is the part worth lifting into internal/layout. -->
+<style>
+  :root {
+    --page: #15161e; --panel: #1c1d27; --ink: #d7d9e4; --muted: #8a8fa6; --rule: #2c2e3c;
+    --bg: #1e1e2e; --line: #45475a; --fg: #cdd6f4; --dim: #7f849c; --faint: #585b70;
+    --accent: #89b4fa; --warn: #fab387; --bright: #ffffff; --ok: #a6e3a1;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  main { max-width: 1500px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .lede { color: var(--muted); margin: 0 0 18px; max-width: 980px; }
+  .lede b { color: var(--ink); font-weight: 600; }
+  .grid { display: grid; grid-template-columns: auto minmax(320px, 1fr); gap: 18px; align-items: start; }
+  .termwrap { background: var(--bg); border: 1px solid var(--rule); border-radius: 10px; padding: 10px; outline: none; }
+  .termwrap:focus { border-color: var(--accent); }
+  pre#term { margin: 0; font: 13px/16px "SF Mono", Menlo, Consolas, monospace; color: var(--fg); user-select: none; cursor: default; white-space: pre; }
+  .footer { font: 13px/16px "SF Mono", Menlo, monospace; color: var(--dim); margin-top: 4px; white-space: pre; overflow: hidden; }
+  .badge { background: var(--accent); color: var(--bg); font-weight: 700; padding: 0 4px; }
+  .badge.arrange { background: var(--warn); }
+  .k { color: var(--accent); font-weight: 700; }
+  .c-line { color: var(--line); } .c-fg { color: var(--fg); } .c-dim { color: var(--dim); } .c-faint { color: var(--faint); }
+  .c-accent { color: var(--accent); } .c-warn { color: var(--warn); } .c-bright { color: var(--bright); font-weight: 700; }
+  .c-ok { color: var(--ok); }
+  .panel { background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; }
+  .panel h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; }
+  .panel + .panel { margin-top: 14px; }
+  .note { font-size: 14px; min-height: 42px; }
+  .note.fresh { color: var(--bright); }
+  .facts { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; font-size: 13px; margin-top: 8px; }
+  .facts dt { color: var(--muted); } .facts dd { margin: 0; }
+  pre.tree { font: 12px/17px "SF Mono", Menlo, monospace; margin: 0; white-space: pre; overflow-x: auto; color: var(--ink); }
+  pre.tree .changed { color: var(--warn); }
+  details summary { cursor: pointer; color: var(--muted); font-size: 13px; margin-top: 10px; }
+  details pre { font: 11px/15px "SF Mono", Menlo, monospace; max-height: 260px; overflow: auto; background: var(--bg); padding: 8px; border-radius: 6px; }
+  button { font: inherit; font-size: 13px; color: var(--ink); background: #262838; border: 1px solid var(--rule); border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .keys { font-size: 13px; color: var(--muted); margin-top: 8px; }
+  .keys code { color: var(--accent); font-family: "SF Mono", Menlo, monospace; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 4px; margin: 22px 0 0; border-bottom: 1px solid var(--rule); }
+  .tab { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--muted); padding: 8px 12px; }
+  .tab.on { color: var(--ink); border-bottom-color: var(--accent); }
+  .scenario { padding: 14px 2px; }
+  .scenario p { margin: 0 0 10px; max-width: 980px; }
+  .scenario .watch { color: var(--muted); }
+  .steps { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+  .steps button.done { color: var(--muted); border-color: transparent; }
+  .steps button.done::before { content: "✓ "; color: var(--ok); }
+  .steps button.next { border-color: var(--accent); color: var(--bright); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Nested stacks: does arranging feel right?</h1>
+  <p class="lede">Issue #58 proposes that a cell in a row can hold its own rows (a <b>stack</b>), so one Widget can be full height on one side while others stack beside it. This spike simulates visor's grid using the proposed rules, so you can try them with the mouse and visor's own keys. It checks three things. First, <b>drops are local to the tile</b>: dropping on a Widget's top or bottom edge stacks with it, and dropping over a row seam or the dashboard edge opens a full-width row. Second, <b>keyboard move and resize act on the nearest container</b>. Third, <b>arrow focus follows the tiles' positions</b>.</p>
+
+  <div class="grid">
+    <div>
+      <div class="termwrap" id="termwrap" tabindex="0">
+        <pre id="term"></pre>
+        <div class="footer" id="footer"></div>
+      </div>
+      <div class="keys">Drag a title to move a Widget · drag a border between Widgets to resize · click a Widget to focus it.
+        Keys (click the grid first): <code>←→</code> and <code>⇧←↓↑→</code> focus, <code>Tab</code> next top-level row, <code>m</code> arrange; in arrange mode <code>←↓↑→</code> move, <code>⇧←↓↑→</code> resize, <code>⏎</code> keep, <code>esc</code> revert.</div>
+    </div>
+    <div>
+      <div class="panel">
+        <h2>What just happened</h2>
+        <div class="note" id="note"></div>
+        <dl class="facts" id="facts"></dl>
+      </div>
+      <div class="panel">
+        <h2>Layout</h2>
+        <pre class="tree" id="tree"></pre>
+        <details><summary>layout.json</summary><pre id="json"></pre></details>
+      </div>
+      <div class="panel">
+        <h2>Free play</h2>
+        <div class="row">
+          <button data-reset="visor">Reset: today's flat layout</button>
+          <button data-reset="reporter">Reset: the reporter's layout</button>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button data-size="90x30">Terminal 90×30</button>
+          <button data-size="120x40">120×40</button>
+          <button data-size="160x46">160×46</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabs"></div>
+  <div class="scenario" id="scenario"></div>
+</main>
+
+<script>
+// ---------------------------------------------------------------------------
+// Stacks: the pure layout module. No DOM. Mirrors internal/layout with one
+// change: a cell is either a Widget {id, weight} or a stack {weight, rows}.
+// Paths alternate: container (even length; [] is the dashboard, a stack's path
+// is its cell path) → rows[i] → widgets[j] → (stack) rows[k] → ...
+// ---------------------------------------------------------------------------
+const Stacks = (() => {
+  const MIN = { w: 16, h: 5 };
+  const isStack = c => Array.isArray(c.rows);
+  const clone = x => JSON.parse(JSON.stringify(x));
+  const r3 = x => Math.max(Math.round(x * 1000) / 1000, 0.001);
+  const mean = xs => xs.reduce((a, b) => a + b, 0) / xs.length;
+
+  const needCell = c => isStack(c) ? needRows(c.rows) : MIN;
+  const needRow = r => r.widgets.reduce((a, c) => { const n = needCell(c); return { w: a.w + n.w, h: Math.max(a.h, n.h) }; }, { w: 0, h: 0 });
+  const needRows = rows => rows.reduce((a, r) => { const n = needRow(r); return { w: Math.max(a.w, n.w), h: a.h + n.h }; }, { w: 0, h: 0 });
+
+  // split shares total across weights, largest remainder; parts below their own minimum are pinned there.
+  function split(total, weights, mins) {
+    const n = weights.length, out = new Array(n).fill(0), pinned = new Array(n).fill(false);
+    for (;;) {
+      let left = total, sum = 0;
+      weights.forEach((w, i) => { if (pinned[i]) left -= out[i]; else sum += Math.max(w, 0); });
+      let changed = false;
+      weights.forEach((w, i) => {
+        if (!pinned[i] && (sum <= 0 || left * Math.max(w, 0) / sum < mins[i])) { pinned[i] = true; out[i] = mins[i]; changed = true; }
+      });
+      if (changed) continue;
+      const rem = weights.map(() => -1); let used = 0;
+      weights.forEach((w, i) => { if (pinned[i]) return; const f = left * w / sum; out[i] = Math.floor(f); rem[i] = f - out[i]; used += out[i]; });
+      if (pinned.every(Boolean)) { out[n - 1] += Math.max(0, left); return out; }
+      for (; used < left; used++) { let b = 0; rem.forEach((r, i) => { if (r > rem[b]) b = i; }); out[b]++; rem[b] = -1; }
+      return out;
+    }
+  }
+
+  function compute(L, W, H) {
+    const f = { W, H, tiles: [], seams: [], cellRect: new Map(), rowRect: new Map(), need: needRows(L.rows), tooSmall: false };
+    if (W < f.need.w || H < f.need.h) { f.tooSmall = true; return f; }
+    const layRows = (rows, rect, cpath) => {
+      const hs = split(rect.h, rows.map(r => r.weight), rows.map(r => needRow(r).h));
+      let y = rect.y;
+      rows.forEach((r, i) => {
+        const rr = { x: rect.x, y, w: rect.w, h: hs[i] };
+        f.rowRect.set(r, rr);
+        layRow(r, rr, [...cpath, i]);
+        if (i < rows.length - 1) f.seams.push({ kind: "row", path: cpath, index: i, rect: { x: rect.x, y: y + hs[i] - 1, w: rect.w, h: 2 } });
+        y += hs[i];
+      });
+    };
+    const layRow = (row, rect, rpath) => {
+      const ws = split(rect.w, row.widgets.map(c => c.weight), row.widgets.map(c => needCell(c).w));
+      let x = rect.x;
+      row.widgets.forEach((c, j) => {
+        const cr = { x, y: rect.y, w: ws[j], h: rect.h };
+        f.cellRect.set(c, cr);
+        if (isStack(c)) layRows(c.rows, cr, [...rpath, j]);
+        else f.tiles.push({ id: c.id, ...cr, path: [...rpath, j] });
+        if (j < row.widgets.length - 1) f.seams.push({ kind: "col", path: rpath, index: j, rect: { x: x + ws[j] - 1, y: rect.y + 1, w: 2, h: rect.h - 2 } });
+        x += ws[j];
+      });
+    };
+    layRows(L.rows, { x: 0, y: 0, w: W, h: H }, []);
+    return f;
+  }
+
+  function resolve(L, path) {
+    let node = L;
+    path.forEach((idx, k) => { node = k % 2 === 0 ? node.rows[idx] : node.widgets[idx]; });
+    return node;
+  }
+
+  // locate is the chain from the dashboard down to Widget id: at each level the
+  // container, the row in it and the cell in that row.
+  function locate(L, id) {
+    const walk = (container, prefix) => {
+      for (let ri = 0; ri < container.rows.length; ri++) {
+        const row = container.rows[ri];
+        for (let ci = 0; ci < row.widgets.length; ci++) {
+          const cell = row.widgets[ci], lv = { container, rowIndex: ri, row, cellIndex: ci, cell };
+          if (!isStack(cell)) { if (cell.id === id) return [...prefix, lv]; }
+          else { const r = walk(cell, [...prefix, lv]); if (r) return r; }
+        }
+      }
+      return null;
+    };
+    return walk(L, []);
+  }
+
+  const detach = lv => lv.row.widgets.splice(lv.row.widgets.indexOf(lv.cell), 1);
+
+  // normalize removes what's empty, turns a one-row stack back into cells of
+  // its parent row, and a row holding only a stack into rows of its container.
+  function normalize(L) {
+    const normRows = rows => {
+      const out = [];
+      for (const r of rows) {
+        const cells = [];
+        for (const c of r.widgets) {
+          if (isStack(c)) {
+            c.rows = normRows(c.rows);
+            if (c.rows.length === 0) continue;
+            if (c.rows.length === 1) {
+              const inner = c.rows[0].widgets, sum = inner.reduce((a, x) => a + x.weight, 0);
+              inner.forEach(x => cells.push({ ...x, weight: r3(x.weight / sum * c.weight) }));
+              continue;
+            }
+          }
+          cells.push(c);
+        }
+        if (cells.length === 0) continue;
+        if (cells.length === 1 && isStack(cells[0])) {
+          const s = cells[0], sum = s.rows.reduce((a, x) => a + x.weight, 0);
+          s.rows.forEach(x => out.push({ ...x, weight: r3(x.weight / sum * r.weight) }));
+          continue;
+        }
+        out.push({ weight: r.weight, widgets: cells });
+      }
+      return out;
+    };
+    let prev;
+    do { prev = JSON.stringify(L); L.rows = normRows(L.rows); } while (JSON.stringify(L) !== prev);
+    return L;
+  }
+
+  // dropAt is where id lands when released over x, y: the dashboard's top or
+  // bottom edge or a row seam opens a row across that container; over a tile,
+  // the side of the tile the pointer is nearest.
+  function dropAt(L, f, id, x, y) {
+    if (x <= 1) return { kind: "col", side: "left", bar: { x: 0, y: 0, w: 1, h: f.H } };
+    if (x >= f.W - 2) return { kind: "col", side: "right", bar: { x: f.W - 1, y: 0, w: 1, h: f.H } };
+    if (y <= 0) return { kind: "row", path: [], at: 0, bar: { x: 0, y: 0, w: f.W, h: 1 } };
+    if (y >= f.H - 1) return { kind: "row", path: [], at: L.rows.length, bar: { x: 0, y: f.H - 1, w: f.W, h: 1 } };
+    const seam = f.seams.find(s => s.kind === "row" && contains(s.rect, x, y));
+    if (seam) return { kind: "row", path: seam.path, at: seam.index + 1, bar: { x: seam.rect.x, y: seam.rect.y + (y > seam.rect.y ? 1 : 0), w: seam.rect.w, h: 1 } };
+    const t = f.tiles.find(t => t.id !== id && contains(t, x, y));
+    if (!t) return null;
+    const dx = (x - t.x + 0.5) / t.w - 0.5, dy = (y - t.y + 0.5) / t.h - 0.5;
+    let side = "down";
+    if (Math.abs(dx) > Math.abs(dy)) side = dx < 0 ? "left" : "right";
+    else if (dy < 0) side = "up";
+    const bar = { left: { x: t.x, y: t.y, w: 1, h: t.h }, right: { x: t.x + t.w - 1, y: t.y, w: 1, h: t.h },
+                  up: { x: t.x, y: t.y, w: t.w, h: 1 }, down: { x: t.x, y: t.y + t.h - 1, w: t.w, h: 1 } }[side];
+    return { kind: "side", target: t.id, side, bar };
+  }
+
+  // column makes id a full-height column on one side of the dashboard, as
+  // wide as it was; everything else keeps its rows in a stack beside it.
+  function column(L, W, H, id, side) {
+    const f = compute(L, Math.max(W, needRows(L.rows).w), Math.max(H, needRows(L.rows).h));
+    const t = f.tiles.find(x => x.id === id);
+    const share = Math.min(Math.max(t ? t.w / f.W : 0.3, 0.15), 0.6);
+    const c = clone(L), me = locate(c, id);
+    if (!me) return c;
+    detach(me.at(-1));
+    normalize(c);
+    const cell = { id, weight: r3(share * 10) }, rest = { weight: r3((1 - share) * 10), rows: c.rows };
+    c.rows = [{ weight: 1, widgets: side === "left" ? [cell, rest] : [rest, cell] }];
+    return normalize(c);
+  }
+
+  function drop(L, id, d, W, H) {
+    if (d.kind === "col") return column(L, W, H, id, d.side);
+    const c = clone(L);
+    const me = locate(c, id);
+    if (!me) return c;
+    const moving = me[me.length - 1];
+    if (d.kind === "side") {
+      if (d.target === id) return c;
+      const tl = locate(c, d.target).at(-1);
+      detach(moving);
+      const cell = moving.cell;
+      const idx = tl.row.widgets.indexOf(tl.cell);
+      if (d.side === "left" || d.side === "right") {
+        const half = r3(tl.cell.weight / 2);
+        tl.cell.weight = half; cell.weight = half;
+        tl.row.widgets.splice(idx + (d.side === "right" ? 1 : 0), 0, cell);
+      } else {
+        const target = { ...tl.cell, weight: 1 }, mine = { ...cell, weight: 1 };
+        const rows = d.side === "up" ? [mine, target] : [target, mine];
+        tl.row.widgets[idx] = { weight: tl.cell.weight, rows: rows.map(x => ({ weight: 1, widgets: [x] })) };
+      }
+    } else {
+      const container = resolve(c, d.path);
+      const upper = d.at > 0 ? container.rows[d.at - 1] : null;
+      const weight = r3(mean(container.rows.map(r => r.weight)));
+      detach(moving);
+      const at = upper ? container.rows.indexOf(upper) + 1 : 0;
+      container.rows.splice(at, 0, { weight, widgets: [{ ...moving.cell, weight: 1 }] });
+    }
+    return normalize(c);
+  }
+
+  const center = r => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
+  const nearestBy = (cells, rectOf, axis, v) => {
+    let best = null, bd = Infinity;
+    for (const c of cells) {
+      const r = rectOf(c), lo = axis === "x" ? r.x : r.y, hi = lo + (axis === "x" ? r.w : r.h);
+      const d = v < lo ? lo - v : v >= hi ? v - hi + 1 : 0;
+      if (d < bd) { best = c; bd = d; }
+    }
+    return best;
+  };
+
+  // move is the keyboard move. Left and right swap with the neighbour in the
+  // row, enter a neighbouring stack as a row of its own at the height of the
+  // Widget's centre, or step out of the stack at its edge. Up
+  // and down join the next row in the nearest container that has one, at the
+  // same horizontal position (descending into stacks), and past the
+  // dashboard's edge open a new full-width row.
+  function move(L, W, H, id, dir) {
+    const c = clone(L), f = compute(c, Math.max(W, needRows(c.rows).w), Math.max(H, needRows(c.rows).h));
+    const chain = locate(c, id);
+    if (!chain) return c;
+    const lv = chain.at(-1), cell = lv.cell, me = center(f.cellRect.get(cell));
+    const step = dir === "left" || dir === "up" ? -1 : 1;
+    if (dir === "left" || dir === "right") {
+      const j = lv.cellIndex + step;
+      if (j >= 0 && j < lv.row.widgets.length) {
+        const nb = lv.row.widgets[j];
+        if (!isStack(nb)) { lv.row.widgets[j] = cell; lv.row.widgets[lv.cellIndex] = nb; return c; }
+        const at = nb.rows.filter(r => center(f.rowRect.get(r)).y < me.y).length;
+        const weight = r3(mean(nb.rows.map(r => r.weight)));
+        detach(lv);
+        nb.rows.splice(at, 0, { weight, widgets: [{ ...cell, weight: 1 }] });
+        return normalize(c);
+      }
+      if (chain.length < 2) return column(L, W, H, id, dir);
+      const parent = chain.at(-2);
+      detach(lv);
+      cell.weight = r3(mean(parent.row.widgets.map(x => x.weight)));
+      parent.row.widgets.splice(parent.row.widgets.indexOf(parent.cell) + (step > 0 ? 1 : 0), 0, cell);
+      return normalize(c);
+    }
+    for (let k = chain.length - 1; k >= 0; k--) {
+      const level = chain[k], j = level.rowIndex + step;
+      if (j < 0 || j >= level.container.rows.length) {
+        if (k > 0) continue;
+        const weight = r3(mean(c.rows.map(r => r.weight)));
+        detach(lv);
+        c.rows.splice(step < 0 ? 0 : c.rows.length, 0, { weight, widgets: [{ ...cell, weight: 1 }] });
+        return normalize(c);
+      }
+      let row = level.container.rows[j];
+      for (;;) {
+        const near = nearestBy(row.widgets, x => f.cellRect.get(x), "x", me.x);
+        if (isStack(near)) { row = step < 0 ? near.rows.at(-1) : near.rows[0]; continue; }
+        detach(lv);
+        cell.weight = r3(mean(row.widgets.map(x => x.weight)));
+        const at = row.widgets.indexOf(near) + (me.x >= center(f.cellRect.get(near)).x ? 1 : 0);
+        row.widgets.splice(at, 0, cell);
+        return normalize(c);
+      }
+    }
+    return c;
+  }
+
+  // reshare is internal/layout's: one weight's share moves by delta, the rest keep their proportions.
+  function reshare(items, i, delta) {
+    const minShare = 0.05;
+    if (items.length < 2) return;
+    const sum = items.reduce((a, x) => a + Math.max(x.weight, 0), 0), rest = sum - Math.max(items[i].weight, 0);
+    if (sum <= 0 || rest <= 0) return;
+    const share = Math.min(Math.max(items[i].weight / sum + delta, minShare), 1 - minShare);
+    items[i].weight = r3(share * rest / (1 - share));
+  }
+
+  // resize is the keyboard resize, applied in the nearest container (from the
+  // Widget outwards) where the Widget or its stack has a sibling that way.
+  function resize(L, id, dir) {
+    const c = clone(L), chain = locate(c, id);
+    if (!chain) return { layout: c, level: -1 };
+    const delta = dir === "left" || dir === "up" ? -0.1 : 0.1;
+    for (let k = chain.length - 1; k >= 0; k--) {
+      const lv = chain[k];
+      if ((dir === "left" || dir === "right") && lv.row.widgets.length >= 2) { reshare(lv.row.widgets, lv.cellIndex, delta); return { layout: c, level: k }; }
+      if ((dir === "up" || dir === "down") && lv.container.rows.length >= 2) { reshare(lv.container.rows, lv.rowIndex, delta); return { layout: c, level: k }; }
+    }
+    return { layout: c, level: -1 };
+  }
+
+  // splitSeam moves a seam so its first cell lands on at, keeping both sides' combined weight and minimums.
+  function splitSeam(L, W, H, seam, at) {
+    const c = clone(L), f = compute(c, W, H);
+    if (f.tooSmall) return c;
+    let a, b, first, span, la, lb;
+    if (seam.kind === "col") {
+      const row = resolve(c, seam.path);
+      a = row.widgets[seam.index]; b = row.widgets[seam.index + 1];
+      const ra = f.cellRect.get(a), rb = f.cellRect.get(b);
+      first = ra.x; span = ra.w + rb.w; la = needCell(a).w; lb = needCell(b).w;
+    } else {
+      const cont = resolve(c, seam.path);
+      a = cont.rows[seam.index]; b = cont.rows[seam.index + 1];
+      const ra = f.rowRect.get(a), rb = f.rowRect.get(b);
+      first = ra.y; span = ra.h + rb.h; la = needRow(a).h; lb = needRow(b).h;
+    }
+    if (span < la + lb) return c;
+    const size = Math.min(Math.max(at - first + 1, la), span - lb), total = a.weight + b.weight;
+    a.weight = r3(total * size / span); b.weight = r3(total - a.weight);
+    return c;
+  }
+
+  // focusTo is arrow focus by position: the nearest tile that way, preferring
+  // ones that overlap the focused tile across the direction of travel.
+  function focusTo(f, id, dir) {
+    const t = f.tiles.find(x => x.id === id);
+    if (!t) return id;
+    const horiz = dir === "left" || dir === "right";
+    let best = null, bs = null;
+    for (const o of f.tiles) {
+      if (o.id === id) continue;
+      const gap = { right: o.x - (t.x + t.w), left: t.x - (o.x + o.w), down: o.y - (t.y + t.h), up: t.y - (o.y + o.h) }[dir];
+      if (gap < 0) continue;
+      const ov = horiz ? Math.min(t.y + t.h, o.y + o.h) - Math.max(t.y, o.y) : Math.min(t.x + t.w, o.x + o.w) - Math.max(t.x, o.x);
+      const perp = horiz ? Math.abs(center(o).y - center(t).y) : Math.abs(center(o).x - center(t).x);
+      const s = [ov > 0 ? 0 : 1, gap, perp];
+      if (!bs || s[0] < bs[0] || (s[0] === bs[0] && (s[1] < bs[1] || (s[1] === bs[1] && s[2] < bs[2])))) { best = o; bs = s; }
+    }
+    return best ? best.id : id;
+  }
+
+  // nextRow is Tab: the tile in the next top-level row nearest the focused one horizontally.
+  function nextRow(L, f, id, step) {
+    const t = f.tiles.find(x => x.id === id);
+    if (!t) return f.tiles[0]?.id;
+    const n = L.rows.length, ri = ((t.path[0] + step) % n + n) % n, cx = center(t).x;
+    const cands = f.tiles.filter(o => o.path[0] === ri);
+    cands.sort((a, b) => {
+      const d = o => cx < o.x ? o.x - cx : cx >= o.x + o.w ? cx - (o.x + o.w) + 1 : 0;
+      return d(a) - d(b) || a.y - b.y;
+    });
+    return cands[0]?.id ?? id;
+  }
+
+  const contains = (r, x, y) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
+  return { isStack, clone, compute, dropAt, drop, column, move, resize, splitSeam, focusTo, nextRow, locate, contains, needRows };
+})();
+
+// ---------------------------------------------------------------------------
+// The page: a simulated visor grid over Stacks. Throwaway.
+// ---------------------------------------------------------------------------
+const TITLES = { priorities: "Priorities", spotify: "Spotify", agents: "Agents", prs: "Review requests", meetings: "Meetings",
+  clock: "Clock", weather: "Weather", calendar: "Calendar", cpu: "CPU + memory", disk: "Disk", devbox: "Dev box", tokens: "Tokens", sessions: "Top sessions" };
+const BODY = {
+  priorities: ["Needs you now", "MOB-1851 White Friar Media: script edits…  SLA -12d", "MOB-1849 Udacity: teleprompter speed…    SLA -8d", "MOB-1850 GSK: teleprompter not showing… SLA -7d", "IOS-1971 Agent asks to choose content…      22h", "#9020 Replace mbSheet with system sheets     1d", "#9054 Thumbnails and post durations         21h", "#9119 Fit the home screen and side menu     12h", "Focus · Agents on Mobile", "IOS-2005 Show question sheets inline        14h", "IOS-2015 Send a push for every message      14h", "IOS-2008 Suggest uploading an external…     21h", "IOS-2011 Retry failed uploads                1d", "IOS-2019 Agent chat empty state              2d", "IOS-2023 Haptics on send                     3d"],
+  spotify: ["▞▚▞▚  Life Of A Nine (Instrumental)", "▚▞▚▞  Issues", "▞▚▞▚  ▶ 1:49 ━━━━━━━━──── 3:13", "", "Up next", "1 The Langdon House (Instrumental)", "2 Late · Issues"],
+  agents: ["✓ codex  Create printable agent…  10m", "✓ codex  Create Natan's agent…     19m", "Idle", "○ claude Visor plugin ideas       23m", "○ claude Visor Priorities widget  36m", "○ claude Visor Simulators/disk    44m", "○ claude Open PRs triage          51m"],
+  prs: ["✓ Riverside-iOS#9119 [IOS-2013]  +20 -10", "✓ Riverside-iOS#9109 [MOB-1367]  +95 -4", "✓ Riverside-iOS#9054 [IOS-1835]  +324 -10", "· RxOptional#113 Remove Packa…   +0 -52", "· RxSwiftExt#257 Add FlatScan…   +525 -91"],
+  meetings: ["Today", "12:27 ──────────────", "14:00 Hive Workshop   in 1h 32m", "18:45 Tuesday dinner  in 6h 17m", "Tomorrow", "08:00 Workout             1h 30m"],
+  clock: ["12:28:28", "Tue 20 Oct"], weather: ["Ramat Gan · from IP", "☼ 25°C Partly cloudy"], calendar: ["October 2026", "Su Mo Tu We Th Fr Sa", "             1  2  3"],
+  cpu: ["cpu 56%", "mem ██████████████──── 82%", "load 23.18 36.79 52.74"],
+  disk: ["█▀█ █▀█ ▀▀█", "103 GB free of 995 GB", "██████████████──── 90% used", "Reclaimable · 11 GB"],
+  devbox: ["Simulators", "● iPhone 18     iOS 27.0  14 GB", "● iPhone 18     iOS 27.0  4.5 GB", "● Handoff       iOS 18.6  5.0 GB", "○ Agents Rel…   iOS 18.6  1.4 GB"],
+  tokens: ["▀█ ▀▀█ ▀▀█  █▀█ ▀▀█ █▀▀  █ █ █▀█ █▀▀", "122 875 485 tokens in the last 7 days", "⣀⣠⣤⣴⣶⣾⣿⣷⣶⣤⣀⣠⣴⣾⣿", "Models", "Opus 5.5 ██████████  80M  $1,975"],
+  sessions: ["○ Create printabl…  3.3M   n/a", "● Agents audit 10…  1.8M $42.19", "● Visor Simulator…  643K $16.12", "● Deleted recordi…  563K  $5.99"],
+};
+
+const VISOR = { rows: [
+  { weight: 14, widgets: [{ id: "priorities", weight: 6 }, { id: "spotify", weight: 3.5 }] },
+  { weight: 10, widgets: [{ id: "agents", weight: 3 }, { id: "prs", weight: 3.5 }, { id: "meetings", weight: 2.5 }] },
+  { weight: 5, widgets: [{ id: "clock", weight: 3 }, { id: "weather", weight: 3 }, { id: "calendar", weight: 3 }, { id: "cpu", weight: 3 }] },
+  { weight: 12, widgets: [{ id: "disk", weight: 3 }, { id: "devbox", weight: 3 }, { id: "tokens", weight: 3.5 }, { id: "sessions", weight: 3 }] },
+] };
+const REPORTER = Stacks.column(VISOR, 120, 39, "priorities", "left");
+const STACKED = (() => {
+  let L = Stacks.drop(VISOR, "agents", { kind: "side", target: "spotify", side: "down" });
+  L = Stacks.drop(L, "prs", { kind: "side", target: "agents", side: "down" });
+  for (let i = 0; i < 3; i++) L = Stacks.resize(L, "priorities", "down").layout;
+  return L;
+})();
+
+let S = { L: Stacks.clone(VISOR), W: 120, H: 40, mode: "normal", saved: null, focus: "priorities",
+          hover: null, drag: null, seamDrag: null, note: "Click the grid, then drag a title or use the keys.", fresh: false, changed: new Set() };
+
+const term = document.getElementById("term"), wrap = document.getElementById("termwrap");
+const charW = (() => { const s = document.createElement("span"); s.textContent = "M".repeat(100); term.appendChild(s); const w = s.getBoundingClientRect().width / 100; s.remove(); return w; })();
+const charH = 16;
+const gridH = () => S.H - 1;
+
+function setLayout(L, note) {
+  const before = new Map(), after = new Map();
+  const index = (L0, m) => { const f = Stacks.compute(L0, S.W, gridH()); f.tiles.forEach(t => m.set(t.id, `${t.x},${t.y},${t.w},${t.h}`)); };
+  index(S.L, before); index(L, after);
+  S.changed = new Set([...after.keys()].filter(k => before.get(k) !== after.get(k)));
+  S.L = L; S.note = note; S.fresh = true;
+}
+
+// ---- drawing ----
+function render() {
+  const W = S.W, H = gridH(), f = Stacks.compute(S.L, W, H);
+  const buf = Array.from({ length: H }, () => Array.from({ length: W }, () => ({ ch: " ", c: "" })));
+  const put = (x, y, ch, c) => { if (y >= 0 && y < H && x >= 0 && x < W) buf[y][x] = { ch, c }; };
+  const text = (x, y, s, c, max) => { [...s].slice(0, max).forEach((ch, i) => put(x + i, y, ch, c)); };
+  if (f.tooSmall) {
+    const msg = `Terminal too small: the layout needs ${f.need.w}×${f.need.h + 1}, this is ${W}×${H + 1}`;
+    text(Math.max(0, (W - msg.length) >> 1), H >> 1, msg, "c-warn", W);
+  } else {
+    for (const t of f.tiles) {
+      const focused = t.id === S.focus, arranging = focused && S.mode === "arrange";
+      const bc = arranging ? "c-warn" : focused ? "c-accent" : "c-line";
+      const [tl, tr, bl, br, hz, vt] = arranging ? ["┏", "┓", "┗", "┛", "━", "┃"] : ["╭", "╮", "╰", "╯", "─", "│"];
+      for (let x = t.x; x < t.x + t.w; x++) { put(x, t.y, hz, bc); put(x, t.y + t.h - 1, hz, bc); }
+      for (let y = t.y; y < t.y + t.h; y++) { put(t.x, y, vt, bc); put(t.x + t.w - 1, y, vt, bc); }
+      put(t.x, t.y, tl, bc); put(t.x + t.w - 1, t.y, tr, bc); put(t.x, t.y + t.h - 1, bl, bc); put(t.x + t.w - 1, t.y + t.h - 1, br, bc);
+      const handle = S.hover?.kind === "handle" && S.hover.id === t.id || S.drag?.id === t.id;
+      const title = (handle ? "⠿ " : "") + TITLES[t.id];
+      put(t.x + 2, t.y, " ", ""); text(t.x + 3, t.y, title, focused ? "c-bright" : "c-fg", t.w - 6); put(t.x + 3 + Math.min(title.length, t.w - 6), t.y, " ", "");
+      if (handle) put(t.x + 3, t.y, "⠿", "c-accent");
+      const size = ` ${t.w}×${t.h} `;
+      if (t.w > size.length + 4) text(t.x + t.w - 2 - size.length, t.y + t.h - 1, size, S.changed.has(t.id) ? "c-warn" : "c-faint", size.length);
+      (BODY[t.id] || []).slice(0, t.h - 2).forEach((line, i) => text(t.x + 2, t.y + 1 + i, line, i === 0 ? "c-dim" : "c-faint", t.w - 4));
+    }
+    const seam = S.seamDrag?.seam || (S.hover?.kind === "seam" ? S.hover.seam : null);
+    if (seam) {
+      const r = seam.rect;
+      for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) if (y < H && x < W && "─│╭╮╰╯━┃┏┓┗┛".includes(buf[y][x].ch)) buf[y][x].c = "c-accent";
+    }
+    if (S.drag) {
+      const t = f.tiles.find(x => x.id === S.drag.id);
+      if (t) {
+        const gw = Math.min(t.w, 34), gh = Math.min(t.h, 6);
+        let gx = S.drag.x - Math.min(S.drag.dx, gw - 2), gy = S.drag.y - Math.min(S.drag.dy, gh - 1);
+        gx = Math.min(Math.max(gx, 0), W - gw); gy = Math.min(Math.max(gy, 0), H - gh);
+        for (let x = gx; x < gx + gw; x++) { put(x, gy, "┄", "c-accent"); put(x, gy + gh - 1, "┄", "c-accent"); }
+        for (let y = gy; y < gy + gh; y++) { put(gx, y, "┆", "c-accent"); put(gx + gw - 1, y, "┆", "c-accent"); }
+        put(gx, gy, "┌", "c-accent"); put(gx + gw - 1, gy, "┐", "c-accent"); put(gx, gy + gh - 1, "└", "c-accent"); put(gx + gw - 1, gy + gh - 1, "┘", "c-accent");
+        text(gx + 2, gy, " " + TITLES[t.id] + " ", "c-bright", gw - 4);
+      }
+      const b = S.drag.drop?.bar;
+      if (b) for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) put(x, y, b.h === 1 ? "━" : "┃", "c-warn");
+    }
+  }
+  term.innerHTML = buf.map(row => {
+    let out = "", cur = null, run = "";
+    const flush = () => { if (run) out += cur ? `<span class="${cur}">${esc(run)}</span>` : esc(run); run = ""; };
+    for (const cell of row) { if (cell.c !== cur) { flush(); cur = cell.c; } run += cell.ch; }
+    flush(); return out;
+  }).join("\n");
+
+  const hints = S.mode === "arrange"
+    ? `<span class="badge arrange">ARRANGE</span> <span class="k">←↓↑→</span> move · <span class="k">⇧←↓↑→</span> resize · <span class="k">⏎</span> keep · <span class="k">esc</span> revert`
+    : `<span class="badge">NORMAL</span> <span class="k">Tab</span> rows · <span class="k">↔</span> widgets · <span class="k">⇧arrows</span> any direction · <span class="k">m</span> arrange`;
+  document.getElementById("footer").innerHTML = hints;
+  renderState(f);
+}
+const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+
+function renderState(f) {
+  const n = document.getElementById("note");
+  n.textContent = S.note; n.className = "note" + (S.fresh ? " fresh" : "");
+  const chain = Stacks.locate(S.L, S.focus) || [];
+  const where = chain.length > 1 ? `inside ${chain.length - 1 === 1 ? "a stack" : `${chain.length - 1} nested stacks`}` : "in a top-level row";
+  document.getElementById("facts").innerHTML =
+    `<dt>Mode</dt><dd>${S.mode === "arrange" ? "Arranging" : "Normal"}</dd>` +
+    `<dt>Focused</dt><dd>${TITLES[S.focus] || "—"}, ${where}</dd>` +
+    `<dt>Minimum terminal</dt><dd>${f.need.w}×${f.need.h + 1}${f.tooSmall ? ' <span class="c-warn">(too small now)</span>' : ""}</dd>` +
+    `<dt>Moved or resized</dt><dd>${S.changed.size ? [...S.changed].map(id => TITLES[id]).join(", ") : "nothing"}</dd>`;
+  const lines = [];
+  const pct = (w, all) => Math.round(100 * w / all.reduce((a, x) => a + x.weight, 0)) + "%";
+  const walkRows = (rows, indent) => rows.forEach((r, i) => {
+    const last = i === rows.length - 1;
+    lines.push(`${indent}${last ? "└" : "├"} Row · ${pct(r.weight, rows)} tall`);
+    const ind2 = indent + (last ? "  " : "│ ");
+    r.widgets.forEach((c, j) => {
+      const lastc = j === r.widgets.length - 1, mark = lastc ? "└" : "├";
+      if (Stacks.isStack(c)) { lines.push(`${ind2}${mark} Stack · ${pct(c.weight, r.widgets)} wide`); walkRows(c.rows, ind2 + (lastc ? "  " : "│ ")); }
+      else lines.push(`${ind2}${mark} ${S.changed.has(c.id) ? "<span class=changed>" : ""}${TITLES[c.id]} · ${pct(c.weight, r.widgets)} wide${S.changed.has(c.id) ? "</span>" : ""}`);
+    });
+  });
+  lines.push("Dashboard");
+  walkRows(S.L.rows, "");
+  document.getElementById("tree").innerHTML = lines.join("\n");
+  document.getElementById("json").textContent = JSON.stringify({ default: S.L }, null, 2);
+}
+
+// ---- actions shared by mouse, keys and walkthroughs ----
+const DIRS = { ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "down", h: "left", l: "right", k: "up", j: "down", H: "left", L: "right", K: "up", J: "down" };
+const sideWords = { left: "left edge", right: "right edge", up: "top edge", down: "bottom edge" };
+
+function dropOp(id, d) {
+  const L = Stacks.drop(S.L, id, d, S.W, gridH());
+  let note;
+  if (d.kind === "col") {
+    note = `Dropped ${TITLES[id]} on the dashboard's ${d.side} edge: it becomes a full-height column, as wide as it was. Everything else keeps its rows beside it.`;
+  } else if (d.kind === "side") {
+    const stacked = d.side === "up" || d.side === "down";
+    note = `Dropped ${TITLES[id]} on the ${sideWords[d.side]} of ${TITLES[d.target]}: ` + (stacked
+      ? `the two now share ${TITLES[d.target]}'s cell, one above the other. Its neighbours keep their size.`
+      : `it takes half of ${TITLES[d.target]}'s width in that row.`);
+  } else {
+    note = d.path.length === 0
+      ? `Dropped ${TITLES[id]} ${d.at === 0 ? "on the dashboard's top edge" : d.at >= S.L.rows.length ? "on the dashboard's bottom edge" : "over a row seam"}: it opens a full-width row of its own.`
+      : `Dropped ${TITLES[id]} over a seam inside a stack: it opens a row across that stack.`;
+  }
+  S.focus = id;
+  setLayout(L, note);
+}
+
+function keyOp(key, shift) {
+  const f = Stacks.compute(S.L, S.W, gridH());
+  const dir = DIRS[key];
+  const isShift = shift || /^[HJKL]$/.test(key);
+  if (S.mode === "arrange") {
+    if (key === "Enter") { S.mode = "normal"; S.note = "⏎ keeps the arrangement (visor writes layout.json here)."; S.fresh = true; S.changed = new Set(); return; }
+    if (key === "Escape") { S.mode = "normal"; setLayout(S.saved, "esc reverts to the arrangement from before m."); return; }
+    if (!dir) return;
+    if (isShift) {
+      const { layout, level } = Stacks.resize(S.L, S.focus, dir);
+      const axis = dir === "left" || dir === "right" ? (dir === "right" ? "wider" : "narrower") : (dir === "down" ? "taller" : "shorter");
+      const chain = Stacks.locate(S.L, S.focus);
+      const what = level < 0 ? "nothing to share with that way" : level === chain.length - 1 ? `${TITLES[S.focus]} itself` : `the stack ${TITLES[S.focus]} is in`;
+      setLayout(layout, level < 0 ? `⇧${arrow(dir)}: ${TITLES[S.focus]} has nothing to share space with that way.` : `⇧${arrow(dir)} makes ${what} ${axis}, within its nearest container that has a neighbour that way.`);
+    } else {
+      const before = Stacks.locate(S.L, S.focus).length;
+      const L = Stacks.move(S.L, S.W, gridH(), S.focus, dir);
+      const after = Stacks.locate(L, S.focus).length;
+      const depth = after > before ? "into a stack" : after < before ? "out of its stack" : "";
+      setLayout(L, `${arrow(dir)} moves ${TITLES[S.focus]}${depth ? " " + depth : ""}${JSON.stringify(L) === JSON.stringify(S.L) ? ": nowhere to go that way." : "."}`);
+    }
+    return;
+  }
+  if (key === "m") { S.mode = "arrange"; S.saved = Stacks.clone(S.L); S.note = `Arranging ${TITLES[S.focus]}: arrows move it, ⇧arrows resize, ⏎ keeps, esc reverts.`; S.fresh = true; return; }
+  if (key === "Tab") { S.focus = Stacks.nextRow(S.L, f, S.focus, shift ? -1 : 1); S.note = `Tab: ${TITLES[S.focus]}, in the ${shift ? "previous" : "next"} top-level row.`; S.fresh = true; return; }
+  if (/^[1-9]$/.test(key)) { const t = f.tiles[+key - 1]; if (t) S.focus = t.id; return; }
+  if (dir && (isShift || dir === "left" || dir === "right")) {
+    const to = Stacks.focusTo(f, S.focus, dir);
+    S.note = to === S.focus ? `No Widget ${dir} of ${TITLES[S.focus]}.` : `${isShift ? "⇧" : ""}${arrow(dir)}: focus moves to ${TITLES[to]}, the nearest tile that way.`;
+    S.focus = to; S.fresh = true;
+  }
+}
+const arrow = d => ({ left: "←", right: "→", up: "↑", down: "↓" })[d];
+
+// ---- mouse ----
+const cellAt = e => { const r = term.getBoundingClientRect(); return { x: Math.floor((e.clientX - r.left) / charW), y: Math.floor((e.clientY - r.top) / charH) }; };
+function hitAt(f, x, y) {
+  for (const t of f.tiles) { const tw = Math.min(TITLES[t.id].length + 3 + (S.hover?.id === t.id ? 2 : 0), t.w - 2); if (y === t.y && x >= t.x + 1 && x < t.x + 1 + tw) return { kind: "handle", id: t.id, t }; }
+  for (const s of f.seams) if (s.kind === "col" && Stacks.contains(s.rect, x, y)) return { kind: "seam", seam: s };
+  for (const s of f.seams) if (s.kind === "row" && Stacks.contains(s.rect, x, y)) return { kind: "seam", seam: s };
+  for (const t of f.tiles) if (Stacks.contains(t, x, y)) return { kind: "body", id: t.id };
+  return null;
+}
+term.addEventListener("mousedown", e => {
+  e.preventDefault(); wrap.focus();
+  const { x, y } = cellAt(e), f = Stacks.compute(S.L, S.W, gridH());
+  if (f.tooSmall) return;
+  const h = hitAt(f, x, y);
+  if (!h) return;
+  if (h.kind === "handle") S.drag = { id: h.id, x, y, dx: x - h.t.x, dy: y - h.t.y, drop: null };
+  else if (h.kind === "seam") S.seamDrag = { seam: h.seam, base: Stacks.clone(S.L) };
+  else { S.focus = h.id; S.note = `Focused ${TITLES[h.id]}.`; S.fresh = true; }
+  render();
+});
+window.addEventListener("mousemove", e => {
+  const { x, y } = cellAt(e), f = Stacks.compute(S.L, S.W, gridH());
+  if (S.drag) { S.drag.x = x; S.drag.y = y; S.drag.drop = Stacks.dropAt(S.L, f, S.drag.id, x, y); render(); return; }
+  if (S.seamDrag) {
+    const s = S.seamDrag.seam;
+    S.L = Stacks.splitSeam(S.seamDrag.base, S.W, gridH(), s, s.kind === "col" ? x : y);
+    render(); return;
+  }
+  const h = f.tooSmall ? null : hitAt(f, x, y);
+  const hover = h && (h.kind === "handle" || h.kind === "seam") ? h : null;
+  if (JSON.stringify(hover?.id ?? hover?.seam?.rect) !== JSON.stringify(S.hover?.id ?? S.hover?.seam?.rect)) { S.hover = hover; render(); }
+});
+window.addEventListener("mouseup", () => {
+  if (S.drag) {
+    const d = S.drag; S.drag = null;
+    if (d.drop) dropOp(d.id, d.drop); else { S.note = "Released outside any target: nothing moved."; S.fresh = true; }
+    render();
+  }
+  if (S.seamDrag) {
+    const base = S.seamDrag.base, L = S.L; S.seamDrag = null; S.L = base;
+    setLayout(L, "Dragged a seam: only the two sides of that seam change size."); render();
+  }
+});
+wrap.addEventListener("keydown", e => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (["Tab", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Enter", "Escape"].includes(e.key) || /^[hjklHJKLm1-9]$/.test(e.key)) {
+    e.preventDefault(); S.fresh = false; keyOp(e.key, e.shiftKey); render();
+  }
+});
+
+// ---- free play ----
+document.querySelectorAll("[data-reset]").forEach(b => b.onclick = () => {
+  S.mode = "normal"; S.focus = "priorities";
+  setLayout(Stacks.clone(b.dataset.reset === "visor" ? VISOR : REPORTER), b.dataset.reset === "visor" ? "Reset to today's flat layout: rows of Widgets only." : "Reset to the reporter's layout: Priorities full height, a stack of Spotify, Agents and Review requests beside it.");
+  S.changed = new Set(); render(); wrap.focus();
+});
+document.querySelectorAll("[data-size]").forEach(b => b.onclick = () => {
+  const [w, h] = b.dataset.size.split("x").map(Number); S.W = w; S.H = h;
+  S.note = `Terminal resized to ${w}×${h}.`; S.fresh = true; S.changed = new Set(); render(); wrap.focus();
+});
+
+// ---- guided walkthroughs ----
+const focusOn = id => () => { S.focus = id; S.note = `Focused ${TITLES[id]}.`; S.fresh = true; };
+const key = (k, shift) => () => keyOp(k, !!shift);
+const dragTo = (id, d) => () => dropOp(id, d);
+const SCENARIOS = [
+  { name: "Full-height column in one drag", start: VISOR, focus: "priorities",
+    desc: "The request: Priorities on the left at full height, with everything else beside it. Drag its title to the dashboard's left edge (the outermost two columns of cells). It becomes a full-height column, as wide as it was, and every other row keeps its Widgets on the right.",
+    watch: "Try it by hand too: drag the Priorities title to the far left. The drop bar runs the full height of the dashboard.",
+    steps: [
+      ["Drag Priorities onto the dashboard's left edge", dragTo("priorities", { kind: "col", side: "left" })],
+      ["Drag it onto the top edge: back to a full-width row", dragTo("priorities", { kind: "row", path: [], at: 0 })],
+      ["Keyboard instead: press m, then ← past the left edge", () => { focusOn("priorities")(); keyOp("m"); keyOp("ArrowLeft"); }],
+      ["→ : into the rows beside it, as a row of its own", key("ArrowRight")],
+      ["→ again: out the other side, a full-height column on the right", key("ArrowRight")],
+      ["⏎ to keep", key("Enter")],
+    ] },
+  { name: "Stack vs full-width row", start: VISOR, focus: "clock",
+    desc: "Each edge of the dashboard opens something across the whole of it: top and bottom a full-width row, left and right a full-height column. A tile's top or bottom edge stacks the dragged Widget with that tile in its cell, and a row seam opens a row across its container.",
+    watch: "Watch the warn-coloured drop bar while dragging by hand. It spans only the target tile for a stack, and the whole dashboard for an edge.",
+    steps: [
+      ["Drag Clock onto the bottom edge of Priorities", dragTo("clock", { kind: "side", target: "priorities", side: "down" })],
+      ["Drag Clock over the seam between rows 1 and 2", () => dropOp("clock", { kind: "row", path: [], at: 1 })],
+      ["Drag Clock onto the dashboard's top edge", dragTo("clock", { kind: "row", path: [], at: 0 })],
+      ["Drag Clock onto the dashboard's right edge", dragTo("clock", { kind: "col", side: "right" })],
+      ["Drag Clock onto the left edge of Weather (back where it was, nearly)", dragTo("clock", { kind: "side", target: "weather", side: "left" })],
+    ] },
+  { name: "Keyboard in and out of a stack", start: STACKED, focus: "agents",
+    desc: "In arrange mode, the arrow keys move the Widget within its nearest container. ←/→ into a stack gives the Widget its own row there, and ←/→ at a stack's edge steps it out to the parent row. ↑/↓ join the next row at the same horizontal position, as they do today.",
+    watch: "Is it predictable? Pay attention to ↑ from inside the stack: it joins Spotify's row inside the stack (side by side) rather than swapping places with it.",
+    steps: [
+      ["Focus Agents (in the stack) and press m", () => { focusOn("agents")(); keyOp("m"); }],
+      ["← : step out of the stack, between Priorities and the stack", key("ArrowLeft")],
+      ["→ : enter the stack again, as a row of its own at the height of its centre", key("ArrowRight")],
+      ["↑ : join the row above inside the stack", key("ArrowUp")],
+      ["↑ : past the top of the dashboard, open a new full-width row", key("ArrowUp")],
+      ["esc : revert all of it", key("Escape")],
+    ] },
+  { name: "Stacks unwind themselves", start: Stacks.drop(VISOR, "agents", { kind: "side", target: "spotify", side: "down" }), focus: "agents",
+    desc: "A stack left holding a single Widget becomes a plain cell again, so layout.json never collects empty or one-item wrappers. This starts with Agents stacked under Spotify.",
+    watch: "Watch the Layout tree on the right: the Stack entry disappears.",
+    steps: [
+      ["Drag Agents onto the left edge of Review requests", dragTo("agents", { kind: "side", target: "prs", side: "left" })],
+    ] },
+  { name: "Resize picks the nearest container", start: STACKED, focus: "agents",
+    desc: "⇧←→ resizes within the nearest row where the Widget, or the stack around it, has a neighbour. ⇧↑↓ does the same in the nearest column of rows.",
+    watch: "⇧→ on Agents widens the whole stack against Priorities, because Agents has no neighbour inside its own row. ⇧↓ makes Agents taller within the stack.",
+    steps: [
+      ["Focus Agents and press m", () => { focusOn("agents")(); keyOp("m"); }],
+      ["⇧→ twice", () => { keyOp("ArrowRight", true); keyOp("ArrowRight", true); }],
+      ["⇧↓ twice", () => { keyOp("ArrowDown", true); keyOp("ArrowDown", true); }],
+      ["⏎ to keep", key("Enter")],
+    ] },
+  { name: "Focus by position", start: STACKED, focus: "priorities",
+    desc: "With stacks, a row no longer lines up with a band of the screen. So the arrows move focus to the nearest tile in that direction, and Tab still cycles the top-level rows.",
+    watch: "→ from a full-height Priorities lands on the stacked tile nearest its centre. ← from Review requests comes back to Priorities.",
+    steps: [
+      ["→ from Priorities", () => { focusOn("priorities")(); keyOp("ArrowRight"); }],
+      ["⇧↓ down the stack", key("ArrowDown", true)],
+      ["⇧↓ again", key("ArrowDown", true)],
+      ["← back to Priorities", key("ArrowLeft")],
+      ["Tab to the next top-level row", key("Tab")],
+    ] },
+  { name: "Minimum size", start: STACKED, focus: "priorities",
+    desc: "A stack needs room for every Widget in it, so stacking raises the minimum terminal height of that row.",
+    watch: "Watch Minimum terminal on the right: the three-Widget stack alone needs 15 rows, so the whole layout needs 31, where today's flat layout needs 21.",
+    steps: [
+      ["Shrink the terminal to 100×32: still fits", () => { S.W = 100; S.H = 32; S.note = "Terminal resized to 100×32."; S.fresh = true; }],
+      ["Shrink to 100×28: too small for the stack", () => { S.W = 100; S.H = 28; S.note = "Terminal resized to 100×28."; S.fresh = true; }],
+      ["Same size, today's flat layout: fits", () => { S.L = Stacks.clone(VISOR); S.note = "Today's flat layout at 100×28."; S.fresh = true; }],
+      ["Back to the stacked layout at 120×40", () => { S.L = Stacks.clone(STACKED); S.W = 120; S.H = 40; S.note = "Terminal resized to 120×40."; S.fresh = true; }],
+    ] },
+];
+let tab = 0, done = 0;
+function renderScenario() {
+  document.getElementById("tabs").innerHTML = SCENARIOS.map((s, i) => `<button class="tab${i === tab ? " on" : ""}" data-tab="${i}">${s.name}</button>`).join("");
+  const s = SCENARIOS[tab];
+  document.getElementById("scenario").innerHTML = `<p>${s.desc}</p><p class="watch">${s.watch}</p><div class="steps">` +
+    `<button data-start>${done ? "Start over" : "Start"}: reset to the scenario's layout</button>` +
+    s.steps.map(([label], i) => `<button data-step="${i}" class="${i < done ? "done" : i === done ? "next" : ""}">${i + 1}. ${label}</button>`).join("") + `</div>`;
+  document.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { tab = +b.dataset.tab; done = 0; startScenario(); });
+  document.querySelector("[data-start]").onclick = startScenario;
+  document.querySelectorAll("[data-step]").forEach(b => b.onclick = () => {
+    const i = +b.dataset.step;
+    if (i > done) { S.note = "Run the steps in order (or press Start to begin again)."; S.fresh = true; render(); return; }
+    if (i < done) startScenario(), SCENARIOS[tab].steps.slice(0, i).forEach(([, run]) => run());
+    S.fresh = false; s.steps[i][1](); done = i + 1; render(); renderScenario(); wrap.focus();
+  });
+}
+function startScenario() {
+  const s = SCENARIOS[tab];
+  S.mode = "normal"; S.W = 120; S.H = 40; S.drag = null; S.seamDrag = null;
+  S.L = Stacks.clone(s.start); S.focus = s.focus; S.changed = new Set();
+  S.note = `Scenario: ${s.name}. Run the steps below in order.`; S.fresh = true; done = 0;
+  render(); renderScenario(); wrap.focus();
+}
+
+render(); renderScenario(); wrap.focus();
+</script>
+</body>
+</html>
