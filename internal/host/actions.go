@@ -98,7 +98,7 @@ func (m Model) clampList(id string) {
 }
 
 // itemRows is how many rows of list Widget p, in r, show Items: the body
-// below its summary.
+// below its Summary.
 func itemRows(p widget.Payload, r layout.Rect) int {
 	body := r.H - 2
 	return max(1, body-render.SummaryRows(p, body))
@@ -107,7 +107,7 @@ func itemRows(p widget.Payload, r layout.Rect) int {
 // textRows is how many lines wrapped Widget id's Payload p takes in r, and
 // how many of them show beside or around its Image.
 func (m Model) textRows(id string, p widget.Payload, r layout.Rect) (rows, shown int) {
-	var pic *render.Picture
+	var pic *render.Image
 	if shown, ok := m.images.shown[id]; ok {
 		pic = &shown
 	}

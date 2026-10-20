@@ -69,8 +69,7 @@ type Model struct {
 	keyMap      bool
 	arranging   bool
 	// before is the Layout arrange mode reverts to.
-	before layout.Layout
-	// via is what the last arrange move went into.
+	before  layout.Layout
 	via     layout.Via
 	picking bool
 	cursor  int
@@ -443,7 +442,7 @@ func (m Model) scene() scene {
 			Status:  m.chrome(t.ID),
 		}
 		if pic, ok := m.images.shown[t.ID]; ok {
-			tile.Picture = &pic
+			tile.Image = &pic
 		}
 		switch {
 		case m.editing != nil && t.ID == m.editing.widget:

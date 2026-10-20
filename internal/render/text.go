@@ -12,7 +12,7 @@ import (
 // TextRows is how many lines a wrapped Payload takes in a body w×h, beside
 // or around its Image when pic is drawn, and how many of them show; the
 // host clamps its scroll offset with them.
-func TextRows(p widget.Payload, pic *Picture, w, h int) (rows, shown int) {
+func TextRows(p widget.Payload, pic *Image, w, h int) (rows, shown int) {
 	if p.HasImage() && pic != nil {
 		if _, rest, ok := imageSplit(p, *pic, w, h); ok {
 			w, h = rest.W, rest.H

@@ -207,7 +207,7 @@ type Frame struct {
 // Payload is what a Widget shows: a live view's styled Lines, or a list
 // Widget's Items under Columns. Either kind may carry Widget Actions.
 type Payload struct {
-	// Lines in a list are its summary, pinned above the Items; there a chart
+	// Lines in a list are its Summary, pinned above the Items; there a chart
 	// without Rows takes one row, and Center and Wrap don't apply.
 	Lines []Line `json:"lines,omitempty"`
 	// Center centres the block vertically and each line horizontally.
