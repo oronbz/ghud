@@ -9,9 +9,17 @@ import (
 	"github.com/oronbz/visor/internal/widget"
 )
 
-// TextRows is how many lines a wrapped Payload takes in a body w cells
-// wide; the host clamps its scroll offset with it.
-func TextRows(p widget.Payload, w int) int { return len(wrapped(theme.Dark(), p, w)) }
+// TextRows is how many lines a wrapped Payload takes in a body w×h, beside
+// or around its Image when pic is drawn, and how many of them show; the
+// host clamps its scroll offset with them.
+func TextRows(p widget.Payload, pic *Image, w, h int) (rows, shown int) {
+	if p.HasImage() && pic != nil {
+		if _, rest, ok := imageSplit(p, *pic, w, h); ok {
+			w, h = rest.W, rest.H
+		}
+	}
+	return len(wrapped(theme.Dark(), p, w)), h
+}
 
 // wrapped is a wrapped Payload's lines, word-wrapped inside a one-cell margin each side.
 func wrapped(th theme.Theme, p widget.Payload, w int) []string {

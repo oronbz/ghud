@@ -14,4 +14,4 @@ visor keeps Widgets and their settings in a hand-edited, fully commented `config
 
 ## Notes
 
-- 2026-10-20: The Layout is no longer only rows and weights. A cell is a Widget (`{"id", "weight"}`) or a stack (`{"weight", "rows": [...]}`) holding rows of its own, to any depth, which makes full-height columns possible (#58). Today's `layout.json` files are unchanged by this: they load as they are and save back byte for byte. visor normalises the Layout after every change, so the file never collects empty rows, one-row stacks or rows holding only a stack.
+- 2026-10-20: The Layout is no longer only rows and weights. A cell is a Widget (`{"id", "weight"}`) or a Stack (`{"weight", "rows": [...]}`) holding rows of its own, to any depth, which makes full-height columns possible (#58). Today's `layout.json` files are unchanged by this: they load as they are and save back byte for byte. visor normalises the Layout after every change, so the file never collects empty rows, one-row Stacks or rows holding only a Stack.

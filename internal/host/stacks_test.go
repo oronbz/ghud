@@ -175,8 +175,8 @@ func TestASeamInsideAStackDragsOnlyItsTwoRows(t *testing.T) {
 	}
 	l := saved(t, h)
 	top := l.Rows[0]
-	stack := top.Widgets[1].Rows
-	if top.Weight != 2 || top.Widgets[0].Weight != 3 || top.Widgets[1].Weight != 7 || stack[2].Weight != 1 {
+	stack := top.Cells[1].Rows
+	if top.Weight != 2 || top.Cells[0].Weight != 3 || top.Cells[1].Weight != 7 || stack[2].Weight != 1 {
 		t.Errorf("saved %+v, want only Bravo's and Charlie's weights changed", l)
 	}
 	if sum := stack[0].Weight + stack[1].Weight; sum != 2 || stack[0].Weight >= 1 {

@@ -14,9 +14,9 @@ import (
 	"github.com/oronbz/visor/internal/theme"
 )
 
-// colorWait is how long visor waits for the terminal to answer its colour
+// queryWait is how long visor waits for the terminal to answer its colour
 // and graphics queries before settling on what it has.
-const colorWait = 500 * time.Millisecond
+const queryWait = 500 * time.Millisecond
 
 // colors tracks the theme against the terminal's colour answers.
 type colors struct {
@@ -25,13 +25,13 @@ type colors struct {
 	name   string
 	over   theme.Overrides
 	term   theme.Terminal
-	// asking is true until the terminal has answered or colorWait passed;
+	// asking is true until the terminal has answered or queryWait passed;
 	// visor leaves the terminal background alone meanwhile so the query
 	// doesn't read back visor's own colour.
 	asking bool
 }
 
-type colorWaitMsg struct{}
+type queryWaitMsg struct{}
 
 // Theme is the palette in use.
 func (m Model) Theme() theme.Theme { return m.opts.Theme }
@@ -44,10 +44,11 @@ func (m Model) queryTerminal() tea.Cmd {
 
 // queryColors asks for the terminal's colours, unless the theme is pinned.
 func (m Model) queryColors() tea.Cmd {
-	if m.colors.pinned {
+	queries := m.colorQueries()
+	if queries == nil {
 		return nil
 	}
-	return m.query(m.colorQueries())
+	return m.query(queries)
 }
 
 // query sends queries, then asks for device attributes, whose answer comes
@@ -55,7 +56,7 @@ func (m Model) queryColors() tea.Cmd {
 func (m Model) query(queries []tea.Cmd) tea.Cmd {
 	return tea.Batch(
 		tea.Sequence(append(queries, tea.Raw(ansi.RequestPrimaryDeviceAttributes))...),
-		m.opts.Ports.Clock.After(colorWait, func(time.Time) tea.Msg { return colorWaitMsg{} }),
+		m.opts.Ports.Clock.After(queryWait, func(time.Time) tea.Msg { return queryWaitMsg{} }),
 	)
 }
 
@@ -109,7 +110,7 @@ func (m Model) applyColorAnswer(msg tea.Msg) (Model, bool) {
 		if !paletteAnswer(string(msg), &m.colors.term) {
 			return m, false
 		}
-	case uv.PrimaryDeviceAttributesEvent, colorWaitMsg:
+	case uv.PrimaryDeviceAttributesEvent, queryWaitMsg:
 		m.colors.asking = false
 		return m, true
 	default:

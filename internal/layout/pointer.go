@@ -159,11 +159,11 @@ func (l Layout) Drop(id string, d Drop) Layout {
 		t := out.cellAt(tp)
 		t.Weight = round3(t.Weight / 2)
 		cell.Weight = t.Weight
-		at := tp[len(tp)-1]
+		at := tp.last()
 		if d.Side == Right {
 			at++
 		}
-		out.insertCell(tp[:len(tp)-1], at, cell)
+		out.insertCell(tp.parent(), at, cell)
 	default:
 		out.stackWith(tp, cell, d.Side == Up)
 	}
@@ -181,13 +181,14 @@ func (l Layout) Split(f Frame, s Zone, at int) Layout {
 	}
 	var a, b *float64
 	var first, span, la, lb int
+	siblings := 0.0
 	switch {
-	case s.Kind == WidgetSeam && len(s.Path)%2 == 1:
-		cells := out.rowAt(s.Path).Widgets
+	case s.Kind == WidgetSeam && s.Path.isRow():
+		cells := out.rowAt(s.Path).Cells
 		if s.Index < 0 || s.Index >= len(cells) {
 			return out
 		}
-		j := l.nextShown(cells, s.Index, 1)
+		j := nextShown(cells, s.Index, 1, l.shown)
 		if j < 0 {
 			return out
 		}
@@ -195,12 +196,15 @@ func (l Layout) Split(f Frame, s Zone, at int) Layout {
 		first, span = ra.X, ra.W+rb.W
 		la, lb = l.needCell(cells[s.Index]).W, l.needCell(cells[j]).W
 		a, b = &cells[s.Index].Weight, &cells[j].Weight
-	case s.Kind == RowSeam && len(s.Path)%2 == 0:
+		for _, c := range cells {
+			siblings += c.Weight
+		}
+	case s.Kind == RowSeam && !s.Path.isRow():
 		rows := *out.rowsAt(s.Path)
 		if s.Index < 0 || s.Index >= len(rows) {
 			return out
 		}
-		j := l.nextRowShown(rows, s.Index, 1)
+		j := nextShown(rows, s.Index, 1, l.rowShown)
 		if j < 0 {
 			return out
 		}
@@ -208,6 +212,9 @@ func (l Layout) Split(f Frame, s Zone, at int) Layout {
 		first, span = ra.Y, ra.H+rb.H
 		la, lb = l.needRow(rows[s.Index]).H, l.needRow(rows[j]).H
 		a, b = &rows[s.Index].Weight, &rows[j].Weight
+		for _, r := range rows {
+			siblings += r.Weight
+		}
 	default:
 		return out
 	}
@@ -215,10 +222,10 @@ func (l Layout) Split(f Frame, s Zone, at int) Layout {
 		return out
 	}
 	size := min(max(at-first+1, la), span-lb)
-	total := *a + *b
-	*a = math.Round(total*float64(size)/float64(span)*1000) / 1000
-	*b = math.Round((total-*a)*1000) / 1000
-	return out
+	total, floor := *a+*b, round3(siblings*minShare)
+	*a = min(max(round3(total*float64(size)/float64(span)), floor), total-floor)
+	*b = round3(total - *a)
+	return out.normalise()
 }
 
 // tint is the border cells of seam s: a widget seam's two facing side

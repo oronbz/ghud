@@ -47,13 +47,39 @@ func TestSplitMovesASeamBetweenVisibleNeighboursOnly(t *testing.T) {
 	if c, _ := moved.Tile("c"); c.X != 60 || c.W != 30 {
 		t.Errorf("c moved to %+v, want it untouched at 60, 30 wide", c.Rect)
 	}
-	if w := got.Rows[0].Widgets[1].Weight; w != 1 {
+	if w := got.Rows[0].Cells[1].Weight; w != 1 {
 		t.Errorf("hidden h's weight changed to %v", w)
 	}
 
 	squeezed := layout.Compute(l.Split(f, seam, 2), nil, 90, 10, layout.Pointer{})
 	if a, _ := squeezed.Tile("a"); a.W != layout.MinTile.W {
 		t.Errorf("a is %d wide after a seam drag past its minimum, want %d", a.W, layout.MinTile.W)
+	}
+}
+
+func TestASeamDragLeavesNoWeightUnder5PercentOfItsSiblings(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		l    layout.Layout
+		seam layout.Zone
+		w, h int
+	}{
+		{"row seam", parse("a / b"), layout.Zone{Kind: layout.RowSeam, Path: layout.Path{}, Index: 0}, 40, 400},
+		{"widget seam", parse("a b"), layout.Zone{Kind: layout.WidgetSeam, Path: layout.Path{0}, Index: 0}, 800, 10},
+	} {
+		f := layout.Compute(c.l, nil, c.w, c.h, layout.Pointer{})
+		for _, at := range []int{0, c.w + c.h} {
+			got := c.l.Split(f, c.seam, at)
+			var ws []float64
+			if c.seam.Kind == layout.RowSeam {
+				ws = []float64{got.Rows[0].Weight, got.Rows[1].Weight}
+			} else {
+				ws = []float64{got.Rows[0].Cells[0].Weight, got.Rows[0].Cells[1].Weight}
+			}
+			if sum := ws[0] + ws[1]; sum != 2 || min(ws[0], ws[1]) < 0.1 {
+				t.Errorf("%s dragged to %d gives weights %v, want each at least 5%% of their 2", c.name, at, ws)
+			}
+		}
 	}
 }
 
@@ -76,7 +102,7 @@ func TestDropsOnATilesSidesJoinItsRowOrStackWithIt(t *testing.T) {
 		}
 	}
 	halved := parse("a b / d").Drop("d", layout.Drop{Kind: layout.OnTile, Target: "b", Side: layout.Left})
-	if ws := halved.Rows[0].Widgets; ws[1].Weight != 0.5 || ws[2].Weight != 0.5 {
+	if ws := halved.Rows[0].Cells; ws[1].Weight != 0.5 || ws[2].Weight != 0.5 {
 		t.Errorf("a side drop gives weights %v %v, want b's 1 halved between them", ws[1].Weight, ws[2].Weight)
 	}
 }

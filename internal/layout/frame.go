@@ -57,7 +57,7 @@ func (k ZoneKind) String() string {
 
 // Zone is a hit-test rectangle. ID names the Widget for Body and Title. A
 // WidgetSeam's Path is its row and Index the cell to its left; a RowSeam's
-// Path is its container (the dashboard or a stack) and Index the row above
+// Path is its container (the dashboard or a Stack) and Index the row above
 // it. Indexes count every cell or row, hidden ones included.
 type Zone struct {
 	Kind ZoneKind
@@ -103,8 +103,8 @@ func Compute(l Layout, titles map[string]string, w, h int, p Pointer) Frame {
 		return f
 	}
 	f.rects = map[string]Rect{}
-	lay := laying{l: l, f: &f, titles: titles, handle: p.Handle}
-	lay.rows(l.Rows, Rect{0, 0, w, h}, Path{})
+	fr := framer{l: l, f: &f, titles: titles, handle: p.Handle}
+	fr.rows(l.Rows, Rect{0, 0, w, h}, Path{})
 	f.Tint = f.tint(p.Seam)
 	if p.Drag != nil {
 		f.Ghost, f.Bar = f.ghost(*p.Drag, w, h)
@@ -112,80 +112,62 @@ func Compute(l Layout, titles map[string]string, w, h int, p Pointer) Frame {
 	return f
 }
 
-type laying struct {
+type framer struct {
 	l      Layout
 	f      *Frame
 	titles map[string]string
 	handle string
 }
 
-func (y laying) rows(rows []Row, area Rect, at Path) {
-	var idx []int
-	var weights []float64
-	var least []int
-	for i, r := range rows {
-		if y.l.rowShown(r) {
-			idx = append(idx, i)
-			weights = append(weights, r.Weight)
-			least = append(least, y.l.needRow(r).H)
-		}
-	}
+func (fr framer) rows(rows []Row, area Rect, at Path) {
+	idx, weights, least := shownParts(rows, fr.l.rowShown, rowWeights, func(r Row) int { return fr.l.needRow(r).H })
 	top := area.Y
 	for k, rh := range split(area.H, weights, least) {
 		i := idx[k]
 		rect := Rect{area.X, top, area.W, rh}
-		y.f.rects[at.with(i).key()] = rect
-		y.row(rows[i], rect, at.with(i))
+		fr.f.rects[at.with(i).key()] = rect
+		fr.row(rows[i], rect, at.with(i))
 		top += rh
 		if k < len(idx)-1 {
-			y.f.Zones = append(y.f.Zones, Zone{Kind: RowSeam, Path: at, Index: i, Rect: Rect{area.X, top - 1, area.W, 2}})
+			fr.f.Zones = append(fr.f.Zones, Zone{Kind: RowSeam, Path: at, Index: i, Rect: Rect{area.X, top - 1, area.W, 2}})
 		}
 	}
 }
 
-func (y laying) row(r Row, area Rect, at Path) {
-	var idx []int
-	var weights []float64
-	var least []int
-	for j, c := range r.Widgets {
-		if y.l.shown(c) {
-			idx = append(idx, j)
-			weights = append(weights, c.Weight)
-			least = append(least, y.l.needCell(c).W)
-		}
-	}
+func (fr framer) row(r Row, area Rect, at Path) {
+	idx, weights, least := shownParts(r.Cells, fr.l.shown, cellWeights, func(c Cell) int { return fr.l.needCell(c).W })
 	x := area.X
 	for k, cw := range split(area.W, weights, least) {
 		j := idx[k]
-		c, p := r.Widgets[j], at.with(j)
+		c, p := r.Cells[j], at.with(j)
 		rect := Rect{x, area.Y, cw, area.H}
-		y.f.rects[p.key()] = rect
+		fr.f.rects[p.key()] = rect
 		if c.IsStack() {
-			y.rows(c.Rows, rect, p)
+			fr.rows(c.Rows, rect, p)
 		} else {
-			y.tile(c.ID, rect, p)
+			fr.tile(c.ID, rect, p)
 		}
 		if k < len(idx)-1 {
-			y.f.Zones = append(y.f.Zones, Zone{Kind: WidgetSeam, Path: at, Index: j, Rect: Rect{x + cw - 1, area.Y + 1, 2, area.H - 2}})
+			fr.f.Zones = append(fr.f.Zones, Zone{Kind: WidgetSeam, Path: at, Index: j, Rect: Rect{x + cw - 1, area.Y + 1, 2, area.H - 2}})
 		}
 		x += cw
 	}
 }
 
-func (y laying) tile(id string, r Rect, at Path) {
-	t := Tile{ID: id, Title: y.titles[id], Rect: r, Handle: id == y.handle, Path: at}
+func (fr framer) tile(id string, r Rect, at Path) {
+	t := Tile{ID: id, Title: fr.titles[id], Rect: r, Handle: id == fr.handle, Path: at}
 	tw := ansi.StringWidth(t.Title) + 3
 	if t.Handle {
 		tw += ansi.StringWidth(HandleGlyph)
 	}
-	y.f.Tiles = append(y.f.Tiles, t)
-	y.f.Zones = append(y.f.Zones,
+	fr.f.Tiles = append(fr.f.Tiles, t)
+	fr.f.Zones = append(fr.f.Zones,
 		Zone{Kind: Body, ID: id, Path: at, Rect: Rect{r.X + 1, r.Y + 1, r.W - 2, r.H - 2}},
 		Zone{Kind: Title, ID: id, Path: at, Rect: Rect{r.X + 1, r.Y, min(tw, r.W-2), 1}},
 	)
 }
 
-// needCell is the smallest c draws in: a tile, or what a stack's rows need.
+// needCell is the smallest c draws in: a tile, or what a Stack's rows need.
 func (l Layout) needCell(c Cell) Size {
 	if c.IsStack() {
 		return l.needRows(c.Rows)
@@ -195,7 +177,7 @@ func (l Layout) needCell(c Cell) Size {
 
 func (l Layout) needRow(r Row) Size {
 	var n Size
-	for _, c := range r.Widgets {
+	for _, c := range r.Cells {
 		if l.shown(c) {
 			cn := l.needCell(c)
 			n.W += cn.W

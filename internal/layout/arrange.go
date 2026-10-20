@@ -28,30 +28,47 @@ func (d Dir) step() int {
 
 func (d Dir) across() bool { return d == Left || d == Right }
 
-// Via is the Widget a keyboard move went into, and which way, so that the
-// next press that way goes past it. The zero Via is none.
+func (d Dir) opposite() Dir { return [...]Dir{Right, Left, Down, Up}[d] }
+
+// Via is what arrange mode remembers between presses: the Widget the last
+// press went into and which way, so the next press that way goes past it,
+// and the press the opposite arrow undoes. The zero Via is none.
 type Via struct {
-	ID  string
-	Dir Dir
+	ID   string
+	Dir  Dir
+	back *press
+}
+
+// press is one keyboard move, kept so the opposite arrow can put back the
+// Layout and the Via from before it.
+type press struct {
+	id            string
+	d             Dir
+	before, after Layout
+	via           Via
 }
 
 // Move is the keyboard move: one position per press, into the next Widget
-// that way and then past it. area is the dashboard's size, and via what the
-// last press went into; the Via returned is for the next press.
-//
-// Left and right: into a Widget sharing the row is stacking with it in its
-// cell (above it when level or higher); into a stack is a row of its own
-// there, at the height of id's centre. With nothing that way in its row, id
-// steps out beside the stack it's in, or at the dashboard's edge becomes a
-// full-height column.
-//
-// Up and down: a Widget sharing its row takes a row of its own above or
-// below, unless that way is past the Widget it went into: then it stacks
-// below or above it in its cell. A Widget alone in its row goes into the
-// next row, beside the Widget nearest it, or into a stack there as its first
-// or last row; at a stack's edge it takes a row of its own beside the
-// stack's row, and at the dashboard's it stays.
+// that way and then past it, the opposite arrow undoing each press. area is
+// the dashboard's size, and via what the last press left; the Via returned
+// is for the next press.
 func (l Layout) Move(id string, d Dir, area Size, via Via) (Layout, Via) {
+	b := via.back
+	if b == nil || b.id != id || !l.same(b.after) {
+		via, b = Via{}, nil
+	}
+	if b != nil && b.d == d.opposite() {
+		return b.before.clone(), b.via
+	}
+	out, next := l.move(id, d, area, via)
+	next.back = via.back
+	if !out.same(l) {
+		next.back = &press{id: id, d: d, before: l.clone(), after: out.clone(), via: via}
+	}
+	return out, next
+}
+
+func (l Layout) move(id string, d Dir, area Size, via Via) (Layout, Via) {
 	p := l.Find(id)
 	if p == nil || l.IsHidden(id) {
 		return l.clone(), Via{}
@@ -60,13 +77,13 @@ func (l Layout) Move(id string, d Dir, area Size, via Via) (Layout, Via) {
 	f := Compute(l, nil, max(area.W, need.W), max(area.H, need.H), Pointer{})
 	me := centre(f.rects[p.key()])
 	step := d.step()
-	rp, ci := p[:len(p)-1], p[len(p)-1]
-	cp, ri := rp[:len(rp)-1], rp[len(rp)-1]
-	cells := l.rowAt(rp).Widgets
+	rp, ci := p.parent(), p.last()
+	cp, ri := rp.parent(), rp.last()
+	cells := l.rowAt(rp).Cells
 	out := l.clone()
 
 	if d.across() {
-		j := l.nextShown(cells, ci, step)
+		j := nextShown(cells, ci, step, l.shown)
 		switch {
 		case j >= 0 && cells[j].IsStack():
 			sp := rp.with(j)
@@ -86,7 +103,7 @@ func (l Layout) Move(id string, d Dir, area Size, via Via) (Layout, Via) {
 			return l.column(id, d, f.share(id)), Via{}
 		}
 		cell := out.take(p)
-		pr, pi := cp[:len(cp)-1], cp[len(cp)-1]
+		pr, pi := cp.parent(), cp.last()
 		cell.Weight = out.meanCell(pr)
 		out.insertCell(pr, pi+max(step, 0), cell)
 		return out.normalise(), Via{}
@@ -105,19 +122,19 @@ func (l Layout) Move(id string, d Dir, area Size, via Via) (Layout, Via) {
 	}
 
 	rows := *l.rowsAt(cp)
-	j := l.nextRowShown(rows, ri, step)
+	j := nextShown(rows, ri, step, l.rowShown)
 	if j < 0 {
 		if len(cp) == 0 {
 			return out, Via{}
 		}
 		cell := out.take(p)
-		pr := cp[:len(cp)-1]
-		out.insertRow(pr[:len(pr)-1], pr[len(pr)-1]+max(step, 0), cell)
+		pr := cp.parent()
+		out.insertRow(pr.parent(), pr.last()+max(step, 0), cell)
 		return out.normalise(), Via{}
 	}
 	tp := cp.with(j)
 	near, best := -1, math.Inf(1)
-	for k, c := range rows[j].Widgets {
+	for k, c := range rows[j].Cells {
 		if !l.shown(c) {
 			continue
 		}
@@ -127,11 +144,11 @@ func (l Layout) Move(id string, d Dir, area Size, via Via) (Layout, Via) {
 		}
 	}
 	cell := out.take(p)
-	if rows[j].Widgets[near].IsStack() {
+	if rows[j].Cells[near].IsStack() {
 		sp := tp.with(near)
 		at := 0
 		if step < 0 {
-			at = len(rows[j].Widgets[near].Rows)
+			at = len(rows[j].Cells[near].Rows)
 		}
 		out.insertRow(sp, at, cell)
 		return out.normalise(), Via{}
@@ -142,7 +159,7 @@ func (l Layout) Move(id string, d Dir, area Size, via Via) (Layout, Via) {
 		at++
 	}
 	out.insertCell(tp, at, cell)
-	return out.normalise(), Via{ID: rows[j].Widgets[near].ID, Dir: d}
+	return out.normalise(), Via{ID: rows[j].Cells[near].ID, Dir: d}
 }
 
 type point struct{ x, y float64 }
@@ -161,7 +178,7 @@ func gap(v, lo, hi float64) float64 {
 }
 
 // column makes id a full-height column on side of the dashboard, share of
-// its width; everything else keeps its rows in a stack beside it.
+// its width; everything else keeps its rows in a Stack beside it.
 func (l Layout) column(id string, side Dir, share float64) Layout {
 	out := l.clone()
 	p := out.Find(id)
@@ -175,7 +192,7 @@ func (l Layout) column(id string, side Dir, share float64) Layout {
 	if side == Right {
 		cells = []Cell{rest, cell}
 	}
-	out.Rows = []Row{{Weight: 1, Widgets: cells}}
+	out.Rows = []Row{{Weight: 1, Cells: cells}}
 	return out.normalise()
 }
 
@@ -184,7 +201,7 @@ func (l Layout) column(id string, side Dir, share float64) Layout {
 func (l Layout) openRow(id string, cp Path, at int) Layout {
 	out := l.clone()
 	p := out.Find(id)
-	if p == nil || len(cp)%2 != 0 || !l.has(cp) || len(cp) > 0 && !l.cellAt(cp).IsStack() {
+	if p == nil || cp.isRow() || !l.has(cp) || len(cp) > 0 && !l.cellAt(cp).IsStack() {
 		return out
 	}
 	out.insertRow(cp, at, out.take(p))
@@ -202,7 +219,7 @@ func (l *Layout) take(p Path) Cell {
 
 func (l *Layout) insertCell(rp Path, at int, c Cell) {
 	r := l.rowAt(rp)
-	r.Widgets = slices.Insert(r.Widgets, min(max(at, 0), len(r.Widgets)), c)
+	r.Cells = slices.Insert(r.Cells, min(max(at, 0), len(r.Cells)), c)
 }
 
 // insertRow puts c in a row of its own in the container at cp, before its
@@ -216,10 +233,10 @@ func (l *Layout) insertRow(cp Path, at int, c Cell) {
 		}
 	}
 	c.Weight = 1
-	*rows = slices.Insert(*rows, min(max(at, 0), len(*rows)), Row{Weight: mean(ws), Widgets: []Cell{c}})
+	*rows = slices.Insert(*rows, min(max(at, 0), len(*rows)), Row{Weight: mean(ws), Cells: []Cell{c}})
 }
 
-// stackWith turns the Widget at p into a stack of it and c, c on top when
+// stackWith turns the Widget at p into a Stack of it and c, c on top when
 // first.
 func (l *Layout) stackWith(p Path, c Cell, first bool) {
 	t := l.cellAt(p)
@@ -227,12 +244,12 @@ func (l *Layout) stackWith(p Path, c Cell, first bool) {
 	if !first {
 		pair[0], pair[1] = pair[1], pair[0]
 	}
-	*t = Cell{Weight: t.Weight, Rows: []Row{{Weight: 1, Widgets: pair[:1]}, {Weight: 1, Widgets: pair[1:]}}}
+	*t = Cell{Weight: t.Weight, Rows: []Row{{Weight: 1, Cells: pair[:1]}, {Weight: 1, Cells: pair[1:]}}}
 }
 
 func (l Layout) meanCell(rp Path) float64 {
 	var ws []float64
-	for _, c := range l.rowAt(rp).Widgets {
+	for _, c := range l.rowAt(rp).Cells {
 		if l.shown(c) {
 			ws = append(ws, c.Weight)
 		}
@@ -260,7 +277,7 @@ const minShare = 0.05
 
 // Resize is the keyboard resize: Right and Left widen and narrow id, Down
 // and Up make it taller and shorter, in the nearest container (going out
-// from id) where it, or the stack it's in, has a sibling that way. Only
+// from id) where it, or the Stack it's in, has a sibling that way. Only
 // visible cells and rows share the space; the others keep their proportions.
 func (l Layout) Resize(id string, d Dir) Layout {
 	out := l.clone()
@@ -270,29 +287,14 @@ func (l Layout) Resize(id string, d Dir) Layout {
 	}
 	delta := ResizeStep * float64(d.step())
 	for k := len(p); k >= 2; k -= 2 {
-		rp := p[:k-1]
+		cell := p[:k]
+		row := cell.parent()
 		var ws []*float64
-		i := -1
+		var i int
 		if d.across() {
-			cells := out.rowAt(rp).Widgets
-			for j := range cells {
-				if out.shown(cells[j]) {
-					if j == p[k-1] {
-						i = len(ws)
-					}
-					ws = append(ws, &cells[j].Weight)
-				}
-			}
+			ws, i = shownWeights(out.rowAt(row).Cells, out.shown, cellWeights, cell.last())
 		} else {
-			rows := *out.rowsAt(rp[:k-2])
-			for j := range rows {
-				if out.rowShown(rows[j]) {
-					if j == rp[k-2] {
-						i = len(ws)
-					}
-					ws = append(ws, &rows[j].Weight)
-				}
-			}
+			ws, i = shownWeights(*out.rowsAt(row.parent()), out.rowShown, rowWeights, row.last())
 		}
 		if len(ws) >= 2 {
 			reshare(ws, i, delta)
@@ -318,8 +320,8 @@ func reshare(ws []*float64, i int, delta float64) {
 		return
 	}
 	share := min(max(*ws[i]/sum+delta, minShare), 1-minShare)
-	// Solve w/(w+rest) = share for w, rounded so layout.json stays readable.
-	*ws[i] = max(math.Round(share*rest/(1-share)*1000)/1000, 0.001)
+	// Solve w/(w+rest) = share for w.
+	*ws[i] = round3(share * rest / (1 - share))
 }
 
 // SetHidden hides or shows id. A hidden Widget keeps its place, so showing it

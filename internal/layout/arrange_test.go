@@ -15,7 +15,7 @@ func grid(rows ...[]string) layout.Layout {
 	for _, ids := range rows {
 		r := layout.Row{Weight: 1}
 		for _, id := range ids {
-			r.Widgets = append(r.Widgets, layout.Cell{ID: id, Weight: 1})
+			r.Cells = append(r.Cells, layout.Cell{ID: id, Weight: 1})
 		}
 		l.Rows = append(l.Rows, r)
 	}
@@ -30,7 +30,7 @@ func rowsShape(rows []layout.Row) string {
 	var out []string
 	for _, r := range rows {
 		var cells []string
-		for _, c := range r.Widgets {
+		for _, c := range r.Cells {
 			if c.IsStack() {
 				cells = append(cells, "["+rowsShape(c.Rows)+"]")
 			} else {
@@ -61,9 +61,9 @@ func parseRows(tok []string, i int) ([]layout.Row, int) {
 		case "[":
 			var inner []layout.Row
 			inner, i = parseRows(tok, i+1)
-			last.Widgets = append(last.Widgets, layout.Cell{Weight: 1, Rows: inner})
+			last.Cells = append(last.Cells, layout.Cell{Weight: 1, Rows: inner})
 		default:
-			last.Widgets = append(last.Widgets, layout.Cell{ID: t, Weight: 1})
+			last.Cells = append(last.Cells, layout.Cell{ID: t, Weight: 1})
 			i++
 		}
 	}
@@ -134,6 +134,61 @@ func TestEachArrowPressMovesOnePositionIntoTheNextWidgetThenPastIt(t *testing.T)
 	}
 }
 
+func TestTheOppositeArrowUndoesAPressExactly(t *testing.T) {
+	for _, c := range []struct {
+		start, id string
+		dirs      []layout.Dir
+	}{
+		{"a b c", "a", []layout.Dir{down, up}},
+		{"a b c", "b", []layout.Dir{up, down}},
+		{"a b c / d e", "a", []layout.Dir{right, down, up, left}},
+		{"a b c / d e", "d", []layout.Dir{up, up, up, down, down, down}},
+		{"p [s / a]", "s", []layout.Dir{left, down, up, right}},
+	} {
+		l := parse(c.start)
+		l.Rows[0].Cells[0].Weight = 3
+		got := l
+		var via layout.Via
+		for _, d := range c.dirs {
+			got, via = got.Move(c.id, d, area, via)
+		}
+		if !reflect.DeepEqual(got, l) {
+			t.Errorf("%s %v from %q gives %q %+v, want it back as it was %+v", c.id, c.dirs, c.start, shape(got), got, l)
+		}
+	}
+}
+
+func TestUndoingAPressStillLetsTheNextOneGoPast(t *testing.T) {
+	if got := presses(t, parse("a / b c"), "a", down, down, up, down); got[3] != "b [c / a]" {
+		t.Errorf("↓ ↓ ↑ ↓ gives %q, want ↓ again past c after undoing the step past it", got[3])
+	}
+}
+
+func TestADropAResizeOrASeamDragForgetsWhatTheLastPressWentInto(t *testing.T) {
+	start := parse("a / b c / d")
+	moved, via := start.Move("a", down, area, layout.Via{})
+	if shape(moved) != "b a c / d" || via.ID != "c" {
+		t.Fatalf("↓ gives %q into %q, want a into c's row", shape(moved), via.ID)
+	}
+	f := layout.Compute(moved, nil, area.W, area.H, layout.Pointer{})
+	for _, c := range []struct {
+		name string
+		l    layout.Layout
+		want string
+	}{
+		{"a drop", moved.Drop("d", layout.Drop{Kind: layout.OnEdge, Side: up}), "d / b c / a"},
+		{"a resize", moved.Resize("d", down), "b c / a / d"},
+		{"a seam drag", moved.Split(f, layout.Zone{Kind: layout.RowSeam, Path: layout.Path{}, Index: 0}, 25), "b c / a / d"},
+	} {
+		if got, _ := c.l.Move("a", down, area, via); shape(got) != c.want {
+			t.Errorf("after %s ↓ gives %q, want %q as if nothing was remembered", c.name, shape(got), c.want)
+		}
+		if got, _ := c.l.Move("a", up, area, via); reflect.DeepEqual(got, start) {
+			t.Errorf("after %s ↑ undid the ↓ from before it", c.name)
+		}
+	}
+}
+
 func TestASwapWithAnyNeighbourTakesTwoPresses(t *testing.T) {
 	for _, c := range []struct {
 		start, id string
@@ -168,7 +223,7 @@ func TestPastTheDashboardsSideEdgeIsAFullHeightColumnLikeAnEdgeDrop(t *testing.T
 	if got, want := shape(dropped), "a [b / c d / e]"; got != want {
 		t.Errorf("left edge drop gives %q, want %q", got, want)
 	}
-	cells := dropped.Rows[0].Widgets
+	cells := dropped.Rows[0].Cells
 	if share := cells[0].Weight / (cells[0].Weight + cells[1].Weight); share < 0.49 || share > 0.51 {
 		t.Errorf("the column has %.3f of the width, want the half a had", share)
 	}
@@ -204,8 +259,9 @@ func TestEveryOperationLeavesTheLayoutNormalised(t *testing.T) {
 		f := layout.Compute(l, nil, area.W, area.H, layout.Pointer{})
 		for _, id := range l.IDs() {
 			for _, d := range []layout.Dir{left, right, up, down} {
-				for _, via := range []layout.Via{{}, {ID: "a", Dir: d}, {ID: "s", Dir: d}} {
-					got, _ := l.Move(id, d, area, via)
+				once, via := l.Move(id, d, area, layout.Via{})
+				twice, _ := once.Move(id, d, area, via)
+				for _, got := range []layout.Layout{once, twice} {
 					if err := normal(got); err != "" {
 						t.Errorf("%q: %s %v gives %q with %s", start, id, d, shape(got), err)
 					}
@@ -241,17 +297,17 @@ func normal(l layout.Layout) string {
 			return "a stack of fewer than two rows"
 		}
 		for _, r := range rows {
-			if len(r.Widgets) == 0 {
+			if len(r.Cells) == 0 {
 				return "an empty row"
 			}
-			if len(r.Widgets) == 1 && r.Widgets[0].IsStack() {
+			if len(r.Cells) == 1 && r.Cells[0].IsStack() {
 				return "a row holding only a stack"
 			}
 			sum := 0.0
-			for _, c := range r.Widgets {
+			for _, c := range r.Cells {
 				sum += c.Weight
 			}
-			for _, c := range r.Widgets {
+			for _, c := range r.Cells {
 				if !c.IsStack() && c.ID == "" {
 					return "an empty cell"
 				}
@@ -273,7 +329,7 @@ func normal(l layout.Layout) string {
 func TestResizeChangesTheWidgetsShareOfItsRowOrItsRowsShareOfTheHeight(t *testing.T) {
 	l := grid([]string{"a", "b"}, []string{"c"})
 	wide := func(l layout.Layout) float64 {
-		return l.Rows[0].Widgets[0].Weight / (l.Rows[0].Widgets[0].Weight + l.Rows[0].Widgets[1].Weight)
+		return l.Rows[0].Cells[0].Weight / (l.Rows[0].Cells[0].Weight + l.Rows[0].Cells[1].Weight)
 	}
 	tall := func(l layout.Layout) float64 { return l.Rows[0].Weight / (l.Rows[0].Weight + l.Rows[1].Weight) }
 	near := func(a, b float64) bool { return a-b < 0.01 && b-a < 0.01 }
@@ -290,10 +346,10 @@ func TestResizeChangesTheWidgetsShareOfItsRowOrItsRowsShareOfTheHeight(t *testin
 	if got := tall(l.Resize("c", layout.Up)); !near(got, 0.6) {
 		t.Errorf("Up shrinks c's row to 0.4, leaving the first row %.3f of the height, want 0.6", got)
 	}
-	if got := l.Resize("c", layout.Right); got.Rows[1].Widgets[0].Weight != 1 {
-		t.Errorf("widening a Widget alone in its row changed its weight to %v", got.Rows[1].Widgets[0].Weight)
+	if got := l.Resize("c", layout.Right); got.Rows[1].Cells[0].Weight != 1 {
+		t.Errorf("widening a Widget alone in its row changed its weight to %v", got.Rows[1].Cells[0].Weight)
 	}
-	if l.Rows[0].Widgets[0].Weight != 1 || l.Rows[0].Weight != 1 {
+	if l.Rows[0].Cells[0].Weight != 1 || l.Rows[0].Weight != 1 {
 		t.Error("Resize changed the Layout it was called on")
 	}
 
@@ -309,10 +365,10 @@ func TestResizeChangesTheWidgetsShareOfItsRowOrItsRowsShareOfTheHeight(t *testin
 func TestResizeUsesTheNearestContainerWithASiblingThatWay(t *testing.T) {
 	l := column()
 	share := func(a, b float64) float64 { return a / (a + b) }
-	if s := l.Resize("agents", layout.Right).Rows[0].Widgets; share(s[1].Weight, s[0].Weight) < 0.79 {
+	if s := l.Resize("agents", layout.Right).Rows[0].Cells; share(s[1].Weight, s[0].Weight) < 0.79 {
 		t.Errorf("→ on agents, alone in its row, gives its stack %.3f of the width, want 0.8", share(s[1].Weight, s[0].Weight))
 	}
-	if rs := l.Resize("agents", layout.Down).Rows[0].Widgets[1].Rows; share(rs[1].Weight, rs[0].Weight) < 0.59 {
+	if rs := l.Resize("agents", layout.Down).Rows[0].Cells[1].Rows; share(rs[1].Weight, rs[0].Weight) < 0.59 {
 		t.Errorf("↓ on agents gives it %.3f of the stack's height, want 0.6", share(rs[1].Weight, rs[0].Weight))
 	}
 	if same := l.Resize("priorities", layout.Down); !reflect.DeepEqual(same, l) {
@@ -324,7 +380,7 @@ func TestResizeSharesOnlyAmongVisibleWidgets(t *testing.T) {
 	l := grid([]string{"a", "h", "b"})
 	l.Hidden = []string{"h"}
 	got := l.Resize("a", layout.Right)
-	ws := got.Rows[0].Widgets
+	ws := got.Rows[0].Cells
 	if share := ws[0].Weight / (ws[0].Weight + ws[2].Weight); share < 0.59 || share > 0.61 {
 		t.Errorf("a's share of the visible row %.3f, want 0.6", share)
 	}
@@ -371,7 +427,7 @@ func TestJoinDropsWidgetsThatAreGoneFromStacksAndUnwindsWhatThatLeaves(t *testin
 	if want := "p s / x / new"; shape(got) != want {
 		t.Errorf("Join gives %q, want %q", shape(got), want)
 	}
-	if ws := got.Rows[0].Widgets; ws[0].Weight != 3 || ws[1].Weight != 7 {
+	if ws := got.Rows[0].Cells; ws[0].Weight != 3 || ws[1].Weight != 7 {
 		t.Errorf("weights %v %v, want s to take its stack's 7 beside p's 3", ws[0].Weight, ws[1].Weight)
 	}
 	if !slices.Equal(got.Hidden, []string{"s"}) {

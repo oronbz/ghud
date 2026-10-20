@@ -11,30 +11,29 @@ import (
 )
 
 // Layout is the saved arrangement: weighted rows of weighted cells, where a
-// cell is a Widget or a stack holding rows of its own.
+// cell is a Widget or a Stack holding rows of its own.
 type Layout struct {
 	Rows   []Row    `json:"rows"`
 	Hidden []string `json:"hidden,omitempty"`
 }
 
 type Row struct {
-	Weight  float64 `json:"weight"`
-	Widgets []Cell  `json:"widgets"`
+	Weight float64 `json:"weight"`
+	Cells  []Cell  `json:"widgets"`
 }
 
-// Cell is a Widget (ID set) or a stack (Rows set), weighted within its row.
+// Cell is a Widget (ID set) or a Stack (Rows set), weighted within its row.
 type Cell struct {
 	ID     string  `json:"id,omitempty"`
 	Weight float64 `json:"weight"`
 	Rows   []Row   `json:"rows,omitempty"`
 }
 
-// IsStack reports whether c holds rows rather than a Widget.
 func (c Cell) IsStack() bool { return len(c.Rows) > 0 }
 
 // Path addresses a place in a Layout: row and cell indexes alternate from
 // the dashboard down. An odd-length Path is a row; an even-length one is a
-// cell, or for a stack also the container of its rows. The empty Path is the
+// cell, or for a Stack also the container of its rows. The empty Path is the
 // dashboard itself.
 type Path []int
 
@@ -49,14 +48,20 @@ func (p Path) key() string {
 
 func (p Path) with(i ...int) Path { return append(slices.Clone(p), i...) }
 
+func (p Path) parent() Path { return p[:len(p)-1] }
+
+func (p Path) last() int { return p[len(p)-1] }
+
+func (p Path) isRow() bool { return len(p)%2 == 1 }
+
 // Default is the built-in Layout used until layout.json exists. Ids are the
 // Widget type names; Join drops the ones whose type isn't available.
 func Default() Layout {
 	w := func(id string, weight float64) Cell { return Cell{ID: id, Weight: weight} }
 	return Layout{Rows: []Row{
-		{Weight: 12, Widgets: []Cell{w("clock", 3), w("calendar", 3), w("meetings", 4)}},
-		{Weight: 12, Widgets: []Cell{w("tasks", 3), w("reminders", 4), w("notes", 3), w("cpu", 3)}},
-		{Weight: 12, Widgets: []Cell{w("prs", 6), w("jira", 4), w("weather", 3)}},
+		{Weight: 12, Cells: []Cell{w("clock", 3), w("calendar", 3), w("meetings", 4)}},
+		{Weight: 12, Cells: []Cell{w("tasks", 3), w("reminders", 4), w("notes", 3), w("cpu", 3)}},
+		{Weight: 12, Cells: []Cell{w("prs", 6), w("jira", 4), w("weather", 3)}},
 	}}
 }
 
@@ -74,13 +79,13 @@ func (l Layout) Join(ids []string) Layout {
 		out := make([]Row, 0, len(rows))
 		for _, r := range rows {
 			nr := Row{Weight: r.Weight}
-			for _, c := range r.Widgets {
+			for _, c := range r.Cells {
 				switch {
 				case c.IsStack():
-					nr.Widgets = append(nr.Widgets, Cell{Weight: c.Weight, Rows: keep(c.Rows)})
+					nr.Cells = append(nr.Cells, Cell{Weight: c.Weight, Rows: keep(c.Rows)})
 				case exists[c.ID] && !placed[c.ID]:
 					placed[c.ID] = true
-					nr.Widgets = append(nr.Widgets, c)
+					nr.Cells = append(nr.Cells, c)
 				}
 			}
 			out = append(out, nr)
@@ -93,10 +98,10 @@ func (l Layout) Join(ids []string) Layout {
 	for _, id := range ids {
 		if !placed[id] {
 			placed[id] = true
-			extra.Widgets = append(extra.Widgets, Cell{ID: id, Weight: 1})
+			extra.Cells = append(extra.Cells, Cell{ID: id, Weight: 1})
 		}
 	}
-	if len(extra.Widgets) > 0 {
+	if len(extra.Cells) > 0 {
 		extra.Weight = 1
 		if n := len(out.Rows); n > 0 {
 			extra.Weight = out.Rows[n-1].Weight
@@ -112,13 +117,13 @@ func (l Layout) Join(ids []string) Layout {
 }
 
 // IDs lists every Widget in l, hidden or not, in reading order: row by row,
-// and through a stack's rows where it stands.
+// and through a Stack's rows where it stands.
 func (l Layout) IDs() []string {
 	var out []string
 	var walk func(rows []Row)
 	walk = func(rows []Row) {
 		for _, r := range rows {
-			for _, c := range r.Widgets {
+			for _, c := range r.Cells {
 				if c.IsStack() {
 					walk(c.Rows)
 				} else {
@@ -140,9 +145,9 @@ func (l Layout) normalise() Layout {
 		ws := make([]*float64, len(rows))
 		for i := range rows {
 			ws[i] = &rows[i].Weight
-			cs := make([]*float64, len(rows[i].Widgets))
-			for j := range rows[i].Widgets {
-				c := &rows[i].Widgets[j]
+			cs := make([]*float64, len(rows[i].Cells))
+			for j := range rows[i].Cells {
+				c := &rows[i].Cells[j]
 				cs[j] = &c.Weight
 				floor(c.Rows)
 			}
@@ -164,8 +169,8 @@ func atLeast(ws []*float64) {
 	}
 }
 
-// tidy removes empty cells, rows and stacks, turns a one-row stack into
-// cells of its parent row and a row holding only a stack into rows of its
+// tidy removes empty cells, rows and Stacks, turns a one-row Stack into
+// cells of its parent row and a row holding only a Stack into rows of its
 // container, rescaling weights so nothing changes size on screen.
 func tidy(rows []Row) []Row {
 	for {
@@ -181,7 +186,7 @@ func tidyOnce(rows []Row) []Row {
 	var out []Row
 	for _, r := range rows {
 		var cells []Cell
-		for _, c := range r.Widgets {
+		for _, c := range r.Cells {
 			if !c.IsStack() {
 				if c.ID != "" {
 					cells = append(cells, c)
@@ -192,7 +197,7 @@ func tidyOnce(rows []Row) []Row {
 			switch len(c.Rows) {
 			case 0:
 			case 1:
-				cells = append(cells, rescale(c.Rows[0].Widgets, cellWeights, c.Weight, len(r.Widgets) == 1)...)
+				cells = append(cells, rescale(c.Rows[0].Cells, cellWeights, c.Weight, len(r.Cells) == 1)...)
 			default:
 				cells = append(cells, c)
 			}
@@ -204,7 +209,7 @@ func tidyOnce(rows []Row) []Row {
 			copy(inner, cells[0].Rows)
 			out = append(out, rescale(inner, rowWeights, r.Weight, len(rows) == 1)...)
 		default:
-			out = append(out, Row{Weight: r.Weight, Widgets: cells})
+			out = append(out, Row{Weight: r.Weight, Cells: cells})
 		}
 	}
 	return out
@@ -234,8 +239,12 @@ func cellWeights(c *Cell) *float64 { return &c.Weight }
 
 func rowWeights(r *Row) *float64 { return &r.Weight }
 
+func (l Layout) same(o Layout) bool {
+	return slices.EqualFunc(l.Rows, o.Rows, sameRow) && slices.Equal(l.Hidden, o.Hidden)
+}
+
 func sameRow(a, b Row) bool {
-	return a.Weight == b.Weight && slices.EqualFunc(a.Widgets, b.Widgets, func(x, y Cell) bool {
+	return a.Weight == b.Weight && slices.EqualFunc(a.Cells, b.Cells, func(x, y Cell) bool {
 		return x.ID == y.ID && x.Weight == y.Weight && slices.EqualFunc(x.Rows, y.Rows, sameRow)
 	})
 }
