@@ -358,7 +358,8 @@ type Chart struct {
 }
 
 // Digits is how big the host draws a line's text. Big digits cover 0-9,
-// ':', space, A, P and M; other characters are skipped.
+// ':', '.', ',', '%', '-', space, A, B, G, K, M, P and T, lowercase letters
+// drawn as uppercase; other characters are skipped.
 type Digits int
 
 const (
