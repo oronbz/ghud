@@ -15,16 +15,10 @@ import (
 func liveLines(th theme.Theme, lines []widget.Line, w, h int) []string {
 	used, fills := 0, 0
 	for _, l := range lines {
-		switch {
-		case l.Chart != nil && l.Chart.Rows == 0:
+		if l.Chart != nil && l.Chart.Rows == 0 {
 			fills++
-		case l.Chart != nil:
-			used += l.Chart.Rows
-		case l.Digits != widget.NoDigits:
-			used += DigitsSize("", l.Digits).H
-		default:
-			used++
 		}
+		used += lineRows(l)
 	}
 	spare := max(0, h-used)
 	var out []string
@@ -45,6 +39,17 @@ func liveLines(th theme.Theme, lines []widget.Line, w, h int) []string {
 		}
 	}
 	return out
+}
+
+// lineRows is how many rows a line takes, a chart without a height none.
+func lineRows(l widget.Line) int {
+	switch {
+	case l.Chart != nil:
+		return l.Chart.Rows
+	case l.Digits != widget.NoDigits:
+		return DigitsSize("", l.Digits).H
+	}
+	return 1
 }
 
 // braille dot bits by dot row, top first, for a cell's left and right columns.

@@ -1,6 +1,7 @@
 package render
 
 import (
+	"slices"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -47,9 +48,52 @@ type List struct {
 // minFlex is the narrowest a flex column gets before other columns drop.
 const minFlex = 10
 
-// listBody draws exactly h lines of w cells: a one-cell margin each side,
-// and a scroll thumb in the right margin when the list overflows.
+// SummaryRows is how many of a list body's h rows its summary takes: all of
+// its Lines, or none when they and one Item row don't fit. The Items are
+// drawn in the rows below it.
+func SummaryRows(p widget.Payload, h int) int {
+	n := 0
+	for _, l := range summary(p) {
+		n += lineRows(l)
+	}
+	if n+1 > h {
+		return 0
+	}
+	return n
+}
+
+// summary is a list's Lines as drawn above its Items, where a chart without
+// a height takes one row rather than the rows the Items need.
+func summary(p widget.Payload) []widget.Line {
+	lines := slices.Clone(p.Lines)
+	for i, l := range lines {
+		if l.Chart != nil && l.Chart.Rows == 0 {
+			c := *l.Chart
+			c.Rows = 1
+			lines[i].Chart = &c
+		}
+	}
+	return lines
+}
+
+// listBody draws exactly h lines of w cells: the summary pinned on top, then
+// the Items, inside a one-cell margin each side.
 func listBody(th theme.Theme, p widget.Payload, l List, w, h int) []string {
+	s := SummaryRows(p, h)
+	if s == 0 {
+		return itemsBody(th, p, l, w, h)
+	}
+	cw := max(0, w-2)
+	out := make([]string, 0, h)
+	for _, line := range liveLines(th, summary(p), cw, s) {
+		out = append(out, " "+fit(line, cw, false)+" ")
+	}
+	return append(out, itemsBody(th, p, l, w, h-s)...)
+}
+
+// itemsBody draws a list's Items as exactly h lines of w cells from row
+// l.Top, with a scroll thumb in the right margin when they overflow.
+func itemsBody(th theme.Theme, p widget.Payload, l List, w, h int) []string {
 	out := make([]string, h)
 	cw := max(0, w-2)
 	if len(p.Items) == 0 {
