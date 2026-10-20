@@ -30,7 +30,7 @@ const paletteRows = 12
 // every Action in Layout order.
 func (m Model) entries() []entry {
 	var all []entry
-	for _, t := range m.placed().Tiles {
+	for _, t := range m.laidOut().Tiles {
 		for _, a := range m.actions(t.ID) {
 			all = append(all, entry{widget: t.ID, title: m.widgets[t.ID].title, action: a})
 		}

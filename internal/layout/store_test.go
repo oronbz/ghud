@@ -119,10 +119,10 @@ func TestAStackSavesAsACellWithRows(t *testing.T) {
 }
 `
 	l := roundTrip(t, stacked)
-	if s := l.Rows[0].Widgets[1]; !s.IsStack() || len(s.Rows) != 2 || s.Rows[1].Widgets[0].ID != "agents" {
+	if s := l.Rows[0].Cells[1]; !s.IsStack() || len(s.Rows) != 2 || s.Rows[1].Cells[0].ID != "agents" {
 		t.Errorf("second cell %+v, want a stack of spotify over agents", s)
 	}
-	if l.Rows[0].Widgets[0].IsStack() {
+	if l.Rows[0].Cells[0].IsStack() {
 		t.Error("a Widget cell reads as a stack")
 	}
 }

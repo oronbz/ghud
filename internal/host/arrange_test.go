@@ -29,7 +29,7 @@ func TestArrangeMoveRightIsKeptWrittenAndRestoredOnRestart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("layout.json not written: %v", err)
 	}
-	if id := saved.Rows[0].Widgets[0].ID; id != "b" {
+	if id := saved.Rows[0].Cells[0].ID; id != "b" {
 		t.Errorf("saved first Widget %q, want b", id)
 	}
 
@@ -198,7 +198,7 @@ func rowsShape(rows []layout.Row) string {
 	var out []string
 	for _, r := range rows {
 		var cells []string
-		for _, c := range r.Widgets {
+		for _, c := range r.Cells {
 			if c.IsStack() {
 				cells = append(cells, "["+rowsShape(c.Rows)+"]")
 			} else {

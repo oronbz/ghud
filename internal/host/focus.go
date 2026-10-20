@@ -165,7 +165,7 @@ func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 			m.focus = m.lastFocus()
 			break
 		}
-		f := m.placed()
+		f := m.laidOut()
 		switch {
 		case key.Matches(msg, keys.Left, keys.MoveLeft):
 			m.focus = f.Toward(m.focus, layout.Left)
@@ -191,10 +191,10 @@ func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// placed lays every visible Widget out. While the terminal is too small to
+// laidOut lays every visible Widget out. While the terminal is too small to
 // draw the grid, it lays out at the minimum size so focus still moves
 // sensibly.
-func (m Model) placed() layout.Frame {
+func (m Model) laidOut() layout.Frame {
 	f := m.frame()
 	if f.TooSmall {
 		f = layout.Compute(m.layout, m.titles(), f.Need.W, f.Need.H, layout.Pointer{})
@@ -203,7 +203,7 @@ func (m Model) placed() layout.Frame {
 }
 
 func (m Model) rects() map[string]layout.Rect {
-	f := m.placed()
+	f := m.laidOut()
 	out := make(map[string]layout.Rect, len(f.Tiles))
 	for _, t := range f.Tiles {
 		out[t.ID] = t.Rect
@@ -213,7 +213,7 @@ func (m Model) rects() map[string]layout.Rect {
 
 // nth is the id of the Nth Widget in reading order from 0, or "".
 func (m Model) nth(n int) string {
-	if ts := m.placed().Tiles; n < len(ts) {
+	if ts := m.laidOut().Tiles; n < len(ts) {
 		return ts[n].ID
 	}
 	return ""

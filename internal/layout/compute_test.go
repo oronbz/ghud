@@ -9,7 +9,7 @@ import (
 func w(id string, weight float64) layout.Cell { return layout.Cell{ID: id, Weight: weight} }
 
 func row(weight float64, cells ...layout.Cell) layout.Row {
-	return layout.Row{Weight: weight, Widgets: cells}
+	return layout.Row{Weight: weight, Cells: cells}
 }
 
 func stack(weight float64, rows ...layout.Row) layout.Cell {
