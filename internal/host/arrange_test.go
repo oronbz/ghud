@@ -190,16 +190,24 @@ title = "Work"
 	}
 }
 
-func shapeOf(l layout.Layout) string {
-	var rows []string
-	for _, r := range l.Rows {
-		var ids []string
+// shapeOf writes l as rows split by " / ", Widgets by spaces and a stack's
+// rows in brackets.
+func shapeOf(l layout.Layout) string { return rowsShape(l.Rows) }
+
+func rowsShape(rows []layout.Row) string {
+	var out []string
+	for _, r := range rows {
+		var cells []string
 		for _, c := range r.Widgets {
-			ids = append(ids, c.ID)
+			if c.IsStack() {
+				cells = append(cells, "["+rowsShape(c.Rows)+"]")
+			} else {
+				cells = append(cells, c.ID)
+			}
 		}
-		rows = append(rows, strings.Join(ids, " "))
+		out = append(out, strings.Join(cells, " "))
 	}
-	return strings.Join(rows, " / ")
+	return strings.Join(out, " / ")
 }
 
 func noLayoutFile(t *testing.T, h *hosttest.Host) {
