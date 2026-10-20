@@ -4,6 +4,7 @@ import (
 	"math"
 	"strings"
 
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/oronbz/visor/internal/theme"
@@ -15,16 +16,10 @@ import (
 func liveLines(th theme.Theme, lines []widget.Line, w, h int) []string {
 	used, fills := 0, 0
 	for _, l := range lines {
-		switch {
-		case l.Chart != nil && l.Chart.Rows == 0:
+		if l.Chart != nil && l.Chart.Rows == 0 {
 			fills++
-		case l.Chart != nil:
-			used += l.Chart.Rows
-		case l.Digits != widget.NoDigits:
-			used += DigitsSize("", l.Digits).H
-		default:
-			used++
 		}
+		used += lineRows(l)
 	}
 	spare := max(0, h-used)
 	var out []string
@@ -45,6 +40,17 @@ func liveLines(th theme.Theme, lines []widget.Line, w, h int) []string {
 		}
 	}
 	return out
+}
+
+// lineRows is how many rows a line takes, a chart without a height none.
+func lineRows(l widget.Line) int {
+	switch {
+	case l.Chart != nil:
+		return l.Chart.Rows
+	case l.Digits != widget.NoDigits:
+		return DigitsSize("", l.Digits).H
+	}
+	return 1
 }
 
 // braille dot bits by dot row, top first, for a cell's left and right columns.
@@ -123,13 +129,14 @@ func barWidths(spans []widget.Span, w int) []int {
 
 var eighths = []string{"", "▏", "▎", "▍", "▌", "▋", "▊", "▉"}
 
-// bar fills Value of w cells in eighth blocks, over a track in the line token.
-func bar(th theme.Theme, s widget.Span, w int) string {
+// bar fills Value of w cells in eighth blocks, over a track in the line
+// token, both on base's background.
+func bar(th theme.Theme, s widget.Span, w int, base lipgloss.Style) string {
 	if w <= 0 {
 		return ""
 	}
 	n := int(math.Round(min(max(s.Bar.Value, 0), 1) * float64(w*8)))
 	filled := strings.Repeat("█", n/8) + eighths[n%8]
 	cells := n/8 + min(1, n%8)
-	return th.Fg(s.Token).Render(filled) + th.Fg(theme.Line).Render(strings.Repeat("─", w-cells))
+	return base.Foreground(th.Color(s.Token)).Render(filled) + base.Foreground(th.Color(theme.Line)).Render(strings.Repeat("─", w-cells))
 }

@@ -23,8 +23,9 @@ Fits when the Widget needs state, a long-lived connection, credentials, choice o
 2. **Write the manifest** at the folder's root: `protocol = 1`, the `command`, and one `[[widget]]` table per Widget type. Declare every setting as a `[[widget.setting]]`: visor validates the user's values against it and lists it in `visor config default`.
 3. **Write the process.** One JSON message per line on stdout, which belongs to the protocol alone; logs go to stderr. Answer an Action id you don't know with a JSON-RPC error. Report trouble through the refresh result's `status` (`error`, `setup` with an Action that fixes it, `rate_limited`), never as text in the payload.
 4. **Colour with tokens.** Every `token` and `bg` is one of the 13 theme tokens below; visor rejects anything else, raw colours included. For big digits, braille charts and bars use the payload's `digits`, `chart` and `bar` fields instead of drawing them.
-5. **Check it.** Run `visor plugin check <folder>` and fix what it reports until it ends in `PASS`. It starts the process, validates every message against the schema, refreshes and closes each Widget type, and invokes the made-up Action id `visor-plugin-check`, so none of your real Actions run.
-6. **Try it in visor.** Add `[[plugin]] path = "<folder>"` and a `[[widget]]` block of your type to the user's `config.toml`, then run `visor`.
+5. **Shape the payload.** `lines` make a live view; `columns` and `items` make a list. A list may also carry `lines`: they become its summary, pinned above the items (headline digits, a chart, a bar), so one Widget type can show both. Give a summary `chart` a `rows` height; without one it takes 1 row. Item fields may hold `bar` spans too, but not digits or charts.
+6. **Check it.** Run `visor plugin check <folder>` and fix what it reports until it ends in `PASS`. It starts the process, validates every message against the schema, refreshes and closes each Widget type, and invokes the made-up Action id `visor-plugin-check`, so none of your real Actions run.
+7. **Try it in visor.** Add `[[plugin]] path = "<folder>"` and a `[[widget]]` block of your type to the user's `config.toml`, then run `visor`.
 
 Done when: `visor plugin check` prints `PASS`, and the Widget renders in visor with its Actions listed in the `^K` palette.
 

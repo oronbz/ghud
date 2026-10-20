@@ -11,6 +11,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/oronbz/visor/internal/layout"
 	"github.com/oronbz/visor/internal/render"
 	"github.com/oronbz/visor/internal/theme"
 	"github.com/oronbz/visor/internal/widget"
@@ -77,6 +78,7 @@ func (m Model) clampList(id string) {
 		m.lists[id] = listState{}
 		return
 	}
+	h = itemRows(p, r)
 	st.idx = min(max(st.idx, 0), len(p.Items)-1)
 	st.sel = p.Items[st.idx].ID
 	rows := render.Rows(p)
@@ -93,6 +95,13 @@ func (m Model) clampList(id string) {
 	}
 	st.top = min(max(st.top, 0), max(0, len(rows)-h))
 	m.lists[id] = st
+}
+
+// itemRows is how many rows of list Widget p, in r, show Items: the body
+// below its summary.
+func itemRows(p widget.Payload, r layout.Rect) int {
+	body := r.H - 2
+	return max(1, body-render.SummaryRows(p, body))
 }
 
 // moveSelection moves the focused list's selection to index i, clamped. A
