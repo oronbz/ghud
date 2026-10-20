@@ -2,6 +2,7 @@ package render
 
 import (
 	"strings"
+	"unicode"
 
 	"github.com/oronbz/visor/internal/theme"
 	"github.com/oronbz/visor/internal/widget"
@@ -25,6 +26,23 @@ var glyphs = map[rune][5]string{
 	'A': {"010", "101", "111", "101", "101"},
 	'P': {"110", "101", "110", "100", "100"},
 	'M': {"10001", "11011", "10101", "10001", "10001"},
+	'.': {"0", "0", "0", "0", "1"},
+	',': {"0", "0", "0", "1", "1"},
+	'-': {"000", "000", "111", "000", "000"},
+	'%': {"101", "001", "010", "100", "101"},
+	'K': {"101", "110", "100", "110", "101"},
+	'G': {"111", "100", "101", "101", "111"},
+	'B': {"110", "101", "110", "101", "110"},
+	'T': {"111", "010", "010", "010", "010"},
+}
+
+// glyph is r's bitmap, or its uppercase form's when r has none of its own.
+func glyph(r rune) ([5]string, bool) {
+	if g, ok := glyphs[r]; ok {
+		return g, true
+	}
+	g, ok := glyphs[unicode.ToUpper(r)]
+	return g, ok
 }
 
 func DigitsSize(text string, d widget.Digits) widget.Size {
@@ -37,7 +55,7 @@ func DigitsSize(text string, d widget.Digits) widget.Size {
 	}
 	w, n := 0, 0
 	for _, r := range text {
-		if g, ok := glyphs[r]; ok {
+		if g, ok := glyph(r); ok {
 			w += len(g[0]) * scale
 			n++
 		}
@@ -58,7 +76,7 @@ func digitLines(th theme.Theme, l widget.Line) []string {
 	for _, s := range l.Spans {
 		st := th.Fg(s.Token)
 		for _, r := range s.Text {
-			g, ok := glyphs[r]
+			g, ok := glyph(r)
 			if !ok {
 				continue
 			}
