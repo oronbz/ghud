@@ -18,10 +18,10 @@ func (m Model) footer() string {
 	th := m.opts.Theme
 	mode, modeColor := " NORMAL ", theme.Accent
 	bindings := normalBindings()
-	hints := "Tab/hl focus · 1–9 jump · w widgets · ? keys · q quit"
+	hints := "Tab/←→ focus · 1–9 jump · w widgets · ? keys · q quit"
 	hintTok := theme.Dim
 	if m.focus != "" {
-		hints = "Tab rows · hl widgets · HJKL any direction · m arrange · esc unfocus · ? keys"
+		hints = "Tab rows · ←→ widgets · ⇧arrows any direction · m arrange · esc unfocus · ? keys"
 		if e := m.staleError(m.focus); e != "" {
 			hints, hintTok = e, theme.Warn
 		}
@@ -29,10 +29,10 @@ func (m Model) footer() string {
 	if m.arranging {
 		mode, modeColor = " ARRANGE ", theme.Warn
 		bindings = arrangeBindings()
-		hints = "hjkl move · HJKL resize · ⏎ keep · esc revert"
+		hints = "arrows move · ⇧arrows resize · ⏎ keep · esc revert"
 	}
 	if m.picking {
-		hints = "jk move · ␣ show/hide · esc close"
+		hints = "↑↓ move · ␣ show/hide · esc close"
 	}
 	if m.editing != nil {
 		mode, modeColor = " INSERT ", theme.Ok
@@ -42,7 +42,7 @@ func (m Model) footer() string {
 		hints = "type to filter · ↑↓ choose · ⏎ run · esc close"
 	}
 	if m.menu != nil {
-		hints = "jk choose · ⏎ run · esc close"
+		hints = "↑↓ choose · ⏎ run · esc close"
 		if m.menu.loading {
 			hints = "loading… · esc close"
 		}

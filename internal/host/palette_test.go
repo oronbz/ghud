@@ -223,7 +223,7 @@ func TestHideFromThePaletteHidesTheWidgetAndRecordsIt(t *testing.T) {
 	if _, _, ok := h.Find("─ Todo "); ok {
 		t.Errorf("Todo still drawn after Hide:\n%s", h.Screen())
 	}
-	if footer := h.Line(23); !strings.Contains(footer, "Tab/hl focus") {
+	if footer := h.Line(23); !strings.Contains(footer, "Tab/←→ focus") {
 		t.Errorf("footer %q after hiding the focused Todo, want visor unfocused", footer)
 	}
 	if len(*todoRan) != 0 {

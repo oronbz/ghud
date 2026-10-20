@@ -189,7 +189,7 @@ func TestTheWheelScrollsWithoutFocusingAndAClickSelectsTheItemUnderIt(t *testing
 	if got, want := strings.Trim(h.Line(1), "│▐ "), "b3"; got != want {
 		t.Errorf("after 8 notches the first line is %q, want %q:\n%s", got, want, h.Screen())
 	}
-	if footer := h.Line(11); !strings.Contains(footer, "Tab/hl focus") {
+	if footer := h.Line(11); !strings.Contains(footer, "Tab/←→ focus") {
 		t.Errorf("the wheel focused the Widget: footer %q", footer)
 	}
 
@@ -197,7 +197,7 @@ func TestTheWheelScrollsWithoutFocusingAndAClickSelectsTheItemUnderIt(t *testing
 	if x, y, ok := h.Find("b5"); !ok || y != 3 || !isSel(h, x, y) {
 		t.Errorf("clicking the line showing b5 didn't select it in place:\n%s", h.Screen())
 	}
-	if footer := h.Line(11); strings.Contains(footer, "Tab/hl focus") {
+	if footer := h.Line(11); strings.Contains(footer, "Tab/←→ focus") {
 		t.Errorf("clicking an Item didn't focus its Widget: footer %q", footer)
 	}
 
