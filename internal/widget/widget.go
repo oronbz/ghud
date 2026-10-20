@@ -215,6 +215,9 @@ type Payload struct {
 	// Wrap word-wraps Lines to the Widget's width instead of truncating
 	// them, and lets the user scroll them with j/k.
 	Wrap bool `json:"wrap,omitempty"`
+	// Image is drawn beside or above a live view's Lines; lists and wrapped
+	// Payloads leave it out.
+	Image *Image `json:"image,omitempty"`
 
 	// Columns make the Payload a list: every Item has one Field per Column.
 	Columns []Column `json:"columns,omitempty"`
@@ -387,6 +390,45 @@ func (d *Digits) UnmarshalText(b []byte) error {
 		return fmt.Errorf("digits %q must be \"half-block\" or \"block\"", b)
 	}
 	*d = Digits(i)
+	return nil
+}
+
+// Image is a PNG or JPEG the host draws in a live view, keeping its aspect
+// ratio: from Path, a file the host reads, or Data, its base64 bytes.
+type Image struct {
+	Path string `json:"path,omitempty"`
+	Data string `json:"data,omitempty"`
+	Side Side   `json:"side,omitempty"`
+}
+
+// Side is where an Image sits in the body. Beside the Lines it takes the
+// full height and is dropped when they'd get narrower than 20 cells; above
+// or below them it takes the rows they leave, shared with charts without
+// Rows, and is dropped under 3 rows.
+type Side int
+
+const (
+	Left Side = iota
+	Right
+	Top
+	Bottom
+)
+
+var sideNames = []string{"left", "right", "top", "bottom"}
+
+func (s Side) MarshalText() ([]byte, error) {
+	if s < 0 || int(s) >= len(sideNames) {
+		return nil, fmt.Errorf("unknown side %d", s)
+	}
+	return []byte(sideNames[s]), nil
+}
+
+func (s *Side) UnmarshalText(b []byte) error {
+	i := slices.Index(sideNames, string(b))
+	if i < 0 {
+		return fmt.Errorf("side %q must be \"left\", \"right\", \"top\" or \"bottom\"", b)
+	}
+	*s = Side(i)
 	return nil
 }
 
