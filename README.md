@@ -67,7 +67,7 @@ Both binaries need to end up in the same directory, which `go install` does for 
 With Homebrew, on macOS or Linux:
 
 ```sh
-brew upgrade visor
+brew update && brew upgrade visor
 ```
 
 With a package, the Windows zip or `go install`, install the newer release the same way you installed the first one.
