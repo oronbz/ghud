@@ -305,68 +305,68 @@ const Stacks = (() => {
     return best;
   };
 
-  // move is the keyboard move. Left and right swap with the neighbour in the
-  // row, or enter a neighbouring stack as a row of its own at the height of
-  // the Widget's centre. At a stack's edge they move into the next cell of the
-  // parent row: stacking with a Widget there (above or below, by centre),
-  // joining a stack as its own row, or stepping out beside the stack when
-  // there's no next cell. Past the dashboard's edge, a full-height column. Up
-  // and down join the next row in the nearest container that has one, at the
-  // same horizontal position (descending into stacks), and past the
-  // dashboard's edge open a new full-width row.
+  // move is the keyboard move, one step per press, alternating between going
+  // into the next thing and landing between it and the one after.
+  // Left and right: a Widget sharing its row goes into the next cell that way,
+  // stacking with a Widget there (above it when level or higher) or taking a
+  // row of its own in a stack at the height of its centre; at the row's edge
+  // the next cell is looked for further out. A Widget alone in a stack's row
+  // steps out beside that stack. Past the dashboard's edge, a full-height column.
+  // Up and down: a Widget sharing its row takes a row of its own above or
+  // below; alone, it joins the next row at the same horizontal position
+  // (descending into stacks), stepping out of a stack as a row of its own
+  // beside the stack's row.
   function move(L, W, H, id, dir) {
-    const c = clone(L), f = compute(c, Math.max(W, needRows(c.rows).w), Math.max(H, needRows(c.rows).h));
+    const c = clone(L), n = needRows(c.rows), f = compute(c, Math.max(W, n.w), Math.max(H, n.h));
     const chain = locate(c, id);
     if (!chain) return c;
     const lv = chain.at(-1), cell = lv.cell, me = center(f.cellRect.get(cell));
     const step = dir === "left" || dir === "up" ? -1 : 1;
+    const ownRow = (rows, at) => rows.splice(at, 0, { weight: r3(mean(rows.map(r => r.weight))), widgets: [{ ...cell, weight: 1 }] });
     if (dir === "left" || dir === "right") {
-      const j = lv.cellIndex + step;
-      if (j >= 0 && j < lv.row.widgets.length) {
-        const nb = lv.row.widgets[j];
-        if (!isStack(nb)) { lv.row.widgets[j] = cell; lv.row.widgets[lv.cellIndex] = nb; return c; }
-        const at = nb.rows.filter(r => center(f.rowRect.get(r)).y < me.y).length;
-        const weight = r3(mean(nb.rows.map(r => r.weight)));
+      if (lv.row.widgets.length === 1) {
+        if (chain.length < 2) return column(L, W, H, id, dir);
+        const parent = chain.at(-2), pr = parent.row.widgets;
         detach(lv);
-        nb.rows.splice(at, 0, { weight, widgets: [{ ...cell, weight: 1 }] });
+        pr.splice(pr.indexOf(parent.cell) + (step > 0 ? 1 : 0), 0, { ...cell, weight: r3(mean(pr.map(x => x.weight))) });
         return normalize(c);
       }
-      if (chain.length < 2) return column(L, W, H, id, dir);
-      const parent = chain.at(-2), pr = parent.row.widgets, nj = pr.indexOf(parent.cell) + step;
+      for (let k = chain.length - 1; k >= 0; k--) {
+        const level = chain[k], row = level.row, nb = row.widgets[row.widgets.indexOf(level.cell) + step];
+        if (!nb) continue;
+        detach(lv);
+        if (isStack(nb)) {
+          ownRow(nb.rows, nb.rows.filter(r => center(f.rowRect.get(r)).y < me.y).length);
+        } else {
+          const mine = { ...cell, weight: 1 }, target = { ...nb, weight: 1 };
+          const rows = me.y <= center(f.cellRect.get(nb)).y ? [mine, target] : [target, mine];
+          row.widgets[row.widgets.indexOf(nb)] = { weight: nb.weight, rows: rows.map(x => ({ weight: 1, widgets: [x] })) };
+        }
+        return normalize(c);
+      }
+      return column(L, W, H, id, dir);
+    }
+    if (lv.row.widgets.length > 1) {
       detach(lv);
-      if (nj < 0 || nj >= pr.length) {
-        cell.weight = r3(mean(pr.map(x => x.weight)));
-        pr.splice(pr.indexOf(parent.cell) + (step > 0 ? 1 : 0), 0, cell);
-        return normalize(c);
-      }
-      const nb = pr[nj];
-      if (isStack(nb)) {
-        const at = nb.rows.filter(r => center(f.rowRect.get(r)).y < me.y).length;
-        nb.rows.splice(at, 0, { weight: r3(mean(nb.rows.map(r => r.weight))), widgets: [{ ...cell, weight: 1 }] });
-      } else {
-        const mine = { ...cell, weight: 1 }, target = { ...nb, weight: 1 };
-        const rows = me.y < center(f.cellRect.get(nb)).y ? [mine, target] : [target, mine];
-        pr[nj] = { weight: nb.weight, rows: rows.map(x => ({ weight: 1, widgets: [x] })) };
-      }
+      ownRow(lv.container.rows, lv.container.rows.indexOf(lv.row) + (step > 0 ? 1 : 0));
       return normalize(c);
     }
     for (let k = chain.length - 1; k >= 0; k--) {
-      const level = chain[k], j = level.rowIndex + step;
-      if (j < 0 || j >= level.container.rows.length) {
-        if (k > 0) continue;
-        const weight = r3(mean(c.rows.map(r => r.weight)));
+      const level = chain[k];
+      if (k < chain.length - 1 && level.row.widgets.length > 1) {
         detach(lv);
-        c.rows.splice(step < 0 ? 0 : c.rows.length, 0, { weight, widgets: [{ ...cell, weight: 1 }] });
+        ownRow(level.container.rows, level.container.rows.indexOf(level.row) + (step > 0 ? 1 : 0));
         return normalize(c);
       }
+      const j = level.rowIndex + step;
+      if (j < 0 || j >= level.container.rows.length) continue;
       let row = level.container.rows[j];
       for (;;) {
         const near = nearestBy(row.widgets, x => f.cellRect.get(x), "x", me.x);
         if (isStack(near)) { row = step < 0 ? near.rows.at(-1) : near.rows[0]; continue; }
         detach(lv);
         cell.weight = r3(mean(row.widgets.map(x => x.weight)));
-        const at = row.widgets.indexOf(near) + (me.x >= center(f.cellRect.get(near)).x ? 1 : 0);
-        row.widgets.splice(at, 0, cell);
+        row.widgets.splice(row.widgets.indexOf(near) + (me.x >= center(f.cellRect.get(near)).x ? 1 : 0), 0, cell);
         return normalize(c);
       }
     }
@@ -743,19 +743,44 @@ const SCENARIOS = [
       ["Focus Meetings and press m", () => { focusOn("meetings")(); keyOp("m"); }],
       ["← : into Priorities' column, above it", key("ArrowLeft")],
       ["← again: out as a column of its own, left of Priorities", key("ArrowLeft")],
-      ["→ : swap places with Priorities", key("ArrowRight")],
+      ["→ : back into Priorities' column", key("ArrowRight")],
+      ["→ : out the other side, a column between Priorities and the rows", key("ArrowRight")],
       ["→ : into the rows on the right, as a row of its own at its height", key("ArrowRight")],
       ["esc : revert all of it", key("Escape")],
     ] },
+  { name: "Stack with a neighbour", start: REPORTER, focus: "agents",
+    desc: "Agents, Review requests and Meetings share a row. The goal is Agents stacked above Review requests in Review requests' cell. Every arrow press is one step, alternating between going into the next thing and landing between it and the one after.",
+    watch: "One → does it. A second → lands Agents between Review requests and Meetings, which is the old swap in two presses. ← walks every step back.",
+    steps: [
+      ["Focus Agents and press m", () => { focusOn("agents")(); keyOp("m"); }],
+      ["→ : into Review requests' cell, above it", key("ArrowRight")],
+      ["→ : out the other side, between Review requests and Meetings", key("ArrowRight")],
+      ["← : back into Review requests' cell", key("ArrowLeft")],
+      ["← : out the left side, where it started", key("ArrowLeft")],
+      ["↓ : a row of its own below the row", key("ArrowDown")],
+      ["↓ : into the Clock row", key("ArrowDown")],
+      ["esc : revert all of it", key("Escape")],
+    ] },
+  { name: "Today's flat layout: ↑/↓", start: VISOR, focus: "clock",
+    desc: "The one-step rule changes ↑/↓ in today's flat layouts too. A Widget sharing its row first gets a row of its own, and the next press joins the next row. Today's visor goes straight to joining.",
+    watch: "Is the extra step worth it? It means rows can now be opened anywhere by keyboard, not only past the top or bottom edge.",
+    steps: [
+      ["Focus Clock and press m", () => { focusOn("clock")(); keyOp("m"); }],
+      ["↑ : a full-width row of its own, above its old row", key("ArrowUp")],
+      ["↑ : into the Agents row", key("ArrowUp")],
+      ["esc : revert", key("Escape")],
+    ] },
   { name: "Keyboard in and out of a stack", start: STACKED, focus: "agents",
-    desc: "In arrange mode, the arrow keys move the Widget within its nearest container. ←/→ into a stack gives the Widget its own row there. At a stack's edge, ←/→ move it into the next cell over: stacking with a Widget there, or joining a stack as its own row. ↑/↓ join the next row at the same horizontal position, as they do today.",
-    watch: "Is it predictable? Pay attention to ↑ from inside the stack: it joins Spotify's row inside the stack (side by side) rather than swapping places with it.",
+    desc: "Agents is alone in its row inside a stack. Each press is one step: out beside the stack, into the next cell, out the other side, and so on.",
+    watch: "↑ inside the stack first joins Spotify's row (side by side). The next ↑ gives it a row of its own above Spotify, which is a swap in two presses.",
     steps: [
       ["Focus Agents (in the stack) and press m", () => { focusOn("agents")(); keyOp("m"); }],
-      ["← : into Priorities' cell, below it (its centre is lower)", key("ArrowLeft")],
-      ["→ : back into the stack on the right, as a row of its own at its height", key("ArrowRight")],
-      ["↑ : join the row above inside the stack", key("ArrowUp")],
-      ["↑ : past the top of the dashboard, open a new full-width row", key("ArrowUp")],
+      ["← : out of the stack, a column between Priorities and the stack", key("ArrowLeft")],
+      ["← : into Priorities' cell, above it", key("ArrowLeft")],
+      ["→ : out the other side, a column again", key("ArrowRight")],
+      ["→ : back into the stack, as a row of its own at its height", key("ArrowRight")],
+      ["↑ : into Spotify's row", key("ArrowUp")],
+      ["↑ : a row of its own above Spotify", key("ArrowUp")],
       ["esc : revert all of it", key("Escape")],
     ] },
   { name: "Stacks unwind themselves", start: Stacks.drop(VISOR, "agents", { kind: "side", target: "spotify", side: "down" }), focus: "agents",
