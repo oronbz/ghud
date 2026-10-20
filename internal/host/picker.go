@@ -52,13 +52,7 @@ func (m Model) setHidden(id string, hidden bool) Model {
 
 // pickerIDs lists every Widget, hidden or not, in Layout order.
 func (m Model) pickerIDs() []string {
-	var ids []string
-	for _, r := range m.layout.Rows {
-		for _, c := range r.Widgets {
-			ids = append(ids, c.ID)
-		}
-	}
-	return ids
+	return m.layout.IDs()
 }
 
 func (m Model) pickerLayer() *lipgloss.Layer {

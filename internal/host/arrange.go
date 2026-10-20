@@ -17,16 +17,16 @@ import (
 func (m Model) arrangeKey(msg tea.KeyPressMsg) Model {
 	switch {
 	case key.Matches(msg, keys.Keep):
-		m.arranging = false
+		m.arranging, m.via = false, layout.Via{}
 		if !reflect.DeepEqual(m.layout, m.before) {
 			m = m.saveLayout()
 		}
 	case key.Matches(msg, keys.Revert):
-		m.arranging, m.layout = false, m.before
+		m.arranging, m.layout, m.via = false, m.before, layout.Via{}
 	case key.Matches(msg, keys.Shift):
-		m.layout = m.layout.Move(m.focus, dirOf(msg))
+		m.layout, m.via = m.layout.Move(m.focus, dirOf(msg), layout.Size{W: m.w, H: m.h - footerHeight}, m.via)
 	case key.Matches(msg, keys.Grow):
-		m.layout = m.layout.Resize(m.focus, dirOf(msg))
+		m.layout, m.via = m.layout.Resize(m.focus, dirOf(msg)), layout.Via{}
 	}
 	return m
 }

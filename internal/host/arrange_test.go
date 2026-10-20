@@ -21,9 +21,9 @@ func TestArrangeMoveRightIsKeptWrittenAndRestoredOnRestart(t *testing.T) {
 	root := savedLayout(t, threeAcross)
 	h := phoneticAt(t, root)
 
-	h.Press("1", "m", "l", "enter")
+	h.Press("1", "m", "l", "l", "enter")
 	if got := order(t, h, "Alpha", "Bravo", "Charlie"); got != "Bravo Alpha Charlie" {
-		t.Fatalf("after m l ⏎ the first row reads %q, want Bravo Alpha Charlie:\n%s", got, h.Screen())
+		t.Fatalf("after m l l ⏎ the first row reads %q, want Bravo Alpha Charlie:\n%s", got, h.Screen())
 	}
 	saved, err := layout.Load(h.Paths.Config)
 	if err != nil {
@@ -190,16 +190,24 @@ title = "Work"
 	}
 }
 
-func shapeOf(l layout.Layout) string {
-	var rows []string
-	for _, r := range l.Rows {
-		var ids []string
+// shapeOf writes l as rows split by " / ", Widgets by spaces and a stack's
+// rows in brackets.
+func shapeOf(l layout.Layout) string { return rowsShape(l.Rows) }
+
+func rowsShape(rows []layout.Row) string {
+	var out []string
+	for _, r := range rows {
+		var cells []string
 		for _, c := range r.Widgets {
-			ids = append(ids, c.ID)
+			if c.IsStack() {
+				cells = append(cells, "["+rowsShape(c.Rows)+"]")
+			} else {
+				cells = append(cells, c.ID)
+			}
 		}
-		rows = append(rows, strings.Join(ids, " "))
+		out = append(out, strings.Join(cells, " "))
 	}
-	return strings.Join(rows, " / ")
+	return strings.Join(out, " / ")
 }
 
 func noLayoutFile(t *testing.T, h *hosttest.Host) {

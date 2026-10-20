@@ -11,3 +11,7 @@ visor keeps Widgets and their settings in a hand-edited, fully commented `config
 
 - A Widget in the config but not in the Layout is placed at the end; a Layout entry with no matching Widget is dropped. Renaming an id orphans its saved position and cached frame.
 - New options reach users through `visor config default` (the full commented reference), never by visor rewriting their config.
+
+## Notes
+
+- 2026-10-20: The Layout is no longer only rows and weights. A cell is a Widget (`{"id", "weight"}`) or a stack (`{"weight", "rows": [...]}`) holding rows of its own, to any depth, which makes full-height columns possible (#58). Today's `layout.json` files are unchanged by this: they load as they are and save back byte for byte. visor normalises the Layout after every change, so the file never collects empty rows, one-row stacks or rows holding only a stack.
