@@ -5,10 +5,12 @@
 package hosttest
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -81,6 +83,7 @@ type Host struct {
 	w, h   int
 	quit   bool
 	clears int
+	raw    strings.Builder
 }
 
 func New(t testing.TB, o Options) *Host {
@@ -289,6 +292,10 @@ func (h *Host) Quit() bool { return h.quit }
 // Clears counts the times the app has asked Bubble Tea to clear the screen.
 func (h *Host) Clears() int { return h.clears }
 
+// Written is everything the app has written to the terminal outside its
+// frames, such as queries and kitty graphics escapes, in order.
+func (h *Host) Written() string { return h.raw.String() }
+
 var (
 	cmdType         = reflect.TypeFor[tea.Cmd]()
 	clearScreenType = reflect.TypeOf(tea.ClearScreen())
@@ -302,6 +309,8 @@ func (h *Host) run(cmd tea.Cmd) {
 	case nil:
 	case tea.QuitMsg:
 		h.quit = true
+	case tea.RawMsg:
+		fmt.Fprint(&h.raw, msg.Msg)
 	case tea.BatchMsg:
 		for _, c := range msg {
 			h.run(c)
