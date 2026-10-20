@@ -21,7 +21,7 @@ func (m Model) footer() string {
 	hints := "Tab/←→ focus · 1–9 jump · w widgets · ? keys · q quit"
 	hintTok := theme.Dim
 	if m.focus != "" {
-		hints = "Tab rows · ←→ widgets · ⇧arrows any direction · m arrange · esc unfocus · ? keys"
+		hints = "Tab rows · ←→ widgets · ⇧←↓↑→ any direction · m arrange · esc unfocus · ? keys"
 		if e := m.staleError(m.focus); e != "" {
 			hints, hintTok = e, theme.Warn
 		}
@@ -29,7 +29,7 @@ func (m Model) footer() string {
 	if m.arranging {
 		mode, modeColor = " ARRANGE ", theme.Warn
 		bindings = arrangeBindings()
-		hints = "arrows move · ⇧arrows resize · ⏎ keep · esc revert"
+		hints = "←↓↑→ move · ⇧←↓↑→ resize · ⏎ keep · esc revert"
 	}
 	if m.picking {
 		hints = "↑↓ move · ␣ show/hide · esc close"
