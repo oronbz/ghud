@@ -38,8 +38,15 @@ func (m Model) Theme() theme.Theme { return m.opts.Theme }
 
 // queryTerminal asks whether the terminal draws kitty graphics and how big
 // its cells are, then what queryColors asks.
+//
+// The queries go out before the first frame enters the alternate screen, and
+// a terminal without kitty graphics, such as Terminal.app, may print the
+// graphics query's text. Asked from inside the alternate screen, that text
+// is gone once the first frame clears it, instead of left on the shell's
+// screen at quit.
 func (m Model) queryTerminal() tea.Cmd {
-	return m.query(append([]tea.Cmd{tea.Raw(graphicsQuery + cellSizeQueries)}, m.colorQueries()...))
+	graphics := ansi.SetModeAltScreenSaveCursor + graphicsQuery + ansi.ResetModeAltScreenSaveCursor
+	return m.query(append([]tea.Cmd{tea.Raw(graphics + cellSizeQueries)}, m.colorQueries()...))
 }
 
 // queryColors asks for the terminal's colours, unless the theme is pinned.

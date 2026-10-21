@@ -321,10 +321,13 @@ func (c *Commands) Ran() [][]string {
 
 // EventKit fakes macOS calendars and reminders. Access defaults to AccessUnsupported.
 type EventKit struct {
-	mu       sync.Mutex
-	Access   map[ports.Entity]ports.Access
-	Granted  bool // what the user answers to a Request prompt
-	Requests []ports.Entity
+	mu      sync.Mutex
+	Access  map[ports.Entity]ports.Access
+	Granted bool // what the user answers to a Request prompt
+	// Unaskable is a terminal that can't show the prompt, so a Request
+	// leaves undetermined or unaskable access AccessUnaskable.
+	Unaskable bool
+	Requests  []ports.Entity
 	// Calendar is every event; Events returns the ones overlapping its range.
 	Calendar []ports.Event
 	// Open is every open reminder; Complete removes one and records its ID
@@ -345,8 +348,11 @@ func (e *EventKit) Request(_ context.Context, en ports.Entity) (ports.Access, er
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.Requests = append(e.Requests, en)
-	if e.Access[en] == ports.AccessUndetermined {
+	if a := e.Access[en]; a == ports.AccessUndetermined || a == ports.AccessUnaskable {
 		e.Access[en] = ports.AccessDenied
+		if e.Unaskable {
+			e.Access[en] = ports.AccessUnaskable
+		}
 		if e.Granted {
 			e.Access[en] = ports.AccessGranted
 		}

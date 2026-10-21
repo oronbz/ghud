@@ -26,16 +26,41 @@ import (
 // user for access when they haven't answered yet, so they only ever run from
 // Request or once Status says access is granted.
 type macEventKit struct {
-	mu  sync.Mutex
-	cal *calendar.Client
-	rem *reminders.Client
+	mu        sync.Mutex
+	cal       *calendar.Client
+	rem       *reminders.Client
+	unaskable [2]bool
 }
 
 func newEventKit() EventKit { return &macEventKit{} }
 
 func (k *macEventKit) Status(e Entity) Access {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	return k.status(e)
+}
+
+// status is Status with k.mu held.
+func (k *macEventKit) status(e Entity) Access {
+	client := e == Events && k.cal != nil || e == Reminders && k.rem != nil
 	// EKEntityTypeEvent is 0 and EKEntityTypeReminder 1, like Entity.
-	return accessOf(int(C.visor_ek_status(C.int(e))))
+	return accessWith(accessOf(int(C.visor_ek_status(C.int(e)))), client, k.unaskable[e])
+}
+
+// accessWith refines EventKit's status a: in a terminal it can stay
+// undetermined after a grant made moments ago in this process, which a
+// client go-eventkit made shows, or after a Request no prompt answered.
+// Any other status is EventKit's own, so access revoked meanwhile shows.
+func accessWith(a Access, client, unaskable bool) Access {
+	switch {
+	case a != AccessUndetermined:
+		return a
+	case client:
+		return AccessGranted
+	case unaskable:
+		return AccessUnaskable
+	}
+	return a
 }
 
 // accessOf maps an EKAuthorizationStatus; write-only access can't read, so
@@ -58,10 +83,18 @@ func (k *macEventKit) Request(_ context.Context, e Entity) (Access, error) {
 	case Reminders:
 		_, err = k.reminders()
 	}
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	k.unaskable[e] = false
+	a := k.status(e)
 	if err != nil && !errors.Is(err, calendar.ErrAccessDenied) && !errors.Is(err, reminders.ErrAccessDenied) {
-		return k.Status(e), err
+		return a, err
 	}
-	return k.Status(e), nil
+	if a == AccessUndetermined {
+		k.unaskable[e] = true
+		a = AccessUnaskable
+	}
+	return a, nil
 }
 
 func (k *macEventKit) Events(_ context.Context, from, to time.Time) ([]Event, error) {

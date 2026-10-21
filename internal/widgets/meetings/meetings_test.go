@@ -196,6 +196,28 @@ func TestDeniedAccessOpensTheCalendarsPrivacyPane(t *testing.T) {
 	}
 }
 
+// cmux lacks the calendars entitlement, so macOS refuses it without a prompt.
+func TestATerminalThatCantAskSaysSoInsteadOfOfferingAccess(t *testing.T) {
+	ek := &hosttest.EventKit{
+		Access:    map[ports.Entity]ports.Access{ports.Events: ports.AccessUndetermined},
+		Unaskable: true,
+	}
+	h := withMeetings(t, ek, "", 80, 14)
+	h.Press("1", "enter")
+	if _, _, ok := h.Find("This terminal can't ask for Calendar access; run visor in another"); !ok {
+		t.Errorf("a terminal that can't ask doesn't say so:\n%s", h.Screen())
+	}
+	if _, _, ok := h.Find("wasn't allowed"); ok {
+		t.Errorf("a terminal that can't ask is toasted as a denial:\n%s", h.Screen())
+	}
+
+	ek.Unaskable, ek.Granted = false, true
+	h.Press("enter")
+	if len(ek.Requests) != 2 {
+		t.Errorf("ask again requested %v, want a second request", ek.Requests)
+	}
+}
+
 func TestMeetingsWithoutEventKitIsNotAvailable(t *testing.T) {
 	h := withMeetings(t, &hosttest.EventKit{}, "", 60, 10)
 	if _, _, ok := h.Find("Not available on this platform"); !ok {

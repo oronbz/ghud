@@ -108,6 +108,10 @@ const (
 	AccessUndetermined
 	AccessDenied
 	AccessGranted
+	// AccessUnaskable is undetermined access the last Request in this
+	// process got no answer for, as when the terminal app lacks the
+	// entitlement and macOS refuses without a prompt.
+	AccessUnaskable
 )
 
 type Entity int

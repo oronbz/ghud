@@ -17,6 +17,7 @@ import (
 	"github.com/oronbz/visor/internal/cache"
 	"github.com/oronbz/visor/internal/hosttest"
 	"github.com/oronbz/visor/internal/paths"
+	"github.com/oronbz/visor/internal/ports"
 	"github.com/oronbz/visor/internal/theme"
 	"github.com/oronbz/visor/internal/widget"
 	"github.com/oronbz/visor/internal/widgets/meetings"
@@ -442,11 +443,32 @@ func TestAPushThatChangesNothingLeavesTheEntryAlone(t *testing.T) {
 }
 
 func TestPRsMeetingsAndRemindersAreCachedWidgets(t *testing.T) {
+	granted := map[ports.Entity]ports.Access{ports.Events: ports.AccessGranted, ports.Reminders: ports.AccessGranted}
 	for _, typ := range []widget.Type{prs.Type, meetings.Type, reminders.Type} {
 		t.Run(typ.Name, func(t *testing.T) {
 			h := hosttest.New(t, hosttest.Options{Width: 60, Height: 10, Types: []widget.Type{typ},
-				Config: "[[widget]]\ntype = \"" + typ.Name + "\"\n"})
+				Config:   "[[widget]]\ntype = \"" + typ.Name + "\"\n",
+				EventKit: &hosttest.EventKit{Access: granted}})
 			entryFile(t, h.Root)
+		})
+	}
+}
+
+// Access to calendars and reminders is granted per terminal app, so an
+// instance in another terminal, or the next one in this, checks for itself.
+func TestMeetingsAndRemindersLeaveTheirAccessSetupOutOfTheCache(t *testing.T) {
+	for _, typ := range []widget.Type{meetings.Type, reminders.Type} {
+		t.Run(typ.Name, func(t *testing.T) {
+			h := hosttest.New(t, hosttest.Options{Width: 60, Height: 10, Types: []widget.Type{typ},
+				Config:   "[[widget]]\ntype = \"" + typ.Name + "\"\n",
+				EventKit: &hosttest.EventKit{Access: map[ports.Entity]ports.Access{ports.Events: ports.AccessUndetermined, ports.Reminders: ports.AccessUndetermined}}})
+			if !strings.Contains(h.Screen(), "allow access") {
+				t.Fatalf("screen:\n%s\nwant the allow access setup", h.Screen())
+			}
+			files, _ := filepath.Glob(filepath.Join(paths.Under(h.Root).Cache, "widgets", "*.json"))
+			if len(files) != 0 {
+				t.Errorf("cache entries %v, want none", files)
+			}
 		})
 	}
 }

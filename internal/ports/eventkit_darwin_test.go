@@ -23,6 +23,24 @@ func TestEKAuthorizationStatusMapsToAccess(t *testing.T) {
 	}
 }
 
+func TestAnUndeterminedStatusIsRefinedByWhatThisProcessSaw(t *testing.T) {
+	for _, c := range []struct {
+		a                 Access
+		client, unaskable bool
+		want              Access
+	}{
+		{AccessUndetermined, false, false, AccessUndetermined},
+		{AccessUndetermined, true, false, AccessGranted},
+		{AccessUndetermined, false, true, AccessUnaskable},
+		{AccessDenied, true, false, AccessDenied}, // revoked after the grant
+		{AccessGranted, false, true, AccessGranted},
+	} {
+		if got := accessWith(c.a, c.client, c.unaskable); got != c.want {
+			t.Errorf("accessWith(%v, client %v, unaskable %v) = %v, want %v", c.a, c.client, c.unaskable, got, c.want)
+		}
+	}
+}
+
 func TestADueDayWithoutATimeIsDateOnly(t *testing.T) {
 	day := time.Date(2026, 10, 20, 0, 0, 0, 0, time.Local)
 	timed := time.Date(2026, 10, 20, 16, 30, 0, 0, time.Local)

@@ -401,6 +401,18 @@ func TestAWrappedPayloadDrawsItsImageAndScrollsItsLinesBesideIt(t *testing.T) {
 	}
 }
 
+// Terminal.app prints an APC's text, and the query goes out before the
+// first frame enters the alternate screen, so it would be left on the
+// shell's screen at quit.
+func TestTheGraphicsQueryIsAskedFromTheAlternateScreen(t *testing.T) {
+	h := hosttest.New(t, hosttest.Options{Width: 40, Height: 9})
+	h.Advance(time.Second)
+	want := ansi.SetModeAltScreenSaveCursor + "\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\" + ansi.ResetModeAltScreenSaveCursor
+	if !strings.Contains(h.Written(), want) {
+		t.Errorf("wrote %q, want the graphics query inside the alternate screen", h.Written())
+	}
+}
+
 func TestWithoutAGraphicsAnswerAnImageIsDrawnInHalfBlocks(t *testing.T) {
 	h, _ := withPicture(t, 40, 9, &widget.Image{Data: dataOf(pngOf(t, 8, 8, redPx))}, widget.Text(theme.Fg, "hello"))
 	h.Advance(time.Second)
