@@ -55,9 +55,10 @@ type Setting struct {
 	Why         string   `toml:"why"`
 	Choices     []string `toml:"choices"`
 	Required    bool     `toml:"required"`
+	Target      string   `toml:"target"`
 }
 
-var kinds = map[string]widget.Kind{"string": widget.String, "bool": widget.Bool, "int": widget.Int, "duration": widget.Duration}
+var kinds = map[string]widget.Kind{"string": widget.String, "bool": widget.Bool, "int": widget.Int, "duration": widget.Duration, "secret": widget.Secret}
 
 // reserved are the keys every [[widget]] block takes, so no setting may use them.
 var reserved = []string{"type", "id", "title", "refresh"}
@@ -144,9 +145,11 @@ func (w WidgetType) widgetType() (widget.Type, error) {
 		if slices.ContainsFunc(t.Settings, func(o widget.Setting) bool { return o.Name == s.Name }) {
 			return t, fmt.Errorf("setting.%d: `%s` is declared twice", i, s.Name)
 		}
-		ws := widget.Setting{Name: s.Name, Kind: kinds[s.Kind], Description: s.Description, Why: s.Why, Choices: s.Choices, Required: s.Required}
-		if ws.Default, err = ws.Check(s.Default); err != nil {
-			return t, fmt.Errorf("setting.%d: default %w", i, err)
+		ws := widget.Setting{Name: s.Name, Kind: kinds[s.Kind], Description: s.Description, Why: s.Why, Choices: s.Choices, Required: s.Required, Target: s.Target}
+		if ws.Kind != widget.Secret {
+			if ws.Default, err = ws.Check(s.Default); err != nil {
+				return t, fmt.Errorf("setting.%d: default %w", i, err)
+			}
 		}
 		t.Settings = append(t.Settings, ws)
 	}

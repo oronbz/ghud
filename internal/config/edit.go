@@ -322,7 +322,7 @@ func block(typ, id string, settings []widget.Setting) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "[[widget]]\ntype = %q\nid = %q\n", typ, id)
 	for _, s := range settings {
-		if s.Required {
+		if s.Required && s.Kind != widget.Secret {
 			fmt.Fprintf(&b, "%s = %s\n", s.Name, widget.TOMLValue(s.Default))
 		}
 	}

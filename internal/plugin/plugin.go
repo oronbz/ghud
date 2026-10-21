@@ -95,7 +95,7 @@ func (r *Registry) Discover(dirs []string, taken []string) ([]widget.Type, []str
 		}
 		names = append(names, m.Name)
 		rec, _ := ReadRecord(dir)
-		types = append(types, r.provide(dir, m, rec, &taken, func(typ string) {
+		types = append(types, r.provide(dir, Identity(dir, rec), m, rec, &taken, func(typ string) {
 			problems = append(problems, fmt.Sprintf("%s: Widget type `%s` is taken; it's left out", file, typ))
 		})...)
 	}
@@ -122,22 +122,23 @@ func (r *Registry) Bundled(ms []Manifest, taken []string) []widget.Type {
 	taken = slices.Clone(taken)
 	var types []widget.Type
 	for _, m := range ms {
-		types = append(types, r.provide("bundled:"+m.Name, m, Record{}, &taken, func(string) {})...)
+		key := "bundled:" + m.Name
+		types = append(types, r.provide(key, key, m, Record{}, &taken, func(string) {})...)
 	}
 	return types
 }
 
 // provide registers m's Plugin under key, restarting the one already there
 // when its manifest or record changed.
-func (r *Registry) provide(key string, m Manifest, rec Record, taken *[]string, isTaken func(typ string)) []widget.Type {
+func (r *Registry) provide(key, identity string, m Manifest, rec Record, taken *[]string, isTaken func(typ string)) []widget.Type {
 	p := r.plugins[key]
 	switch {
 	case p == nil || p.name != m.Name:
-		p = &Plugin{name: m.Name, m: m, record: rec, widgets: map[string]*pluginWidget{}}
+		p = &Plugin{name: m.Name, identity: identity, m: m, record: rec, widgets: map[string]*pluginWidget{}}
 		r.plugins[key] = p
 	case !reflect.DeepEqual(p.m, m) || p.record != rec:
 		// Widgets keep their Plugin across a reload, so an update restarts it in place.
-		p.restart(m, rec)
+		p.restart(identity, m, rec)
 		for _, wt := range m.Widgets {
 			r.restarted = append(r.restarted, wt.Type)
 		}
@@ -187,13 +188,15 @@ func (r *Registry) Close() {
 type Plugin struct {
 	name string
 
-	// m and record change only under mu, when the Plugin is restarted.
-	m      Manifest
-	record Record
+	// identity, m and record change only under mu, when the Plugin is restarted.
+	identity string
+	m        Manifest
+	record   Record
 
-	mu    sync.Mutex
-	clock ports.Clock
-	proc  *process
+	mu      sync.Mutex
+	clock   ports.Clock
+	keyring ports.Keyring
+	proc    *process
 	// fails counts crashes in a row; retry is when the process may start again.
 	fails   int
 	retry   time.Time
@@ -221,7 +224,7 @@ func (p *Plugin) widget(typ string, schema []widget.Setting, c widget.Config) *p
 	w := &pluginWidget{p: p, id: c.ID, typ: typ, schema: schema, settings: settingsJSON(c.Settings)}
 	p.mu.Lock()
 	if p.clock == nil {
-		p.clock = c.Ports.Clock
+		p.clock, p.keyring = c.Ports.Clock, c.Ports.Keyring
 	}
 	p.mu.Unlock()
 	p.wmu.Lock()
@@ -252,7 +255,8 @@ func (p *Plugin) connect(ctx context.Context, w *pluginWidget) (*process, error)
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if w.on != p.proc {
-		open := openParams{frameParams: frameOf(w.id, w.shown), Type: w.typ, Settings: w.settings}
+		settings := Secrets{p.keyring, p.identity}.withSecrets(w.settings, w.schema)
+		open := openParams{frameParams: frameOf(w.id, w.shown), Type: w.typ, Settings: settings}
 		if err := p.proc.conn.Notify("widget/open", open); err != nil {
 			return nil, p.callErr(err)
 		}
@@ -324,9 +328,9 @@ func (p *Plugin) versionErr(verb string, v int) error {
 
 // restart takes the Plugin as it now is on disk: the running process stops,
 // and the next call starts the new one, reopening each Widget on it.
-func (p *Plugin) restart(m Manifest, rec Record) {
+func (p *Plugin) restart(identity string, m Manifest, rec Record) {
 	p.mu.Lock()
-	p.m, p.record = m, rec
+	p.identity, p.m, p.record = identity, m, rec
 	proc := p.proc
 	p.proc, p.fails, p.retry = nil, 0, time.Time{}
 	p.mu.Unlock()
@@ -410,7 +414,28 @@ func (p *Plugin) notified(method string, params json.RawMessage) {
 		return
 	}
 	payload, err := u.read(p.m.Dir)
+	w.offerSecrets(payload)
 	w.deliver(widget.Push{Payload: payload, Err: p.withName(err)})
+}
+
+func (p *Plugin) secrets() Secrets {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return Secrets{p.keyring, p.identity}
+}
+
+// reopen sends every Widget of the Plugin widget/open again, so each gets
+// the secrets as now stored, and refreshes all but by, which its Action's
+// host refreshes.
+func (p *Plugin) reopen(by *pluginWidget) {
+	for _, w := range p.listed() {
+		w.mu.Lock()
+		w.on = nil
+		w.mu.Unlock()
+		if w != by {
+			go w.repush()
+		}
+	}
 }
 
 // withName puts the Plugin's name in front of errors visor found; ones the
@@ -541,10 +566,50 @@ func (w *pluginWidget) Refresh(ctx context.Context, _ time.Time) (widget.Payload
 	case p == nil:
 		return widget.Payload{}, w.p.withName(errors.New("answered widget/refresh with no payload"))
 	}
+	w.offerSecrets(p)
 	return *p, nil
 }
 
+// repush refreshes w unasked and pushes what it gets.
+func (w *pluginWidget) repush() {
+	p, err := w.Refresh(context.Background(), time.Time{})
+	if err != nil {
+		w.deliver(widget.Push{Err: err})
+		return
+	}
+	w.deliver(widget.Push{Payload: &p})
+}
+
+// offerSecrets adds the host's own Action for each of w's secret settings.
+func (w *pluginWidget) offerSecrets(p *widget.Payload) {
+	if p == nil {
+		return
+	}
+	for _, s := range w.schema {
+		if s.Kind == widget.Secret {
+			p.Actions = append(p.Actions, s.SetAction())
+		}
+	}
+}
+
+// setSecret keeps value as secret setting name, which never reaches the
+// Plugin as an Action, and reopens the Plugin's Widgets with it.
+func (w *pluginWidget) setSecret(name, value string) (widget.Result, error) {
+	i := slices.IndexFunc(w.schema, func(s widget.Setting) bool { return s.Kind == widget.Secret && s.Name == name })
+	if i < 0 {
+		return widget.Result{}, fmt.Errorf("Widget type `%s` has no secret setting `%s`", w.typ, name)
+	}
+	if err := w.p.secrets().store(w.schema[i], value); err != nil {
+		return widget.Result{}, err
+	}
+	w.p.reopen(w)
+	return widget.Result{Toast: "Saved the " + w.schema[i].Label() + " to the keyring"}, nil
+}
+
 func (w *pluginWidget) Invoke(ctx context.Context, inv widget.Invocation) (widget.Result, error) {
+	if name, ok := strings.CutPrefix(inv.Action, widget.SecretPrefix); ok {
+		return w.setSecret(name, inv.Text)
+	}
 	if _, ok := ctx.Deadline(); !ok {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, invokeTimeout)

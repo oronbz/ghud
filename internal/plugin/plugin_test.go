@@ -88,7 +88,7 @@ func TestAPluginWidgetTypeComesFromItsManifest(t *testing.T) {
 	if !typ.Fetches || !typ.OptIn {
 		t.Errorf("Fetches, OptIn = %t, %t; want a cached, opt-in type", typ.Fetches, typ.OptIn)
 	}
-	if len(typ.Settings) != 2 || typ.Settings[0].Name != "greeting" || typ.Settings[0].Default != "hello" || typ.Settings[1].Choices[1] != "lines" {
+	if len(typ.Settings) != 3 || typ.Settings[0].Name != "greeting" || typ.Settings[0].Default != "hello" || typ.Settings[1].Choices[1] != "lines" || typ.Settings[2].Kind != widget.Secret {
 		t.Errorf("settings = %+v", typ.Settings)
 	}
 }

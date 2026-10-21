@@ -78,7 +78,7 @@
       }
     },
     "openParams": {
-      "description": "host → Plugin, notification: a Widget of one of the Plugin's types was placed, with its settings (defaults filled in, durations as strings such as \"5m\") and how it's shown. Sent again, after a new initialize, when the process restarts.",
+      "description": "host → Plugin, notification: a Widget of one of the Plugin's types was placed, with its settings (defaults filled in, durations as strings such as \"5m\") and how it's shown. A secret setting is in settings only once the user has set it. Sent again, after a new initialize, when the process restarts, and for every Widget of the Plugin, with no widget/close first, when the user sets a secret.",
       "allOf": [{ "$ref": "#/$defs/frameParams" }],
       "required": ["type", "settings"],
       "properties": {
@@ -305,7 +305,7 @@
         "toast": { "description": "Shown in the footer.", "type": "string" },
         "edit": { "description": "A file the host opens in $EDITOR; the Widget refreshes when the editor exits.", "type": "string" },
         "then": { "description": "The Action the host runs next, asking for its input first, so one Action leads into another (a setup flow's prompts). With edit, it runs once the editor exits cleanly, with text = the edit file.", "$ref": "#/$defs/action" },
-        "settings": { "description": "Settings the host writes into the Widget's [[widget]] block in config.toml (the old block commented out), checked against the manifest's settings; the Widget is then rebuilt with them.", "type": "object" }
+        "settings": { "description": "Settings the host writes into the Widget's [[widget]] block in config.toml (the old block commented out), checked against the manifest's settings; the Widget is then rebuilt with them. A secret setting can't be set this way.", "type": "object" }
       }
     }
   }

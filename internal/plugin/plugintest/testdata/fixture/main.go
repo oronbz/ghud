@@ -183,6 +183,10 @@ func (f *fixture) refresh(id json.RawMessage, w *widget) {
 	n := f.refreshes[w.ID]
 	f.mu.Unlock()
 	greeting, _ := w.Settings["greeting"].(string)
+	signedIn := ""
+	if _, ok := w.Settings["token"].(string); ok {
+		signedIn = " (signed in)"
+	}
 	switch mode, _ := w.Settings["mode"].(string); mode {
 	case "lines":
 		f.reply(id, map[string]any{"payload": map[string]any{"lines": []any{
@@ -216,7 +220,7 @@ func (f *fixture) refresh(id json.RawMessage, w *widget) {
 			return map[string]any{
 				"id": id,
 				"fields": []any{
-					[]any{map[string]any{"text": greeting + " " + name, "token": "fg"}},
+					[]any{map[string]any{"text": greeting + " " + name + signedIn, "token": "fg"}},
 					[]any{map[string]any{"text": fmt.Sprintf("refresh %d", n), "token": "dim"}},
 				},
 				"actions": []any{
@@ -247,6 +251,8 @@ func (f *fixture) invoke(id json.RawMessage, w *widget, action, item, text, choi
 		f.reply(id, map[string]any{"settings": map[string]any{"volume": 11}})
 	case "bad-mode":
 		f.reply(id, map[string]any{"settings": map[string]any{"mode": "loud"}})
+	case "token-setting":
+		f.reply(id, map[string]any{"settings": map[string]any{"token": "from the Plugin"}})
 	case "chain":
 		f.reply(id, map[string]any{"then": map[string]any{"id": "note", "label": "note", "input": "text", "prompt": "Note"}})
 	case "note":

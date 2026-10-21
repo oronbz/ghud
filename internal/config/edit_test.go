@@ -194,6 +194,21 @@ func TestAnEditThatDoesNotReadBackAsIntendedIsRefusedAndTheFileIsUnchanged(t *te
 	}
 }
 
+func TestAddWidgetLeavesARequiredSecretOutOfTheBlock(t *testing.T) {
+	src := "theme = \"visor\"\n"
+	e, path := editorFor(t, src)
+	e.Types = []widget.Type{{Name: "builds", Title: "Builds", OptIn: true, Settings: []widget.Setting{
+		{Name: "apps", Kind: widget.String, Default: "", Required: true},
+		{Name: "token", Kind: widget.Secret, Required: true},
+	}}}
+	if _, err := e.AddWidget("builds"); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := read(t, path), src+"\n[[widget]]\ntype = \"builds\"\nid = \"builds\"\napps = \"\"\n"; got != want {
+		t.Errorf("config after Add Widget:\n%s\nwant:\n%s", got, want)
+	}
+}
+
 func TestAddWidgetIsRefusedWhenTheResultWouldNotParse(t *testing.T) {
 	src := "widget = [{ type = \"clock\" }]\n"
 	e, path := editorFor(t, src)

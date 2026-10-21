@@ -18,8 +18,18 @@ func Reference(types []widget.Type, loc Locale) string {
 	var b strings.Builder
 	prose := func(format string, args ...any) { fmt.Fprintf(&b, "# "+format+"\n", args...) }
 	option := func(format string, args ...any) { fmt.Fprintf(&b, "#"+format+"\n", args...) }
+	wrapped := func(text string) {
+		for _, line := range strings.Split(ansi.Wordwrap(text, 78, ""), "\n") {
+			prose("%s", line)
+		}
+	}
 	setting := func(s widget.Setting) {
 		prose("%s", s.Description)
+		if s.Kind == widget.Secret {
+			wrapped(fmt.Sprintf("A secret, kept in the keyring, never in this file: set it with the Widget's %q Action.", s.SetAction().Label))
+			prose("Why: %s", s.Why)
+			return
+		}
 		if len(s.Choices) > 0 {
 			prose("One of: %s.", strings.Join(s.Choices, ", "))
 		}
@@ -76,9 +86,7 @@ func Reference(types []widget.Type, loc Locale) string {
 		prose("blocks in this file.")
 	} else {
 		prose("blocks in this file, or the default Widgets when there are none:")
-		for _, line := range strings.Split(ansi.Wordwrap(strings.Join(defaults, ", ")+".", 78, ""), "\n") {
-			prose("%s", line)
-		}
+		wrapped(strings.Join(defaults, ", ") + ".")
 	}
 	prose("Every block takes:")
 	prose(`  type     the Widget type (required)`)

@@ -30,6 +30,22 @@ func TestTheReferenceWrapsTheDefaultWidgetsWithinTheLine(t *testing.T) {
 	}
 }
 
+func TestTheReferenceSaysHowToSetASecretAndGivesNoLineForIt(t *testing.T) {
+	typ := widget.Type{Name: "builds", Title: "Builds", Settings: []widget.Setting{
+		{Name: "limit", Kind: widget.Int, Default: int64(10), Description: "The most builds listed"},
+		{Name: "api_token", Kind: widget.Secret, Description: "Your personal access token", Why: "To sign in"},
+	}}
+	ref := config.Reference([]widget.Type{typ}, config.Locale{})
+	_, block, _ := strings.Cut(ref, "#limit = 10\n")
+	want := "# Your personal access token\n" +
+		"# A secret, kept in the keyring, never in this file: set it with the Widget's\n" +
+		"# \"Set api token\" Action.\n" +
+		"# Why: To sign in\n"
+	if block != want {
+		t.Errorf("after limit the reference reads:\n%s\nwant:\n%s", block, want)
+	}
+}
+
 func TestTheReferenceWithNoDefaultWidgetsHasNoEmptyProseLine(t *testing.T) {
 	ref := config.Reference([]widget.Type{{Name: "script", Title: "Script", OptIn: true}}, config.Locale{})
 	for _, l := range strings.Split(ref, "\n") {

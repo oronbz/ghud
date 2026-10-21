@@ -6,6 +6,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -40,13 +41,17 @@ func writeManifest(t *testing.T, dir, src string) string {
 
 func TestBadManifestsAreProblemsNamingTheFile(t *testing.T) {
 	for name, c := range map[string]struct{ src, want string }{
-		"no command":       {strings.Replace(goodManifest, `command = "./demo"`, "", 1), "missing property 'command'"},
-		"unknown key":      {goodManifest + "colour = \"red\"\n", "additional properties 'colour' not allowed"},
-		"bad refresh":      {goodManifest + "refresh = \"soon\"\n", "widget.0.refresh"},
-		"default mismatch": {goodManifest + "[[widget.setting]]\nname = \"n\"\nkind = \"int\"\ndefault = \"three\"\ndescription = \"a number\"\n", "widget.0.setting.0.default"},
-		"reserved setting": {goodManifest + "[[widget.setting]]\nname = \"title\"\nkind = \"string\"\ndefault = \"\"\ndescription = \"a title\"\n", "`title` is a key every Widget takes"},
-		"bad choice":       {goodManifest + "[[widget.setting]]\nname = \"u\"\nkind = \"string\"\ndefault = \"kelvin\"\nchoices = [\"c\", \"f\"]\ndescription = \"units\"\n", "default must be one of"},
-		"not toml":         {"name = ", "line 1"},
+		"no command":        {strings.Replace(goodManifest, `command = "./demo"`, "", 1), "missing property 'command'"},
+		"unknown key":       {goodManifest + "colour = \"red\"\n", "additional properties 'colour' not allowed"},
+		"bad refresh":       {goodManifest + "refresh = \"soon\"\n", "widget.0.refresh"},
+		"default mismatch":  {goodManifest + "[[widget.setting]]\nname = \"n\"\nkind = \"int\"\ndefault = \"three\"\ndescription = \"a number\"\n", "widget.0.setting.0.default"},
+		"reserved setting":  {goodManifest + "[[widget.setting]]\nname = \"title\"\nkind = \"string\"\ndefault = \"\"\ndescription = \"a title\"\n", "`title` is a key every Widget takes"},
+		"bad choice":        {goodManifest + "[[widget.setting]]\nname = \"u\"\nkind = \"string\"\ndefault = \"kelvin\"\nchoices = [\"c\", \"f\"]\ndescription = \"units\"\n", "default must be one of"},
+		"not toml":          {"name = ", "line 1"},
+		"secret default":    {goodManifest + "[[widget.setting]]\nname = \"token\"\nkind = \"secret\"\ndefault = \"\"\ndescription = \"a token\"\n", "widget.0.setting.0: `default` isn't allowed with this `kind`"},
+		"secret choices":    {goodManifest + "[[widget.setting]]\nname = \"token\"\nkind = \"secret\"\nchoices = [\"a\"]\ndescription = \"a token\"\n", "widget.0.setting.0: `choices` isn't allowed with this `kind`"},
+		"target off secret": {goodManifest + "[[widget.setting]]\nname = \"u\"\nkind = \"string\"\ndefault = \"\"\ntarget = \"https://example.com\"\ndescription = \"units\"\n", "widget.0.setting.0: `target` isn't allowed with this `kind`"},
+		"no default":        {goodManifest + "[[widget.setting]]\nname = \"u\"\nkind = \"string\"\ndescription = \"units\"\n", "widget.0.setting.0: missing property 'default'"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := writeManifest(t, t.TempDir(), c.src)
@@ -181,5 +186,24 @@ func TestTheFixtureManifestMatchesTheSchema(t *testing.T) {
 		if len(plugin.Schema(name)) == 0 {
 			t.Errorf("schema %s isn't embedded", name)
 		}
+	}
+}
+
+func TestASecretSettingTakesATargetAndNoDefault(t *testing.T) {
+	dir := writeManifest(t, t.TempDir(), goodManifest+`[[widget.setting]]
+name = "api_token"
+kind = "secret"
+description = "Your API token"
+why = "Without it the Widget can't sign in"
+required = true
+target = "https://example.com/tokens/new"
+`)
+	types, problems := plugin.NewRegistry().Discover([]string{dir}, nil)
+	if len(problems) != 0 || len(types) != 1 {
+		t.Fatalf("types %v, problems %q", types, problems)
+	}
+	want := widget.Setting{Name: "api_token", Kind: widget.Secret, Description: "Your API token", Why: "Without it the Widget can't sign in", Required: true, Target: "https://example.com/tokens/new"}
+	if got := types[0].Settings; len(got) != 1 || !reflect.DeepEqual(got[0], want) {
+		t.Errorf("settings = %+v, want %+v", got, want)
 	}
 }

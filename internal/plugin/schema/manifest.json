@@ -74,7 +74,7 @@
     },
     "setting": {
       "type": "object",
-      "required": ["name", "kind", "default", "description"],
+      "required": ["name", "kind", "description"],
       "additionalProperties": false,
       "properties": {
         "name": {
@@ -82,14 +82,16 @@
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$"
         },
-        "kind": { "enum": ["string", "bool", "int", "duration"] },
+        "kind": { "description": "A secret is a credential visor keeps in the OS keyring, never in config.toml. It takes no default or choices; visor adds a \"Set <name>\" Widget Action, id `secret:<name>`, that asks for it in a masked prompt, and sends it in widget/open's settings, absent until set. One value per Plugin and name, shared by its Widgets.", "enum": ["string", "bool", "int", "duration", "secret"] },
         "default": { "type": ["string", "boolean", "integer"] },
         "description": { "type": "string", "minLength": 1 },
         "why": { "description": "When you'd change it; the config reference prints it.", "type": "string" },
         "choices": { "description": "The only values a string setting accepts.", "type": "array", "items": { "type": "string" }, "minItems": 1 },
-        "required": { "description": "Add Widget writes the setting, at its default, into the block it appends.", "type": "boolean" }
+        "required": { "description": "Add Widget writes the setting, at its default, into the block it appends.", "type": "boolean" },
+        "target": { "description": "A secret's page where a user creates the credential, opened as the prompt appears.", "type": "string", "minLength": 1 }
       },
       "allOf": [
+        { "if": { "properties": { "kind": { "const": "secret" } } }, "then": { "properties": { "default": false, "choices": false } }, "else": { "required": ["default"], "properties": { "target": false } } },
         { "if": { "properties": { "kind": { "const": "string" } } }, "then": { "properties": { "default": { "type": "string" } } } },
         { "if": { "properties": { "kind": { "const": "bool" } } }, "then": { "properties": { "default": { "type": "boolean" } } } },
         { "if": { "properties": { "kind": { "const": "int" } } }, "then": { "properties": { "default": { "type": "integer" } } } },

@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
+	"github.com/santhosh-tekuri/jsonschema/v6/kind"
 	"golang.org/x/text/language"
 	printer "golang.org/x/text/message"
 )
@@ -99,7 +100,12 @@ func firstViolation(ve *jsonschema.ValidationError) string {
 		ve = ve.Causes[0]
 	}
 	msg := ve.ErrorKind.LocalizedString(printer.NewPrinter(language.English))
-	if at := path.Join(ve.InstanceLocation...); at != "" && at != "." {
+	loc := ve.InstanceLocation
+	// A key the schema forbids with false names only itself; say so from its parent.
+	if _, ok := ve.ErrorKind.(*kind.FalseSchema); ok && len(loc) > 0 {
+		loc, msg = loc[:len(loc)-1], fmt.Sprintf("`%s` isn't allowed with this `kind`", loc[len(loc)-1])
+	}
+	if at := path.Join(loc...); at != "" && at != "." {
 		return strings.ReplaceAll(at, "/", ".") + ": " + msg
 	}
 	return msg

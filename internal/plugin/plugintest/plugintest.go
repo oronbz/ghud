@@ -132,6 +132,12 @@ kind = "string"
 default = %q
 description = "What refreshes return"
 choices = ["items", "lines", "raw-colour", "malformed", "unknown-field", "setup", "error", "two-images", "bad-side", "image-file"]
+
+[[widget.setting]]
+name = "token"
+kind = "secret"
+description = "Your Fixture token"
+target = "https://example.com/tokens/new"
 %s`, o.Name, o.Protocol, quoted(o.Command), o.Name, o.Refresh, o.Default, o.Mode, build.String())
 }
 

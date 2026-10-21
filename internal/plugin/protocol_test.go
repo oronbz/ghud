@@ -83,6 +83,9 @@ func TestSettingsAPluginSendsAreCheckedAgainstItsSchema(t *testing.T) {
 	if _, err := invoke(t, w, widget.Invocation{Action: "bad-mode"}); err == nil || !strings.HasPrefix(err.Error(), "Plugin `fixture` sent setting `mode` that must be one of") {
 		t.Errorf("bad value: %v", err)
 	}
+	if _, err := invoke(t, w, widget.Invocation{Action: "token-setting"}); err == nil || !strings.HasPrefix(err.Error(), "Plugin `fixture` sent setting `token` that is a secret") {
+		t.Errorf("secret: %v", err)
+	}
 }
 
 func TestARawColourIsRejectedNamingIt(t *testing.T) {

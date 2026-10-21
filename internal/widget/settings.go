@@ -20,7 +20,13 @@ const (
 	Duration
 	// Tables is an array of tables, each checked against Fields.
 	Tables
+	// Secret is a credential kept in the keyring, never in config.toml: it's
+	// set through its SetAction and has no Default.
+	Secret
 )
+
+// SecretPrefix starts the id of every Secret setting's SetAction.
+const SecretPrefix = "secret:"
 
 // Setting is one key a Widget type accepts in its [[widget]] block.
 type Setting struct {
@@ -39,6 +45,16 @@ type Setting struct {
 	// their defaults, into the block it appends, and a table missing a
 	// required field is rejected.
 	Required bool
+	// Target, on a Secret, is the page where a user creates the credential.
+	Target string
+}
+
+// Label is how prose names the setting, such as "api token" for api_token.
+func (s Setting) Label() string { return strings.ReplaceAll(s.Name, "_", " ") }
+
+// SetAction is the Action that asks for a Secret setting in a masked prompt.
+func (s Setting) SetAction() Action {
+	return Action{ID: SecretPrefix + s.Name, Label: "Set " + s.Label(), Input: SecretInput, Prompt: s.Description, Target: s.Target}
 }
 
 // Check converts a decoded TOML value to the setting's Go type, or says why it doesn't fit.
@@ -74,6 +90,8 @@ func (s Setting) Check(v any) (any, error) {
 		return d, nil
 	case Tables:
 		return s.checkTables(v)
+	case Secret:
+		return nil, fmt.Errorf("is a secret, kept in the keyring: set it with the Widget's %q Action", s.SetAction().Label)
 	}
 	return nil, fmt.Errorf("has unknown kind %d", s.Kind)
 }
@@ -180,7 +198,9 @@ func (s Settings) Tables(name string) []Settings      { v, _ := s[name].([]Setti
 func Defaults(schema []Setting) Settings {
 	s := make(Settings, len(schema))
 	for _, st := range schema {
-		s[st.Name] = st.Default
+		if st.Kind != Secret {
+			s[st.Name] = st.Default
+		}
 	}
 	return s
 }
