@@ -7,7 +7,6 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
-	"github.com/charmbracelet/x/ansi"
 
 	"github.com/oronbz/visor/internal/theme"
 )
@@ -68,7 +67,7 @@ func (m Model) footer() string {
 	case m.configProblem != "":
 		toast = th.Fg(theme.Warn).Render(m.configProblem) + "  "
 	}
-	return ansi.Truncate(badge+" "+toast+th.Fg(hintTok).Render(hints), m.w, "…")
+	return m.protoFooter(badge + " " + toast + th.Fg(hintTok).Render(hints))
 }
 
 func modifierHints(name string, bindings []key.Binding, uses func(key string) bool) string {

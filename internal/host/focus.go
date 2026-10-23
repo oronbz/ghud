@@ -85,6 +85,9 @@ func (m Model) key(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	// Any other key means the modifier is no longer held alone, and a lost
 	// release can't leave the footer stuck.
 	m.heldModifier = 0
+	if msg.String() == "f9" {
+		return m.protoCycle()
+	}
 	var close closekey.Outcome
 	switch m.closing, close = m.closing.Press(msg, m.opts.Ports.Clock.Now()); close {
 	case closekey.Close:
