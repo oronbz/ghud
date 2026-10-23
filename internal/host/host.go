@@ -379,6 +379,9 @@ func (m Model) View() tea.View {
 	if m.overlay != nil {
 		layers = append(layers, m.overlayLayer())
 	}
+	if l := m.protoPopupLayer(); l != nil {
+		layers = append(layers, l)
+	}
 	canvas := lipgloss.NewCanvas(m.w, m.h)
 	lipgloss.NewCompositor(layers...).Draw(canvas, image.Rect(0, 0, m.w, m.h))
 	m.tint(canvas, s.Tint)
